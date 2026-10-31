@@ -46,8 +46,8 @@ linters:
         - G505
   exclusions:
     rules:
-      # forbidigo guards the library only; the tools may print.
-      - path: ^tools/
+      # forbidigo guards the library only; the tools and the examples may print.
+      - path: ^(tools|examples)/
         linters:
           - forbidigo
       # G115 (integer conversion overflow): the protocol is a fixed-width binary

@@ -1,5 +1,14 @@
 # escp: a Go client for TP-Link Easy Smart switches
 
+<p>
+  <a href="https://github.com/davidlukac/escp-go/actions/workflows/test.yml"><img alt="Tests" src="https://github.com/davidlukac/escp-go/actions/workflows/test.yml/badge.svg?branch=main"></a>
+  <a href="https://pkg.go.dev/github.com/davidlukac/escp-go"><img alt="Go Reference" src="https://pkg.go.dev/badge/github.com/davidlukac/escp-go.svg"></a>
+  <a href="https://github.com/davidlukac/escp-go/tags"><img alt="Version" src="https://img.shields.io/github/v/tag/davidlukac/escp-go?sort=semver&label=version&color=7c3aed"></a>
+  <a href="go.mod"><img alt="Go version" src="https://img.shields.io/github/go-mod/go-version/davidlukac/escp-go?logo=go&logoColor=white&color=00ADD8"></a>
+  <a href="CONTRIBUTING.md#2-tests"><img alt="Test coverage" src="https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fdavidlukac%2Fescp-go%2Fbadges%2Fcoverage.json"></a>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
+</p>
+
 `escp` talks the switches' native UDP management protocol (ESCP), as spoken by the vendor's configuration utility. It reads and writes the settings of a TL-SG108E v6, finds switches on the network, validates every value before anything is sent, and ships the safety gates and a fake switch that a front end needs to use it responsibly. It is the library behind the [Terraform provider](https://github.com/davidlukac/terraform-provider-tplinkeasysmart) for these switches, and is written to be reused by a command line client and by other programs.
 
 **Status: version 0.** The API may change in any minor version until 1.0; [CHANGELOG.md](CHANGELOG.md) lists every change (see also the stability section of the package documentation). Which hardware and firmware it was verified on is in the [compatibility table](#compatibility); the wire format is in [PROTOCOL.md](PROTOCOL.md).
@@ -17,6 +26,21 @@
 | `internal/udp` | sharing the reply port between sockets | no |
 
 The file layout inside `escp` (one file per setting) is described in the package overview, `go doc .`.
+
+## Install
+
+```sh
+go get github.com/davidlukac/escp-go
+```
+
+```go
+import "github.com/davidlukac/escp-go"       // package escp
+import "github.com/davidlukac/escp-go/safety" // write gates and the compatibility table
+```
+
+Go 1.26 or later. The module has one dependency, `golang.org/x/sys` (to share the reply port). It is tested on Linux, macOS and Windows against a fake switch; FreeBSD builds. On a system without a port-sharing option only one client per host works at a time. Pin an exact version while the module is 0.x (see the stability note above).
+
+Read-only runnable example, which lists the switches on the network (and the ports of one when `ESCP_HOST`, `ESCP_USERNAME` and `ESCP_PASSWORD` are set): [`examples/discover`](examples/discover/main.go).
 
 ## Quick start
 
@@ -170,6 +194,10 @@ client, err := escp.Dial(escp.Config{ /* ... */ Logger: logger.With("request_id"
 ## Security
 
 ESCP has no real secrecy: the password travels in every write, protected only by RC4 with a key exchanged under a 64-bit RSA key that anyone who can capture the traffic can break. Use it on a network you trust, never log a `Config`, and do not reuse the switch password elsewhere.
+
+## Disclaimer
+
+This is an independent project. It is not affiliated with, endorsed by or supported by TP-Link; the protocol was worked out from the vendor's configuration utility, earlier open-source clients and observation of the switches. TP-Link, Easy Smart and the model names are trademarks of their owners. Use it at your own risk (see the license, and "Writing safely").
 
 ## See also
 
