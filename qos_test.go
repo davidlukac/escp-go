@@ -13,7 +13,7 @@ import (
 func TestSetPortPrioritiesStopsWhenTheCurrentStateCannotBeRead(t *testing.T) {
 	f := escptest.Start(t)
 	c := dialFast(t, f, "secret")
-	f.Configure(func(f *escptest.Switch) {
+	f.Configure(func(f *escptest.Faults) {
 		f.GetFn = func([]wire.TLVType) ([]escptest.Setting, int32, bool) { return nil, 0, true }
 	})
 	if err := c.SetPortPriorities(context.Background(), map[PortID]Priority{3: 2}); !errors.Is(err, ErrNoReply) {

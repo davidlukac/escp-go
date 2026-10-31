@@ -26,7 +26,7 @@ var (
 // report "session key exchange: no reply" although the switch had moved.
 func TestSetIPConfigSucceedsWhenTheReplyIsLostButTheSwitchMoved(t *testing.T) {
 	f := escptest.Start(t)
-	f.Configure(func(f *escptest.Switch) { f.OnSystemSet = escptest.SystemSetLeaves })
+	f.Configure(func(f *escptest.Faults) { f.OnSystemSet = escptest.SystemSetLeaves })
 	c := dialFake(t, f, "secret")
 	if err := c.SetIPConfig(context.Background(), lostReplyWanted); err != nil {
 		t.Fatalf("the switch has the new settings, so the call must succeed: %v", err)
@@ -46,7 +46,7 @@ func TestSetIPConfigSucceedsWhenTheReplyIsLostButTheSwitchMoved(t *testing.T) {
 // A write that was never applied is not a move: the error says so, and the client stays put.
 func TestSetIPConfigReportsAWriteThatWasNotApplied(t *testing.T) {
 	f := escptest.Start(t)
-	f.Configure(func(f *escptest.Switch) { f.DropSets = true })
+	f.Configure(func(f *escptest.Faults) { f.DropSets = true })
 	c := dialFast(t, f, "secret")
 	err := c.SetIPConfig(context.Background(), lostReplyWanted)
 	if !errors.Is(err, ErrNoReply) {
@@ -61,7 +61,7 @@ func TestSetIPConfigReportsAWriteThatWasNotApplied(t *testing.T) {
 	if n := f.WriteCount(); n != 0 {
 		t.Fatalf("nothing was applied, got %d writes", n)
 	}
-	if f.SetsDropped() == 0 {
+	if f.DroppedSets() == 0 {
 		t.Fatal("the write never reached the switch, so this test did not exercise a lost write")
 	}
 	if !c.dest.IP.Equal(net.IP(lostReplyBefore.IP.AsSlice())) || c.alsoFrom != nil {
@@ -73,7 +73,7 @@ func TestSetIPConfigReportsAWriteThatWasNotApplied(t *testing.T) {
 // looking at both addresses.
 func TestSetIPConfigReportsAMoveThatCannotBeConfirmed(t *testing.T) {
 	f := escptest.Start(t)
-	f.Configure(func(f *escptest.Switch) { f.OnSystemSet = escptest.SystemSetVanishes })
+	f.Configure(func(f *escptest.Faults) { f.OnSystemSet = escptest.SystemSetVanishes })
 	c := dialFast(t, f, "secret")
 	err := c.SetIPConfig(context.Background(), lostReplyWanted)
 	if !errors.Is(err, ErrMoveUnconfirmed) {
@@ -94,7 +94,7 @@ func TestSetIPConfigReportsAMoveThatCannotBeConfirmed(t *testing.T) {
 var otherDevice = MAC{0xaa, 0xbb, 0xcc, 0, 0, 1}
 
 func TestClassifyLostReply(t *testing.T) {
-	mac := MAC(escptest.DefaultMAC)
+	mac := MAC(escptest.DefaultMAC())
 	info := func(mac MAC, cfg IPConfig) Info {
 		return Info{MAC: mac, IP: cfg.IP, Netmask: cfg.Netmask, Gateway: cfg.Gateway}
 	}
@@ -165,7 +165,7 @@ func TestSetIPConfigSettlesWhenTheCallIsCancelledAfterTheWrite(t *testing.T) {
 	f := escptest.Start(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	f.Configure(func(f *escptest.Switch) {
+	f.Configure(func(f *escptest.Faults) {
 		f.OnSystemSet = escptest.SystemSetLeaves
 		f.AfterSystemSet = cancel // the switch has applied the write; the caller gives up
 	})
@@ -185,11 +185,11 @@ func TestSetIPConfigSettlesWhenTheCallIsCancelledAfterTheWrite(t *testing.T) {
 // Cancelled while the switch still shows the old settings: that proves nothing yet, and the error says so.
 func TestSetIPConfigDoesNotClaimTheWriteWasNotAppliedWhenCancelled(t *testing.T) {
 	f := escptest.Start(t)
-	f.Configure(func(f *escptest.Switch) { f.DropSets = true })
+	f.Configure(func(f *escptest.Faults) { f.DropSets = true })
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 5 * time.Second,
-		SwitchPort: f.Port(), BroadcastAddr: escptest.Loopback,
+		SwitchPort: f.Port(), BroadcastAddr: escptest.Loopback(),
 		// the gate lets the write go, then the caller gives up before it is sent
 		WriteGate: func(context.Context, InfoReader, Operation) error { cancel(); return nil }})
 	c.allowLoopback = true
@@ -209,7 +209,7 @@ func TestSetIPConfigDoesNotClaimTheWriteWasNotAppliedWhenCancelled(t *testing.T)
 func TestSetIPConfigDoesNotProbeAfterARefusal(t *testing.T) {
 	t.Run("the switch refuses", func(t *testing.T) {
 		f := escptest.Start(t)
-		f.Configure(func(f *escptest.Switch) { f.RejectSetsFrom = 1 })
+		f.Configure(func(f *escptest.Faults) { f.RejectSetsFrom = 1 })
 		c := dialFake(t, f, "secret")
 		err := c.SetIPConfig(context.Background(), lostReplyWanted)
 		var refused *RejectedError
@@ -223,7 +223,7 @@ func TestSetIPConfigDoesNotProbeAfterARefusal(t *testing.T) {
 	t.Run("the gate refuses", func(t *testing.T) {
 		f := escptest.Start(t)
 		c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 300 * time.Millisecond,
-			SwitchPort: f.Port(), BroadcastAddr: escptest.Loopback,
+			SwitchPort: f.Port(), BroadcastAddr: escptest.Loopback(),
 			WriteGate: func(context.Context, InfoReader, Operation) error { return errGateRefused }})
 		c.allowLoopback = true
 		t.Cleanup(func() { c.Close() })
@@ -337,7 +337,7 @@ func TestSetIPConfigValidatesBeforeTheNetwork(t *testing.T) {
 
 func TestSetIPConfigRefusesUnusableCurrentConfiguration(t *testing.T) {
 	f := escptest.Start(t)
-	f.Configure(func(f *escptest.Switch) {
+	f.Configure(func(f *escptest.Faults) {
 		f.DiscoverReply = []escptest.Setting{{Type: wire.TLVModel, Value: []byte("TL-SG108E\x00")}, {Type: wire.TLVMAC, Value: []byte{0x00, 0x00, 0x5e, 0x00, 0x53, 0x02}}}
 	})
 	c := dialFake(t, f, "secret")
@@ -403,7 +403,7 @@ func TestAcceptsRepliesFromTheNewAddressWhileMoving(t *testing.T) {
 
 func TestSetIPConfigWaitsUntilTheSwitchAnswersAtTheNewAddress(t *testing.T) {
 	f := escptest.Start(t)
-	f.Configure(func(f *escptest.Switch) { f.StaleAfterSet = 2 }) // two probes still see the old address
+	f.Configure(func(f *escptest.Faults) { f.StaleAfterSet = 2 }) // two probes still see the old address
 	c := dialFake(t, f, "secret")
 	start := time.Now()
 	if err := c.SetIPConfig(context.Background(), cfgOf("127.0.0.1", "255.255.0.0", "127.0.0.2")); err != nil {

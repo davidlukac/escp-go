@@ -77,7 +77,7 @@ func TestBandwidthPartialFailureIsReportedAndNotHidden(t *testing.T) {
 	t.Run("ingress rejected: nothing applied", func(t *testing.T) {
 		f := escptest.Start(t)
 		f.EnableModel(nil) // the pre-write read of the other limiter needs a switch that answers
-		f.Configure(func(f *escptest.Switch) { f.RejectSetsFrom = 1 })
+		f.Configure(func(f *escptest.Faults) { f.RejectSetsFrom = 1 })
 		c := dialFast(t, f, "secret")
 		if err := c.SetBandwidth(context.Background(), PortBandwidth{Port: 7, IngressKbps: 64, EgressKbps: 64}); !errors.Is(err, ErrRejected) {
 			t.Fatalf("got %v", err)
@@ -89,7 +89,7 @@ func TestBandwidthPartialFailureIsReportedAndNotHidden(t *testing.T) {
 	t.Run("egress rejected: ingress was applied and the error says so", func(t *testing.T) {
 		f := escptest.Start(t)
 		f.EnableModel(nil) // the pre-write read of the other limiter needs a switch that answers
-		f.Configure(func(f *escptest.Switch) { f.RejectSetsFrom = 2 })
+		f.Configure(func(f *escptest.Faults) { f.RejectSetsFrom = 2 })
 		c := dialFast(t, f, "secret")
 		if err := c.SetBandwidth(context.Background(), PortBandwidth{Port: 7, IngressKbps: 64, EgressKbps: 64}); !errors.Is(err, ErrRejected) {
 			t.Fatalf("got %v", err)

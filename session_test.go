@@ -58,7 +58,7 @@ func TestSessionSetupFailures(t *testing.T) {
 	})
 	t.Run("switch does not answer the key exchange", func(t *testing.T) {
 		f := escptest.Start(t)
-		f.Configure(func(f *escptest.Switch) { f.RSADrop = true })
+		f.Configure(func(f *escptest.Faults) { f.RSADrop = true })
 		c := dialFast(t, f, "secret")
 		err := c.SetLED(context.Background(), true)
 		if !errors.Is(err, ErrNoReply) || !strings.Contains(err.Error(), "session key exchange") {
@@ -70,7 +70,7 @@ func TestSessionSetupFailures(t *testing.T) {
 	})
 	t.Run("switch refuses the key", func(t *testing.T) {
 		f := escptest.Start(t)
-		f.Configure(func(f *escptest.Switch) { f.RSACode = 77 })
+		f.Configure(func(f *escptest.Faults) { f.RSACode = 77 })
 		c := dialFast(t, f, "secret")
 		err := c.SetLED(context.Background(), true)
 		if err == nil || !strings.Contains(err.Error(), "unexpected error code 77") {
@@ -80,7 +80,7 @@ func TestSessionSetupFailures(t *testing.T) {
 			t.Fatal("a refused key must not leave a session behind")
 		}
 		// the next call tries again and succeeds once the switch cooperates
-		f.Configure(func(f *escptest.Switch) { f.RSACode = 0 })
+		f.Configure(func(f *escptest.Faults) { f.RSACode = 0 })
 		if err := c.SetLED(context.Background(), true); err != nil {
 			t.Fatalf("retry after the switch recovered: %v", err)
 		}
@@ -111,7 +111,7 @@ func TestAuthenticatedRequestFailures(t *testing.T) {
 		if _, err := c.LED(context.Background()); err != nil { // establish the session first
 			t.Fatal(err)
 		}
-		f.Configure(func(f *escptest.Switch) { f.DropSets = true })
+		f.Configure(func(f *escptest.Faults) { f.DropSets = true })
 		if err := c.SetLED(context.Background(), false); !errors.Is(err, ErrNoReply) {
 			t.Fatalf("want ErrNoReply, got %v", err)
 		}
@@ -122,7 +122,7 @@ func TestAuthenticatedRequestFailures(t *testing.T) {
 	t.Run("GET gets no answer", func(t *testing.T) {
 		f := escptest.Start(t)
 		c := dialFast(t, f, "secret")
-		f.Configure(func(f *escptest.Switch) {
+		f.Configure(func(f *escptest.Faults) {
 			f.GetFn = func([]wire.TLVType) ([]escptest.Setting, int32, bool) { return nil, 0, true }
 		})
 		if _, err := c.LED(context.Background()); !errors.Is(err, ErrNoReply) {
@@ -132,7 +132,7 @@ func TestAuthenticatedRequestFailures(t *testing.T) {
 	t.Run("LED reply without the LED TLV", func(t *testing.T) {
 		f := escptest.Start(t)
 		c := dialFast(t, f, "secret")
-		f.Configure(func(f *escptest.Switch) {
+		f.Configure(func(f *escptest.Faults) {
 			f.GetFn = func([]wire.TLVType) ([]escptest.Setting, int32, bool) {
 				return []escptest.Setting{{Type: 99, Value: []byte{1}}}, 0, false
 			}
@@ -144,7 +144,7 @@ func TestAuthenticatedRequestFailures(t *testing.T) {
 	t.Run("LED reply with the wrong length", func(t *testing.T) {
 		f := escptest.Start(t)
 		c := dialFast(t, f, "secret")
-		f.Configure(func(f *escptest.Switch) {
+		f.Configure(func(f *escptest.Faults) {
 			f.GetFn = func([]wire.TLVType) ([]escptest.Setting, int32, bool) {
 				return []escptest.Setting{{Type: wire.TLVLED, Value: []byte{1, 1}}}, 0, false
 			}

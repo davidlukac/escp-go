@@ -17,7 +17,7 @@ import (
 // another one, finds the switch by its MAC when it has no usable address, and Locate looks one up.
 
 var (
-	wantMAC  = MAC(escptest.DefaultMAC)
+	wantMAC  = MAC(escptest.DefaultMAC())
 	otherMAC = MAC{0x02, 0, 0, 0, 0, 0x77}
 )
 
@@ -26,7 +26,7 @@ var (
 func dialMAC(t *testing.T, f *escptest.Switch, host string, mac MAC, locator func(MAC) (Info, error)) (*Client, *int) {
 	t.Helper()
 	c := newBoundClient(t, Config{Host: host, MAC: mac, Username: "admin", Password: "secret", Timeout: 150 * time.Millisecond, Retries: NoRetries,
-		SwitchPort: f.Port(), BroadcastAddr: escptest.Loopback})
+		SwitchPort: f.Port(), BroadcastAddr: escptest.Loopback()})
 	c.allowLoopback = true
 	calls := new(int)
 	c.locator = func(_ context.Context, m MAC) (Info, error) {
@@ -108,7 +108,7 @@ func TestADeviceWithAnotherMACIsNeverWrittenTo(t *testing.T) {
 	if n := f.WriteCount(); n != 0 {
 		t.Fatalf("nothing may be written to the wrong device, got %d writes", n)
 	}
-	if got := wrong.Error(); got == "" || wrong.IP != escptest.Loopback || !strings.Contains(got, " at 127.0.0.1") {
+	if got := wrong.Error(); got == "" || wrong.IP != escptest.Loopback() || !strings.Contains(got, " at 127.0.0.1") {
 		t.Fatalf("the error names both addresses and where the device is: %q %v", got, wrong.IP)
 	}
 }
@@ -116,7 +116,7 @@ func TestADeviceWithAnotherMACIsNeverWrittenTo(t *testing.T) {
 func TestTheMACInTheDiscoveryReplyIsCheckedToo(t *testing.T) {
 	// the header carries the wanted MAC but the description names another device
 	f := escptest.Start(t)
-	f.Configure(func(f *escptest.Switch) {
+	f.Configure(func(f *escptest.Faults) {
 		f.DiscoverReply = []escptest.Setting{{Type: wire.TLVMAC, Value: otherMAC[:]}, {Type: wire.TLVIP, Value: []byte{127, 0, 0, 1}}}
 	})
 	c, _ := dialMAC(t, f, "127.0.0.1", wantMAC, nil)

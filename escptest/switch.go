@@ -18,8 +18,9 @@ const (
 	Password = "secret"
 )
 
-// DefaultFirmware is the firmware version the switch reports until SetFirmware changes it:
-// the build the client was verified against first.
+// DefaultFirmware is the firmware version the switch reports until SetFirmware changes it: the
+// older of the two builds the client is verified on. The rules of EnableModel were measured on
+// 20250710, and on 20230218 where a comment says so.
 const DefaultFirmware = "1.0.0 Build 20230218 Rel.50633"
 
 // BackupMode selects how the switch misbehaves when the configuration is read.
@@ -93,10 +94,14 @@ type Switch struct {
 	bundles          map[wire.TLVType][]wire.TLVType // requests that the switch answers with more types than asked for
 	rows             map[wire.TLVType][][]byte       // tables with one TLV per row (ports, priorities, rates), keyed by the first byte of a row
 
-	// Programmable misbehaviour. Set these inside Configure, which holds the lock.
+	faults Faults // see Configure
+}
 
+// Faults is the programmable misbehaviour of a Switch. Set it inside Configure, which holds the
+// switch's lock; the zero value is a well-behaved switch.
+type Faults struct {
 	// GetFn scripts the reply to GETs: the settings, the error code, and whether to stay silent.
-	GetFn func(types []wire.TLVType) (settings []Setting, code int32, drop bool)
+	GetFn func(types []TLVType) (settings []Setting, code int32, drop bool)
 	// RSADrop makes the switch ignore the key exchange.
 	RSADrop bool
 	// RSACode answers the key exchange with this code instead of the success code.
@@ -125,7 +130,7 @@ var (
 
 // Loopback is the address a fake switch listens on: a Config that aims at the fake gives it as
 // BroadcastAddr, so discovery stays on this machine.
-var Loopback = netip.MustParseAddr("127.0.0.1")
+func Loopback() netip.Addr { return netip.MustParseAddr("127.0.0.1") }
 
 // FreeUDPPort returns a currently unused UDP port so tests never bind the
 // protocol's real client port 29809. The port is not handed out again by this package: the kernel
@@ -186,7 +191,7 @@ func Start(t testing.TB) *Switch {
 	if err != nil {
 		t.Fatal(err)
 	}
-	lease := DefaultLease
+	lease := DefaultLease()
 	f := &Switch{conn: conn, user: Username, password: Password, led: true, firmware: DefaultFirmware, lease: &lease}
 	t.Cleanup(func() { _ = conn.Close() }) // best effort at the end of the test
 	go f.serve()
@@ -199,10 +204,10 @@ func (f *Switch) Port() int { return f.conn.LocalAddr().(*net.UDPAddr).Port }
 // DropPacket makes the switch ignore the nth packet it receives (1-based), to test retries.
 func (f *Switch) DropPacket(n int) { f.mu.Lock(); f.dropNth = n; f.mu.Unlock() }
 
-// SetsDropped is the number of authenticated SET datagrams the switch ignored under DropSets. A
+// DroppedSets is the number of authenticated SET datagrams the switch ignored under DropSets. A
 // test of "the write was lost" uses it to show that the write really was sent, so that it does
 // not pass for the wrong reason (WriteCount is zero for a write that never left the client too).
-func (f *Switch) SetsDropped() int { f.mu.Lock(); defer f.mu.Unlock(); return f.droppedSets }
+func (f *Switch) DroppedSets() int { f.mu.Lock(); defer f.mu.Unlock(); return f.droppedSets }
 
 // Received is the number of datagrams that have reached the switch so far, whatever it did with
 // them. A discovery probe is two datagrams (see DropFirst). Datagrams on one socket arrive in
@@ -238,8 +243,8 @@ func (f *Switch) Mute() { f.mu.Lock(); f.mute = true; f.mu.Unlock() }
 // ClearSession forgets the session key, as after a reboot: the client must exchange keys again.
 func (f *Switch) ClearSession() { f.mu.Lock(); f.session = nil; f.mu.Unlock() }
 
-// Configure changes the fake's behaviour under its lock.
-func (f *Switch) Configure(fn func(f *Switch)) { f.mu.Lock(); fn(f); f.mu.Unlock() }
+// Configure changes the fake's programmable misbehaviour (Faults) under its lock.
+func (f *Switch) Configure(fn func(*Faults)) { f.mu.Lock(); fn(&f.faults); f.mu.Unlock() }
 
 // SetBackupMode chooses how the configuration backup misbehaves (BackupOK, the default, is a
 // well-behaved switch); it applies to the next backup read.
@@ -258,16 +263,17 @@ func (f *Switch) SetBackupScript(modes ...BackupMode) {
 	f.mu.Unlock()
 }
 
-// TLVType is the type number of a Setting. It is the client's own type, named here so that a test
-// outside the escp module can write the func literals the fake takes (GetFn) without importing
-// the client's internals; a plain number is a valid TLVType wherever a constant is expected.
+// TLVType is the type number of a Setting: the numbers of PROTOCOL.md. It is named here so that a
+// test outside the escp module can write the func literals the fake takes (Faults.GetFn) without
+// importing the client's internals; a plain number is a valid TLVType wherever a constant is
+// expected.
 type TLVType = wire.TLVType
 
 // Setting is one entry of a request or a reply: a protocol type number (the numbers of
-// internal/escp/PROTOCOL.md) and its value. It is the fake's own type, so a test outside the
+// PROTOCOL.md) and its value. It is the fake's own type, so a test outside the
 // escp module needs nothing from the client's internals to read or script traffic.
 type Setting struct {
-	Type  wire.TLVType
+	Type  TLVType
 	Value []byte
 }
 
@@ -435,7 +441,7 @@ func (f *Switch) send(to *net.UDPAddr, op byte, req wire.Header, errCode int32, 
 // vendor utility never sends one and a client that did would be sending the password in the clear.
 func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV, viaSession bool) {
 	f.mu.Lock()
-	gone := f.departed && (h.Op != wire.OpDiscovery || f.OnSystemSet == SystemSetVanishes)
+	gone := f.departed && (h.Op != wire.OpDiscovery || f.faults.OnSystemSet == SystemSetVanishes)
 	f.mu.Unlock()
 	if gone {
 		return
@@ -451,7 +457,7 @@ func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV, viaSe
 	switch h.Op {
 	case wire.OpDiscovery:
 		f.mu.Lock()
-		override := f.DiscoverReply
+		override := f.faults.DiscoverReply
 		f.mu.Unlock()
 		if override != nil {
 			f.send(from, wire.OpReply, h, 0, toTLVs(override), false)
@@ -545,7 +551,7 @@ func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV, viaSe
 		}
 		if v, ok := find(wire.TLVRSAKey); ok {
 			f.mu.Lock()
-			drop, code := f.RSADrop, f.RSACode
+			drop, code := f.faults.RSADrop, f.faults.RSACode
 			if key := DecryptSessionKey(v); !drop && key != nil {
 				f.session = key
 			}
@@ -560,7 +566,7 @@ func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV, viaSe
 			return
 		}
 		f.mu.Lock()
-		DropSets, rejectFrom, RejectCode, accepted := f.DropSets, f.RejectSetsFrom, f.RejectCode, len(f.history)
+		DropSets, rejectFrom, RejectCode, accepted := f.faults.DropSets, f.faults.RejectSetsFrom, f.faults.RejectCode, len(f.history)
 		if DropSets {
 			f.droppedSets++
 		}
@@ -611,7 +617,7 @@ func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV, viaSe
 			f.mu.Lock()
 			f.hostname = wire.CString(v)
 			f.setIP, _ = find(wire.TLVIP)
-			f.staleDiscoveries = f.StaleAfterSet
+			f.staleDiscoveries = f.faults.StaleAfterSet
 			if v, ok := find(wire.TLVDHCP); ok && len(v) == 1 {
 				if v[0] != 0 && !f.dhcp {
 					f.acquiring = f.lease.Silence // asking for a lease: nothing answers for a moment
@@ -633,9 +639,9 @@ func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV, viaSe
 		}
 		if _, isSystem := find(wire.TLVHostname); isSystem {
 			f.mu.Lock()
-			leaves := f.OnSystemSet != SystemSetReplies
+			leaves := f.faults.OnSystemSet != SystemSetReplies
 			f.departed = f.departed || leaves
-			applied := f.AfterSystemSet
+			applied := f.faults.AfterSystemSet
 			f.mu.Unlock()
 			if applied != nil {
 				applied()
@@ -647,7 +653,7 @@ func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV, viaSe
 		f.send(from, wire.OpSetReply, h, 0, nil, true)
 	case wire.OpGet:
 		f.mu.Lock()
-		GetFn := f.GetFn
+		GetFn := f.faults.GetFn
 		f.mu.Unlock()
 		if GetFn != nil {
 			types := make([]wire.TLVType, len(tlvs))
@@ -711,7 +717,7 @@ func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV, viaSe
 // A write of the port table (TLV 4096) keeps what only the switch decides, the LAG and the
 // actual speed, and derives the actual flow control from the configured one. Call EnableState
 // first.
-func (f *Switch) EnableRows(typ wire.TLVType, rows ...[]byte) {
+func (f *Switch) EnableRows(typ TLVType, rows ...[]byte) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.rows[typ] = nil
@@ -815,7 +821,9 @@ type Lease struct {
 
 // DefaultLease is the lease EnableModel gives the switch: the fake's own address with another mask
 // and gateway.
-var DefaultLease = Lease{IP: [4]byte{127, 0, 0, 1}, Mask: [4]byte{255, 255, 0, 0}, Gateway: [4]byte{127, 0, 0, 2}}
+func DefaultLease() Lease {
+	return Lease{IP: [4]byte{127, 0, 0, 1}, Mask: [4]byte{255, 255, 0, 0}, Gateway: [4]byte{127, 0, 0, 2}}
+}
 
 // SetLease changes the lease the fake gives. The fake models the DHCP flag the way switch 03
 // behaves (measured, firmware 20250710) from the start, with DefaultLease: it starts static; a system SET that carries the flag on makes it lease l (discovery
@@ -824,12 +832,12 @@ var DefaultLease = Lease{IP: [4]byte{127, 0, 0, 1}, Mask: [4]byte{255, 255, 0, 0
 func (f *Switch) SetLease(l Lease) { f.mu.Lock(); f.lease = &l; f.mu.Unlock() }
 
 // DefaultMAC is the address the fake reports unless SetMAC says otherwise (the documentation range, RFC 7042).
-var DefaultMAC = [6]byte{0x00, 0x00, 0x5e, 0x00, 0x53, 0x02}
+func DefaultMAC() [6]byte { return [6]byte{0x00, 0x00, 0x5e, 0x00, 0x53, 0x02} }
 
 // macAddr is the MAC the switch reports; callers hold f.mu.
 func (f *Switch) macAddr() [6]byte {
 	if f.mac == ([6]byte{}) {
-		return DefaultMAC
+		return DefaultMAC()
 	}
 	return f.mac
 }

@@ -66,7 +66,7 @@ func TestNoRetriesSendsEachRequestOnce(t *testing.T) {
 			f := escptest.Start(t)
 			f.DropFirst(2) // both datagrams of the first attempt are lost
 			c := newBoundClient(t, Config{Host: "127.0.0.1", Timeout: 80 * time.Millisecond, Retries: tc.retries,
-				SwitchPort: f.Port(), BroadcastAddr: escptest.Loopback})
+				SwitchPort: f.Port(), BroadcastAddr: escptest.Loopback()})
 			c.allowLoopback = true
 			t.Cleanup(func() { c.Close() })
 			_, err := c.Info(context.Background())
@@ -114,7 +114,7 @@ func TestBusyHostPortIsReportedOnFirstUse(t *testing.T) {
 	defer busy.Close()
 	port := busy.LocalAddr().(*net.UDPAddr).Port
 	c, err := Dial(Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 80 * time.Millisecond,
-		SwitchPort: f.Port(), HostPort: port, BroadcastAddr: escptest.Loopback})
+		SwitchPort: f.Port(), HostPort: port, BroadcastAddr: escptest.Loopback()})
 	if err != nil {
 		t.Fatal(err)
 	}
