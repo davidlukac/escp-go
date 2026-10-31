@@ -1,0 +1,534 @@
+  escptest package - github.com/davidlukac/escp-go/escptest - Go Packages
+
+#
+
+## Details
+
+          Valid go.mod file
+
+          The Go module system was introduced in Go 1.11 and is the official dependency management
+          solution for Go.
+
+          Redistributable license
+
+          Redistributable licenses place minimal restrictions on how software can be used,
+          modified, and redistributed.
+
+          Tagged version
+
+Modules with tagged versions give importers more predictable builds.
+
+          Stable version
+
+When a project reaches major version v1 it is considered stable.
+
+      Learn more about best practices
+
+## Repository
+
+          /files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/
+
+##
+
+      Documentation
+      ¶
+
+### Overview ¶
+
+Stability
+
+Package escptest is an in-process TL-SG108E that speaks ESCP over loopback UDP, for
+tests of code that uses the escp client. It imports only the wire codec, never the
+client, so the escp package's own tests can use it without an import cycle.
+
+It models firmware 20230218 closely enough for the client's reads and writes (key
+exchange, credentials on every SET, fragmented configuration backup) and offers
+switches for the failures the client must survive: silence, dropped packets, rejected
+writes and stale discovery replies. It is a test double: it keeps almost no settings
+state, and it is no substitute for the real switch.
+
+A test starts one switch and aims a client at it:
+
+sw := escptest.Start(t)
+c, err := escp.Dial(escp.Config{
+	Host: "127.0.0.1", Username: escptest.Username, Password: escptest.Password,
+	SwitchPort: sw.Port(), HostPort: escptest.FreeUDPPort(t), BroadcastAddr: escptest.Loopback,
+})
+
+Faults are set inside Configure, which holds the switch's lock; what the switch
+received is read back through WriteCount, AllSets, LastSet and the other accessors, in
+the package's own Setting type.
+
+Stability ¶
+
+Version 0, like the escp package: names may change without notice. The switch must
+never be used outside tests.
+
+### Index ¶
+
+Constants
+
+Variables
+
+        func ConfigFile() []byte
+
+        func DecryptSessionKey(v []byte) []byte
+
+        func FreeUDPPort(t testing.TB) int
+
+          type BackupMode
+
+          type Lease
+
+          type LinkSpeed
+
+          type Setting
+
+          type Switch
+
+            func Start(t testing.TB) *Switch
+
+            func (f *Switch) AllSets() [][]Setting
+
+            func (f *Switch) ClearSession()
+
+            func (f *Switch) Configure(fn func(f *Switch))
+
+            func (f *Switch) DropFirst(n int)
+
+            func (f *Switch) DropPacket(n int)
+
+            func (f *Switch) EnableModel(links map[int]LinkSpeed)
+
+            func (f *Switch) EnableRows(typ wire.TLVType, rows ...[]byte)
+
+            func (f *Switch) EnableState(seed ...Setting)
+
+            func (f *Switch) Hostname() string
+
+            func (f *Switch) IPSent() []byte
+
+            func (f *Switch) LED() bool
+
+            func (f *Switch) LastSet() []Setting
+
+            func (f *Switch) Mute()
+
+            func (f *Switch) Port() int
+
+            func (f *Switch) PortSetting(port int) []byte
+
+            func (f *Switch) Received() int
+
+            func (f *Switch) SetBackupMode(mode BackupMode)
+
+            func (f *Switch) SetBackupScript(modes ...BackupMode)
+
+            func (f *Switch) SetFirmware(version string)
+
+            func (f *Switch) SetLease(l Lease)
+
+            func (f *Switch) SetMAC(mac [6]byte)
+
+            func (f *Switch) SetsDropped() int
+
+            func (f *Switch) WriteCount() int
+
+          type SystemSetBehaviour
+
+          type TLVType
+
+### Constants ¶
+
+      View Source
+
+const (
+	Username = "admin"
+	Password = "secret"
+)
+
+Credentials the switch accepts.
+
+      View Source
+
+const DefaultFirmware = "1.0.0 Build 20230218 Rel.50633"
+
+DefaultFirmware is the firmware version the switch reports until SetFirmware changes it:
+the build the client was verified against first.
+
+### Variables ¶
+
+      View Source
+
+var DefaultLease = Lease{IP: [4]byte{127, 0, 0, 1}, Mask: [4]byte{255, 255, 0, 0}, Gateway: [4]byte{127, 0, 0, 2}}
+
+DefaultLease is the lease EnableModel gives the switch: the fake's own address with another mask
+and gateway.
+
+      View Source
+
+var DefaultMAC = [6]byte{0x00, 0x00, 0x5e, 0x00, 0x53, 0x02}
+
+DefaultMAC is the address the fake reports unless SetMAC says otherwise (the documentation range, RFC 7042).
+
+      View Source
+
+var Loopback = netip.MustParseAddr("127.0.0.1")
+
+Loopback is the address a fake switch listens on: a Config that aims at the fake gives it as
+BroadcastAddr, so discovery stays on this machine.
+
+### Functions ¶
+
+      func ConfigFile ¶
+
+func ConfigFile() []byte
+
+ConfigFile is a 2258-byte stand-in for the switch's configuration file.
+
+      func DecryptSessionKey ¶
+
+func DecryptSessionKey(v []byte) []byte
+
+DecryptSessionKey recovers the session key from the RSA key-exchange value a client sent.
+It returns nil for a value too short to be one.
+
+      func FreeUDPPort ¶
+
+func FreeUDPPort(t testing.TB) int
+
+FreeUDPPort returns a currently unused UDP port so tests never bind the
+protocol's real client port 29809. The port is not handed out again by this package: the kernel
+may give a port it has just released to the very next bind (measured: about 1 in 10,000 when
+several goroutines bind at once), which would let a fake switch take the port a test was told to
+use and fail the client's bind with "address already in use". A port taken by something outside
+this package can still collide; a client that binds late cannot rule that out.
+
+### Types ¶
+
+      type BackupMode ¶
+
+type BackupMode string
+
+BackupMode selects how the switch misbehaves when the configuration is read.
+
+const (
+	BackupOK         BackupMode = ""
+	BackupBadMagic   BackupMode = "badmagic"   // the file does not start with the configuration magic
+	BackupShort      BackupMode = "short"      // only the magic, no body
+	BackupDropSecond BackupMode = "dropsecond" // the last fragment never arrives
+	BackupDropFirst  BackupMode = "dropfirst"  // only the last fragment arrives
+	BackupSilent     BackupMode = "silent"     // no reply at all
+	BackupFlood      BackupMode = "flood"      // fragments that never end
+	BackupCorrupt    BackupMode = "corrupt"    // every packet arrives, but one byte of the file is wrong
+	BackupDuplicate  BackupMode = "duplicate"  // the first fragment arrives twice
+)
+
+The ways a configuration backup can go wrong; BackupOK is the well-behaved switch.
+
+      type Lease ¶
+
+type Lease struct {
+	IP, Mask, Gateway [4]byte
+	// Silence is how many packets the switch swallows after DHCP is switched on, while it asks for
+	// the lease (a real switch was silent for about two seconds).
+	Silence int
+}
+
+Lease is what the modelled switch gets from its DHCP server when its DHCP flag is switched on.
+The fake can only answer from 127.0.0.1, so a lease that differs from the static address in
+the mask or the gateway is what tells the two apart, as in SetIPConfig's tests.
+
+      type LinkSpeed ¶
+
+type LinkSpeed byte
+
+LinkSpeed is the actual speed code of a port that has a link, as the switch reports it
+(0 means no link).
+
+const (
+	Link100Full  LinkSpeed = 5
+	Link1000Full LinkSpeed = 6
+)
+
+Link speeds a model port can have.
+
+      type Setting ¶
+
+type Setting struct {
+	Type  wire.TLVType
+	Value []byte
+}
+
+Setting is one entry of a request or a reply: a protocol type number (the numbers of
+internal/escp/PROTOCOL.md) and its value. It is the fake's own type, so a test outside the
+escp module needs nothing from the client's internals to read or script traffic.
+
+      type Switch ¶
+
+type Switch struct {
+
+	// GetFn scripts the reply to GETs: the settings, the error code, and whether to stay silent.
+	GetFn func(types []wire.TLVType) (settings []Setting, code int32, drop bool)
+	// RSADrop makes the switch ignore the key exchange.
+	RSADrop bool
+	// RSACode answers the key exchange with this code instead of the success code.
+	RSACode int32
+	// DropSets makes the switch ignore authenticated SETs.
+	DropSets bool
+	// DiscoverReply replaces the discovery reply; nil keeps the default TL-SG108E reply.
+	DiscoverReply []Setting
+	// RejectSetsFrom rejects the nth and every later authenticated SET (1-based); 0 accepts all.
+	RejectSetsFrom int
+	// RejectCode is the reply code of a rejected SET; 0 means 9.
+	RejectCode int32
+	// StaleAfterSet makes the next n discoveries after a system SET still report the old address.
+	StaleAfterSet int
+	// OnSystemSet is what the switch does after applying a system SET; the default replies.
+	OnSystemSet SystemSetBehaviour
+	// AfterSystemSet, when set, is called (without the lock) once a system SET has been applied
+	// and before the switch replies or leaves, so a test can act at exactly that moment.
+	AfterSystemSet func()
+	// contains filtered or unexported fields
+}
+
+Switch is the fake. Create it with Start; change its behaviour with Configure.
+It can decrypt the session key because the switch's 64-bit RSA modulus factors
+trivially (p=3443843009, q=3765816959), which is also why ESCP offers no real secrecy.
+
+      func Start ¶
+
+func Start(t testing.TB) *Switch
+
+Start runs a fake switch on a free loopback UDP port until the test ends. The LED starts on.
+
+      func (*Switch) AllSets ¶
+
+func (f *Switch) AllSets() [][]Setting
+
+AllSets returns the settings of every accepted SET in order, credentials removed.
+
+      func (*Switch) ClearSession ¶
+
+func (f *Switch) ClearSession()
+
+ClearSession forgets the session key, as after a reboot: the client must exchange keys again.
+
+      func (*Switch) Configure ¶
+
+func (f *Switch) Configure(fn func(f *Switch))
+
+Configure changes the fake's behaviour under its lock.
+
+      func (*Switch) DropFirst ¶
+
+func (f *Switch) DropFirst(n int)
+
+DropFirst makes the switch ignore the first n packets it receives. A discovery probe is sent
+twice per attempt (to the switch and to the broadcast address, which a test points at the same
+fake), so DropFirst(2) loses exactly one whole attempt of a probe.
+
+      func (*Switch) DropPacket ¶
+
+func (f *Switch) DropPacket(n int)
+
+DropPacket makes the switch ignore the nth packet it receives (1-based), to test retries.
+
+      func (*Switch) EnableModel ¶
+
+func (f *Switch) EnableModel(links map[int]LinkSpeed)
+
+EnableModel turns the switch into a model of a freshly reset TL-SG108E: eight ports on auto
+speed (those in links have a link at that speed), no LAG, every port in the default
+port-based VLAN, IGMP and loop prevention on, QoS in DSCP mode, no limits and no mirror. It
+also enforces the cross-setting rules the real switch enforces, with the refusal codes
+measured on firmware 20250710: LAG members must agree on speed, flow control and admin
+state and may not be mirrored, limited or in another VLAN; port-based VLAN membership is
+exclusive, and a port left in none returns to VLAN 1.
+
+      func (*Switch) EnableRows ¶
+
+func (f *Switch) EnableRows(typ wire.TLVType, rows ...[]byte)
+
+EnableRows declares a table the switch keeps one TLV per row of (the ports, the QoS priorities,
+the bandwidth and storm rates) and seeds it. A row is identified by its first byte, the port
+number: a SET replaces the row with the same first byte, a GET returns every row in order.
+A write of the port table (TLV 4096) keeps what only the switch decides, the LAG and the
+actual speed, and derives the actual flow control from the configured one. Call EnableState
+first.
+
+      func (*Switch) EnableState ¶
+
+func (f *Switch) EnableState(seed ...Setting)
+
+EnableState makes the switch remember settings: every accepted SET stores the value of each
+TLV it carries, and a GET for a type it holds (seeded here or written since) answers with that
+value, so a write can be read back the way the real switch does it. Types it holds nothing
+for fall through to the scripted replies (LED, QoS, port count), and GetFn still wins. The
+seeds are the settings the switch starts with.
+
+      func (*Switch) Hostname ¶
+
+func (f *Switch) Hostname() string
+
+Hostname is the device description set by the last hostname SET ("" before any).
+
+      func (*Switch) IPSent ¶
+
+func (f *Switch) IPSent() []byte
+
+IPSent is the IP address carried by the last hostname SET (nil before any).
+
+      func (*Switch) LED ¶
+
+func (f *Switch) LED() bool
+
+LED is the LED state the switch holds: the last LED SET it accepted.
+
+      func (*Switch) LastSet ¶
+
+func (f *Switch) LastSet() []Setting
+
+LastSet returns the settings of the most recent accepted SET, credentials removed.
+
+      func (*Switch) Mute ¶
+
+func (f *Switch) Mute()
+
+Mute makes the switch ignore everything from now on, as if it had gone away.
+
+      func (*Switch) Port ¶
+
+func (f *Switch) Port() int
+
+Port is the UDP port the switch listens on; give it to the client as its switch port.
+
+      func (*Switch) PortSetting ¶
+
+func (f *Switch) PortSetting(port int) []byte
+
+PortSetting is the 7-byte value of the last port SET addressed to port (nil before any).
+
+      func (*Switch) Received ¶
+
+func (f *Switch) Received() int
+
+Received is the number of datagrams that have reached the switch so far, whatever it did with
+them. A discovery probe is two datagrams (see DropFirst). Datagrams on one socket arrive in
+order, so a count read after a reply to a later request includes every earlier one.
+
+      func (*Switch) SetBackupMode ¶
+
+func (f *Switch) SetBackupMode(mode BackupMode)
+
+SetBackupMode chooses how the configuration backup misbehaves (BackupOK, the default, is a
+well-behaved switch); it applies to the next backup read.
+
+      func (*Switch) SetBackupScript ¶
+
+func (f *Switch) SetBackupScript(modes ...BackupMode)
+
+SetBackupScript makes the next backup requests misbehave one mode each, in order (BackupOK for a
+request that goes well); after the last one the mode of SetBackupMode applies again. It plays a
+loss that happens once, as on a real network.
+
+      func (*Switch) SetFirmware ¶
+
+func (f *Switch) SetFirmware(version string)
+
+SetFirmware changes the firmware version the switch reports in discovery replies.
+
+      func (*Switch) SetLease ¶
+
+func (f *Switch) SetLease(l Lease)
+
+SetLease changes the lease the fake gives. The fake models the DHCP flag the way switch 03
+behaves (measured, firmware 20250710) from the start, with DefaultLease: it starts static; a system SET that carries the flag on makes it lease l (discovery
+reports the lease and DHCP on; a static address in later SETs is ignored); a SET with the flag
+off gives it the static address of that SET.
+
+      func (*Switch) SetMAC ¶
+
+func (f *Switch) SetMAC(mac [6]byte)
+
+SetMAC changes the MAC address the switch reports in its headers and in discovery replies,
+to make several fakes distinguishable or to play a different device at the same address.
+
+      func (*Switch) SetsDropped ¶
+
+func (f *Switch) SetsDropped() int
+
+SetsDropped is the number of authenticated SET datagrams the switch ignored under DropSets. A
+test of "the write was lost" uses it to show that the write really was sent, so that it does
+not pass for the wrong reason (WriteCount is zero for a write that never left the client too).
+
+      func (*Switch) WriteCount ¶
+
+func (f *Switch) WriteCount() int
+
+WriteCount is the number of SETs the switch accepted: the answer to "was anything written?".
+
+      type SystemSetBehaviour ¶
+
+type SystemSetBehaviour int
+
+SystemSetBehaviour is what the switch does after it applies a system SET, the write that
+carries the hostname and the management address.
+
+const (
+	// SystemSetReplies answers the SET and carries on.
+	SystemSetReplies SystemSetBehaviour = iota
+	// SystemSetLeaves applies the SET without answering it, then ignores every packet except
+	// discovery, which it still answers: a switch that has moved to its new address, seen from
+	// the old one. The fake cannot change its source address, so discovery still reports the
+	// new settings from the same address.
+	SystemSetLeaves
+	// SystemSetVanishes applies the SET without answering it, then ignores everything,
+	// discovery included: a switch that moved and cannot be found.
+	SystemSetVanishes
+)
+
+The behaviours after a system SET. SystemSetReplies is the well-behaved switch.
+
+      type TLVType ¶
+
+type TLVType = wire.TLVType
+
+TLVType is the type number of a Setting. It is the client's own type, named here so that a test
+outside the escp module can write the func literals the fake takes (GetFn) without importing
+the client's internals; a plain number is a valid TLVType wherever a constant is expected.
+
+##
+
+      Source Files
+      ¶
+
+      View all Source files
+
+doc.go
+
+model.go
+
+switch.go
+
+ Click to show internal directories.
+
+ Click to hide internal directories.
+
+## Jump to
+
+        Close
+
+## Keyboard shortcuts
+
+              ? : This menu
+
+              / : Search site
+
+              f or F : Jump to
+
+              y or Y
+               : Canonical URL
+
+        Close
+

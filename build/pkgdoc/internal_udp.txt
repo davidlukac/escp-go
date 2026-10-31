@@ -1,0 +1,115 @@
+  udp package - github.com/davidlukac/escp-go/internal/udp - Go Packages
+
+#
+
+## Details
+
+          Valid go.mod file
+
+          The Go module system was introduced in Go 1.11 and is the official dependency management
+          solution for Go.
+
+          Redistributable license
+
+          Redistributable licenses place minimal restrictions on how software can be used,
+          modified, and redistributed.
+
+          Tagged version
+
+Modules with tagged versions give importers more predictable builds.
+
+          Stable version
+
+When a project reaches major version v1 it is considered stable.
+
+      Learn more about best practices
+
+## Repository
+
+          /files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/
+
+##
+
+      Documentation
+      ¶
+
+          Rendered for
+
+              linux/amd64
+
+              windows/amd64
+
+              darwin/amd64
+
+              js/wasm
+
+### Overview ¶
+
+Package udp holds the one piece of socket handling the ESCP client needs that has nothing to do
+with the protocol: letting several sockets (several clients, Discover, other processes) bind the
+same reply port. The switch always answers to UDP 29809, whoever asked, so a second client for
+another switch, or a discovery next to a client, needs that port too.
+
+Share is a net.ListenConfig Control function. Where no sharing option is known it does nothing
+and the second bind fails loudly.
+
+### Index ¶
+
+        func Share(_, _ string, c syscall.RawConn) error
+
+### Constants ¶
+
+This section is empty.
+
+### Variables ¶
+
+This section is empty.
+
+### Functions ¶
+
+      func Share ¶
+
+func Share(_, _ string, c syscall.RawConn) error
+
+Share lets several sockets (several clients, Discover, other processes) bind the
+reply port at once. Every socket sharing the port receives the replies, and each keeps
+only those from its own switch. This was observed on macOS: clients for two switches
+got all of theirs, and so did Discover next to a client. Whether a switch addresses its
+replies to the broadcast address or to the host was not captured.
+
+### Types ¶
+
+This section is empty.
+
+##
+
+      Source Files
+      ¶
+
+      View all Source files
+
+doc.go
+
+share_unix.go
+
+ Click to show internal directories.
+
+ Click to hide internal directories.
+
+## Jump to
+
+        Close
+
+## Keyboard shortcuts
+
+              ? : This menu
+
+              / : Search site
+
+              f or F : Jump to
+
+              y or Y
+               : Canonical URL
+
+        Close
+

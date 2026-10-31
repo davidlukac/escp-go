@@ -1,0 +1,77 @@
+  discover command - github.com/davidlukac/escp-go/examples/discover - Go Packages
+
+#
+
+## Details
+
+          Valid go.mod file
+
+          The Go module system was introduced in Go 1.11 and is the official dependency management
+          solution for Go.
+
+          Redistributable license
+
+          Redistributable licenses place minimal restrictions on how software can be used,
+          modified, and redistributed.
+
+          Tagged version
+
+Modules with tagged versions give importers more predictable builds.
+
+          Stable version
+
+When a project reaches major version v1 it is considered stable.
+
+      Learn more about best practices
+
+## Repository
+
+          /files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/
+
+##
+
+      Documentation
+      ¶
+
+### Overview ¶
+
+Command discover is a read-only example of the library: it lists the switches that answer a
+discovery probe on the local network and, when ESCP_HOST, ESCP_USERNAME and ESCP_PASSWORD are
+set, the ports of that switch. It changes nothing on any switch.
+
+go run ./examples/discover
+ESCP_HOST=192.0.2.11 ESCP_USERNAME=admin ESCP_PASSWORD=... go run ./examples/discover
+
+Run it on its own: switches reply to UDP port 29809, which the vendor's utility on the same host
+would share out unpredictably.
+
+##
+
+      Source Files
+      ¶
+
+      View all Source files
+
+main.go
+
+ Click to show internal directories.
+
+ Click to hide internal directories.
+
+## Jump to
+
+        Close
+
+## Keyboard shortcuts
+
+              ? : This menu
+
+              / : Search site
+
+              f or F : Jump to
+
+              y or Y
+               : Canonical URL
+
+        Close
+

@@ -1,0 +1,729 @@
+  safety package - github.com/davidlukac/escp-go/safety - Go Packages
+
+#
+
+## Details
+
+          Valid go.mod file
+
+          The Go module system was introduced in Go 1.11 and is the official dependency management
+          solution for Go.
+
+          Redistributable license
+
+          Redistributable licenses place minimal restrictions on how software can be used,
+          modified, and redistributed.
+
+          Tagged version
+
+Modules with tagged versions give importers more predictable builds.
+
+          Stable version
+
+When a project reaches major version v1 it is considered stable.
+
+      Learn more about best practices
+
+## Repository
+
+          /files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/
+
+##
+
+      Documentation
+      ¶
+
+### Overview ¶
+
+Firmware
+
+What the write is
+
+Ports
+
+Stability
+
+Package safety holds the rules that decide whether a write to a switch is prudent:
+which firmware builds the client was verified against, and what a port is used for
+(link, link aggregation). It has no logging; it reads from a
+switch only through the small interfaces it is given, and reports what it finds as
+typed errors and values so each front end (a Terraform provider, a command line) words the
+refusal in its own vocabulary.
+
+Firmware ¶
+
+The protocol is not versioned, and a newer firmware may change layouts or
+authentication. FirmwareGate returns an escp.WriteGate that refuses every write while
+the switch runs a build outside VerifiedFirmwareBuilds, and lets reads through:
+
+c, err := escp.Dial(escp.Config{Host: host, Username: user, Password: pw, WriteGate: safety.FirmwareGate()})
+
+A front end that offers an opt-in leaves the gate out (a nil WriteGate gates nothing).
+A refusal is a *FirmwareError; branch on its Reason and word the message for your users.
+
+What the write is ¶
+
+A gate is also told the operation: the client method, the ports it names and its Impact
+(cosmetic, traffic or management: the worst the method can do, not a judgement of one
+particular write: a port setting is Traffic even when it disables the uplink). MaxImpact
+refuses above a class with an *ImpactError. Which ports a write touches is a separate
+question, answered by PortGate: it refuses a write that names (or, for a group it replaces
+or removes, drops) a port that is missing, linked or in a LAG, with the same *PortUseError
+as CheckPorts. DryRun records the operations a front end would perform and refuses them all
+with ErrDryRun, so a "--dry-run" is a gate and not a second code path. Chain combines
+gates; put the dry run last so it only sees what the others allowed:
+
+dry := safety.NewDryRun()
+gate := safety.Chain(safety.FirmwareGate(), safety.MaxImpact(escp.ImpactTraffic), safety.PortGate(), dry.Gate())
+
+A ceiling on the impact alone is not a safety rule: without PortGate (or the front end's own
+check of the ports) a write within the ceiling can still cut the uplink.
+
+Ports ¶
+
+UseOf turns a reading of the ports into facts about one port: does it exist, does it
+have a link, is it in a link aggregation group. A port with a link may carry the
+management path or the uplink, so writes to it need an explicit decision.
+
+CheckPorts applies the one rule every front end shares to the ports a write names: each
+must exist, have no link and belong to no LAG (an edit of a LAG tolerates the members of
+that group, through PortRule). The first offender comes back as a *PortUseError; branch on
+its Reason and word the refusal, and the way to proceed, for your users. Whether to run the
+check at all (an opt-in such as a flag that allows disruptive writes) stays with the caller.
+
+Stability ¶
+
+Version 0, like the escp package it belongs to: names may change without notice until
+the library is released on its own. VerifiedFirmwareBuilds is read from compatibility.json
+(the table the README shows) and grows only after a build has been tested on a real switch.
+
+### Index ¶
+
+Variables
+
+        func Chain(gates ...escp.WriteGate) escp.WriteGate
+
+        func CheckFirmware(fw escp.Firmware) error
+
+        func CheckPorts(all []escp.Port, rule PortRule, ports escp.PortSet) error
+
+        func CompatibilityTable() string
+
+        func FirmwareGate() escp.WriteGate
+
+        func MaxImpact(max escp.Impact) escp.WriteGate
+
+        func PortGate() escp.WriteGate
+
+        func VerifiedFirmwareBuilds() []escp.BuildDate
+
+          type DryRun
+
+            func NewDryRun() *DryRun
+
+            func (d *DryRun) Gate() escp.WriteGate
+
+            func (d *DryRun) Operations() []escp.Operation
+
+          type FirmwareError
+
+            func (e *FirmwareError) Error() string
+
+            func (e *FirmwareError) Unwrap() error
+
+          type FirmwareReason
+
+          type ImpactError
+
+            func (e *ImpactError) Error() string
+
+          type PortReason
+
+          type PortRule
+
+          type PortUse
+
+            func UseOf(ports []escp.Port, id escp.PortID) PortUse
+
+            func (u PortUse) InLAG() bool
+
+            func (u PortUse) LinkUp() bool
+
+          type PortUseError
+
+            func (e *PortUseError) Error() string
+
+          type Row
+
+            func Compatibility() []Row
+
+          type Support
+
+### Examples ¶
+
+CheckFirmware
+
+CheckPorts
+
+DryRun
+
+FirmwareGate
+
+UseOf
+
+### Constants ¶
+
+This section is empty.
+
+### Variables ¶
+
+      View Source
+
+var ErrCannotCheckPorts = errors.New("safety: cannot check what the ports are used for")
+
+ErrCannotCheckPorts is what PortGate returns when it cannot establish what the ports are used
+for: the reader it was given cannot list them, or reading them failed. The write is refused,
+because a gate that cannot look must not wave a write through.
+
+      View Source
+
+var ErrDryRun = errors.New("dry run: the write was recorded and not sent")
+
+ErrDryRun is what the gate of a DryRun returns: the write was recorded and not sent. The
+client method returns it unchanged, so callers treat errors.Is(err, ErrDryRun) as success.
+
+### Functions ¶
+
+      func Chain ¶
+
+func Chain(gates ...escp.WriteGate) escp.WriteGate
+
+Chain combines write gates into one that asks each in turn and stops at the first refusal. A
+nil gate is skipped, and Chain of nothing but nil gates is nil, which gates nothing. Put a gate
+that has an effect of its own (DryRun) last, so it only sees what the others allowed.
+
+      func CheckFirmware ¶
+
+func CheckFirmware(fw escp.Firmware) error
+
+CheckFirmware returns a *FirmwareError unless the firmware version names
+a build in VerifiedFirmwareBuilds.
+
+Example ¶
+
+package main
+
+import (
+	"errors"
+	"fmt"
+
+	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/safety"
+)
+
+func main() {
+	fmt.Println(safety.CheckFirmware(escp.ParseFirmware("1.0.0 Build 20250710 Rel.71093")))
+	err := safety.CheckFirmware(escp.ParseFirmware("custom"))
+	var fe *safety.FirmwareError
+	fmt.Println(errors.As(err, &fe) && fe.Reason == safety.FirmwareNoBuildDate)
+}
+
+Output:
+<nil>
+true
+
+        Share
+        Format
+        Run
+
+      func CheckPorts ¶
+
+func CheckPorts(all []escp.Port, rule PortRule, ports escp.PortSet) error
+
+CheckPorts returns a *PortUseError for the lowest-numbered of ports that does not exist, has a link up, or belongs to a LAG the rule does not tolerate, in
+that order for each port. It returns nil when every port is free. all is a reading of the
+ports (Client.Ports); a write to a port that fails the check can cut the management path or
+the uplink, and the switch has no console to recover from that.
+
+Example ¶
+
+CheckPorts names the lowest-numbered port a write should not touch; the caller words the refusal.
+
+package main
+
+import (
+	"errors"
+	"fmt"
+
+	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/safety"
+)
+
+func main() {
+	ports := []escp.Port{
+		{ID: 1, ActualSpeed: escp.Speed1000Full, LAG: 1},
+		{ID: 2, ActualSpeed: escp.SpeedLinkDown, LAG: 1},
+		{ID: 7, ActualSpeed: escp.SpeedLinkDown},
+	}
+	fmt.Println(safety.CheckPorts(ports, safety.PortRule{}, escp.MustPortSet(7)))
+	err := safety.CheckPorts(ports, safety.PortRule{}, escp.MustPortSet(7, 2))
+	var used *safety.PortUseError
+	if errors.As(err, &used) && used.Reason == safety.PortInLAG {
+		fmt.Printf("port %d is in LAG %d\n", used.Port, used.LAG)
+	}
+	// Editing LAG 1 itself tolerates its idle members, but never a link.
+	fmt.Println(safety.CheckPorts(ports, safety.PortRule{TolerateLAG: 1}, escp.MustPortSet(2)))
+	fmt.Println(safety.CheckPorts(ports, safety.PortRule{TolerateLAG: 1}, escp.MustPortSet(1)))
+}
+
+Output:
+<nil>
+port 2 is in LAG 1
+<nil>
+port 1 has a link up (1000Mbps-full)
+
+        Share
+        Format
+        Run
+
+      func CompatibilityTable ¶
+
+func CompatibilityTable() string
+
+CompatibilityTable renders the table as the markdown the README shows.
+
+      func FirmwareGate ¶
+
+func FirmwareGate() escp.WriteGate
+
+FirmwareGate returns an escp.WriteGate that refuses every write while the
+switch runs a firmware build the client was not verified against. Reads always
+pass: they cannot change the switch, and they are how a new firmware is
+fingerprinted. The firmware is read before the first write; a verified build is
+remembered, a refusal or a failed read is not (the next write checks again). The
+gate belongs to one switch: use one gate per client.
+
+Example ¶
+
+A gate belongs to one switch: it remembers a verified build, so each switch gets its own.
+
+package main
+
+import (
+	"context"
+	"errors"
+	"fmt"
+
+	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/safety"
+)
+
+// firmware is an escp.InfoReader that reports a fixed firmware version.
+type firmware string
+
+func (f firmware) Info(context.Context) (escp.Info, error) {
+	return escp.Info{Firmware: escp.ParseFirmware(string(f))}, nil
+}
+
+func main() {
+	err := safety.FirmwareGate()(context.Background(), firmware("1.0.0 Build 20230218 Rel.50633"), escp.Operation{})
+	fmt.Println("verified build:", err)
+
+	err = safety.FirmwareGate()(context.Background(), firmware("1.0.0 Build 20990101 Rel.1"), escp.Operation{})
+	var refused *safety.FirmwareError
+	if errors.As(err, &refused) && refused.Reason == safety.FirmwareUnverified {
+		fmt.Println("refused build", refused.Firmware.Build, "- verified:", refused.Verified)
+	}
+}
+
+Output:
+verified build: <nil>
+refused build 20990101 - verified: [20230218 20250710]
+
+        Share
+        Format
+        Run
+
+      func MaxImpact ¶
+
+func MaxImpact(max escp.Impact) escp.WriteGate
+
+MaxImpact returns a gate that refuses every operation whose Impact is above max. An operation
+that declares no valid Impact is refused too, so a writer that forgot to classify itself fails
+closed. A max that is not an impact class refuses everything. The refusal is an *ImpactError.
+
+      func PortGate ¶
+
+func PortGate() escp.WriteGate
+
+PortGate returns a gate that refuses a write unless every port it touches is free: it must
+exist, have no link and belong to no LAG (CheckPorts, with the same *PortUseError). It looks
+at the ports the operation names and, for a write that replaces or removes a group of ports
+(a LAG, a port-based VLAN, an 802.1Q VLAN), at the group's current members too, because
+taking the uplink out of VLAN 1 is as dangerous as naming it. A LAG's own idle members are
+tolerated when the LAG itself is edited; a link never is. Operations that touch no port
+pass without a read.
+
+It reads through the client it guards (the gate is handed the client, which has the readers),
+before every write it checks, so it costs reads and is for a front end that wants the rule
+enforced by the library instead of by its own code. A front end with an opt-in leaves it out.
+Failures to look are refused with ErrCannotCheckPorts.
+
+      func VerifiedFirmwareBuilds ¶
+
+func VerifiedFirmwareBuilds() []escp.BuildDate
+
+VerifiedFirmwareBuilds returns the firmware builds (the date in "1.0.0 Build
+20230218 Rel.50633") whose protocol behaviour this client was tested
+against on real switches: reads, and writes on unused ports. Any other build
+may have changed layouts or authentication, so writes to it are refused
+unless the user opts in. The result is a copy: changing it changes nothing.
+
+### Types ¶
+
+      type DryRun ¶
+
+type DryRun struct {
+	// contains filtered or unexported fields
+}
+
+DryRun records the operations a front end would perform without sending any of them. Use its
+Gate as the last gate of a client; run the commands as usual; read Operations. A method that
+first reads from the switch (SetHostname, SetIPConfig, SetPortPriorities) still does, and so
+does every method that names a port (it reads the switch's port count once, before the gate),
+so a dry run needs a reachable switch. A method that would send several writes records its
+operation once: the first refusal ends it.
+A DryRun is safe for concurrent use.
+
+Example ¶
+
+A dry run records what a front end would write. The gates are chained so that the dry run only
+sees what the others allowed; the client returns ErrDryRun for every write and sends nothing.
+
+package main
+
+import (
+	"context"
+	"errors"
+	"fmt"
+
+	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/safety"
+)
+
+// firmware is an escp.InfoReader that reports a fixed firmware version.
+type firmware string
+
+func (f firmware) Info(context.Context) (escp.Info, error) {
+	return escp.Info{Firmware: escp.ParseFirmware(string(f))}, nil
+}
+
+func main() {
+	dry := safety.NewDryRun()
+	gate := safety.Chain(safety.MaxImpact(escp.ImpactTraffic), dry.Gate())
+	ctx := context.Background()
+
+	for _, op := range []escp.Operation{
+		{Name: "SetLED", Impact: escp.ImpactCosmetic},
+		{Name: "SetPort", Ports: escp.MustPortSet(7), Impact: escp.ImpactTraffic},
+		{Name: "SetLAG", Ports: escp.MustPortSet(5, 6), Impact: escp.ImpactManagement},
+	} {
+		err := gate(ctx, firmware(""), op)
+		var tooMuch *safety.ImpactError
+		switch {
+		case errors.Is(err, safety.ErrDryRun):
+			fmt.Println("would write:", op.Name)
+		case errors.As(err, &tooMuch):
+			fmt.Println("refused:", tooMuch)
+		}
+	}
+	fmt.Println(len(dry.Operations()), "recorded")
+}
+
+Output:
+would write: SetLED
+would write: SetPort
+refused: SetLAG has impact management, above the allowed traffic
+2 recorded
+
+        Share
+        Format
+        Run
+
+      func NewDryRun ¶
+
+func NewDryRun() *DryRun
+
+NewDryRun returns a DryRun that has recorded nothing yet.
+
+      func (*DryRun) Gate ¶
+
+func (d *DryRun) Gate() escp.WriteGate
+
+Gate returns the gate to put in escp.Config: it records the operation and refuses it with
+ErrDryRun.
+
+      func (*DryRun) Operations ¶
+
+func (d *DryRun) Operations() []escp.Operation
+
+Operations returns what was recorded, in order. The result is a copy.
+
+      type FirmwareError ¶
+
+type FirmwareError struct {
+	Reason   FirmwareReason
+	Firmware escp.Firmware    // the firmware the switch reported, its build date included (not for FirmwareUnreadable)
+	Verified []escp.BuildDate // the builds that would have been accepted
+	Err      error            // the cause (FirmwareUnreadable)
+}
+
+FirmwareError is the refusal of a firmware check. Callers branch on Reason and
+word the message for their users; Error is a neutral description.
+
+      func (*FirmwareError) Error ¶
+
+func (e *FirmwareError) Error() string
+
+Error describes the refusal in neutral words (which build, what would have been accepted); front
+ends word their own message from Reason.
+
+      func (*FirmwareError) Unwrap ¶
+
+func (e *FirmwareError) Unwrap() error
+
+Unwrap returns the cause of a FirmwareUnreadable refusal.
+
+      type FirmwareReason ¶
+
+type FirmwareReason int
+
+FirmwareReason says why a firmware check refused a write.
+
+const (
+	// FirmwareUnreadable: the firmware version could not be read from the switch.
+	FirmwareUnreadable FirmwareReason = iota + 1
+	// FirmwareNoBuildDate: the version string has no build date to match.
+	FirmwareNoBuildDate
+	// FirmwareUnverified: the build is not in VerifiedFirmwareBuilds.
+	FirmwareUnverified
+)
+
+The reasons a firmware check refuses.
+
+      type ImpactError ¶
+
+type ImpactError struct {
+	Op  escp.Operation
+	Max escp.Impact
+}
+
+ImpactError is the refusal of MaxImpact: the operation is above what the front end allows.
+Callers word the message and the way to proceed (a flag, a policy) for their users.
+
+      func (*ImpactError) Error ¶
+
+func (e *ImpactError) Error() string
+
+Error names the operation, its impact and the ceiling it exceeded.
+
+      type PortReason ¶
+
+type PortReason int
+
+PortReason says why a port check refused a port.
+
+const (
+	// PortMissing: the switch has no such port.
+	PortMissing PortReason = iota + 1
+	// PortLinkUp: the port has a link, so it may carry traffic or the management path.
+	PortLinkUp
+	// PortInLAG: the port belongs to a link aggregation group.
+	PortInLAG
+)
+
+The reasons CheckPorts refuses. They are listed in the order the checks run.
+
+      type PortRule ¶
+
+type PortRule struct {
+	// TolerateLAG is a group whose members are fine, for an edit of that very group; zero for
+	// none. A link is never tolerated.
+	TolerateLAG escp.LAGID
+}
+
+PortRule says which uses CheckPorts tolerates. The zero value tolerates none.
+
+      type PortUse ¶
+
+type PortUse struct {
+	// Exists reports whether the switch has the port at all. When false, the other
+	// fields are zero.
+	Exists bool
+	// Speed is the negotiated speed as the client reports it (escp.SpeedLinkDown
+	// without a link).
+	Speed escp.Speed
+	// LAG is the link aggregation group the port belongs to, 0 for none.
+	LAG escp.LAGID
+}
+
+PortUse is what a write to one port could disturb. It states facts only: how a
+caller orders its checks and what it says about them differs per front end (a LAG
+edit tolerates the ports of its own group, a VLAN edit does not), so the verdicts
+stay with the caller.
+
+      func UseOf ¶
+
+func UseOf(ports []escp.Port, id escp.PortID) PortUse
+
+UseOf looks the port up in a Ports reading. A port the switch does not list is
+reported as not existing. A port listed more than once (a real switch never does)
+counts as used if any of its entries says so, so the answer fails closed.
+
+Example ¶
+
+UseOf states facts about a port; the caller decides what they mean for its write.
+
+package main
+
+import (
+	"fmt"
+
+	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/safety"
+)
+
+func main() {
+	ports := []escp.Port{
+		{ID: 1, ActualSpeed: escp.Speed1000Full, LAG: 1},
+		{ID: 7, ActualSpeed: escp.SpeedLinkDown},
+	}
+	for _, id := range []escp.PortID{1, 7, 9} {
+		u := safety.UseOf(ports, id)
+		fmt.Printf("port %d: exists=%v link=%v lag=%v\n", id, u.Exists, u.LinkUp(), u.InLAG())
+	}
+}
+
+Output:
+port 1: exists=true link=true lag=true
+port 7: exists=true link=false lag=false
+port 9: exists=false link=false lag=false
+
+        Share
+        Format
+        Run
+
+      func (PortUse) InLAG ¶
+
+func (u PortUse) InLAG() bool
+
+InLAG reports whether the port is a member of a link aggregation group.
+
+      func (PortUse) LinkUp ¶
+
+func (u PortUse) LinkUp() bool
+
+LinkUp reports whether the port carries a link, and so may carry traffic or the
+management path.
+
+      type PortUseError ¶
+
+type PortUseError struct {
+	Port   escp.PortID
+	Reason PortReason
+	Speed  escp.Speed // the negotiated speed (PortLinkUp)
+	LAG    escp.LAGID // the group (PortInLAG)
+}
+
+PortUseError is the refusal of CheckPorts: the first port that a write should not touch
+without an explicit decision, and why. Callers branch on Reason and word the message in their
+own vocabulary, as with FirmwareError; Error is a neutral description.
+
+      func (*PortUseError) Error ¶
+
+func (e *PortUseError) Error() string
+
+Error names the port and why it may not be written: it does not exist, it has a link, or it is in a
+LAG.
+
+      type Row ¶
+
+type Row struct {
+	Model    string           `json:"model"`
+	Hardware string           `json:"hardware"`
+	Firmware string           `json:"firmware"`
+	Builds   []escp.BuildDate `json:"builds,omitempty"` // the build dates the row covers
+	Support  Support          `json:"support"`
+	Summary  string           `json:"summary,omitempty"` // markdown, what was verified or what to do
+}
+
+Row is one line of the compatibility table: a switch model, a hardware revision and a firmware,
+and what is known about the combination. The table is compatibility.json, embedded in the
+package; it is the one place the README table and the firmware allow-list come from.
+
+      func Compatibility ¶
+
+func Compatibility() []Row
+
+Compatibility returns the compatibility table. The result is a copy.
+
+      type Support ¶
+
+type Support string
+
+Support says how far a hardware and firmware combination has been verified.
+
+const (
+	// SupportVerified: reads and writes were checked on a real switch. Only the builds of
+	// verified rows may write without the user's opt-in.
+	SupportVerified Support = "verified"
+	// SupportUntried: expected to work, never tried. Reads work; writes need the opt-in.
+	SupportUntried Support = "untried"
+	// SupportUntested: nothing is known.
+	SupportUntested Support = "untested"
+	// SupportUnsupported: known not to work.
+	SupportUnsupported Support = "unsupported"
+)
+
+The levels of support, from verified to refused.
+
+##
+
+      Source Files
+      ¶
+
+      View all Source files
+
+compatibility.go
+
+doc.go
+
+firmware.go
+
+gates.go
+
+portgate.go
+
+ports.go
+
+ Click to show internal directories.
+
+ Click to hide internal directories.
+
+## Jump to
+
+        Close
+
+## Keyboard shortcuts
+
+              ? : This menu
+
+              / : Search site
+
+              f or F : Jump to
+
+              y or Y
+               : Canonical URL
+
+        Close
+

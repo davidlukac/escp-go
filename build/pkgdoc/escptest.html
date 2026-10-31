@@ -1,0 +1,2341 @@
+
+
+<!DOCTYPE html>
+<html lang="en" data-layout="responsive" data-local="true">
+  <head>
+    
+    <script>
+      window.addEventListener('error', window.__err=function f(e){f.p=f.p||[];f.p.push(e)});
+    </script>
+    <script>
+      (function() {
+        const theme = document.cookie.match(/prefers-color-scheme=(light|dark|auto)/)?.[1]
+        if (theme) {
+          document.querySelector('html').setAttribute('data-theme', theme);
+        }
+      }())
+    </script>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="Description" content="Package escptest is an in-process TL-SG108E that speaks ESCP over loopback UDP, for tests of code that uses the escp client.">
+    
+    <meta class="js-gtmID" data-gtmid="">
+    <link rel="shortcut icon" href="/static/shared/icon/favicon.ico">
+    
+  
+    <meta name="robots" content="noindex">
+  
+
+    <link href="/static/frontend/frontend.min.css?version=" rel="stylesheet">
+    
+    
+  <title>escptest package - github.com/davidlukac/escp-go/escptest - Go Packages</title>
+
+    
+  <link href="/static/frontend/unit/unit.min.css?version=" rel="stylesheet">
+  
+  <link href="/static/frontend/unit/main/main.min.css?version=" rel="stylesheet">
+
+
+  </head>
+  <body>
+    
+    <script>
+      function loadScript(src, mod = true) {
+        let s = document.createElement('script');
+        s.src = src;
+        if (mod) {
+          s.type = 'module';
+          s.async = true;
+          s.defer = true
+        }
+        document.head.appendChild(s);
+      }
+      loadScript("/third_party/dialog-polyfill/dialog-polyfill.js", false)
+      loadScript("/static/frontend/frontend.js");
+    </script>
+    
+  <header class="go-Header go-Header--full js-siteHeader">
+    <div class="go-Header-inner go-Header-inner--dark">
+      <nav class="go-Header-nav">
+        <a href="/" class="js-headerLogo" data-gtmc="nav link"
+            data-test-id="go-header-logo-link" role="heading" aria-level="1">
+          <img class="go-Header-logo" src="/static/shared/logo/go-white.svg" alt="Go">
+        </a>
+         <div class="skip-navigation-wrapper">
+            <a class="skip-to-content-link" aria-label="Skip to main content" href="#main-content"> Skip to Main Content </a>
+          </div>
+        <div class="go-Header-rightContent">
+          
+<div class="go-SearchForm js-searchForm">
+  <form
+    class="go-InputGroup go-ShortcutKey go-SearchForm-form"
+    action="/search"
+    data-shortcut="/"
+    data-shortcut-alt="search"
+    data-gtmc="search form"
+    aria-label="Search for a package"
+    role="search"
+  >
+    <input name="q" class="go-Input js-searchFocus" aria-label="Search for a package" type="search"
+        autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false"
+        placeholder="Search packages"
+        value="" />
+    <input name="m" value="" hidden>
+    <button class="go-Button go-Button--inverted" aria-label="Submit search">
+      <img
+        class="go-Icon"
+        height="24"
+        width="24"
+        src="/static/shared/icon/search_gm_grey_24dp.svg"
+        alt=""
+      />
+    </button>
+  </form>
+  <button class="go-SearchForm-expandSearch js-expandSearch" data-gtmc="nav button"
+      aria-label="Open search" data-test-id="expand-search">
+    <img class="go-Icon go-Icon--inverted" height="24" width="24"
+        src="/static/shared/icon/search_gm_grey_24dp.svg" alt="">
+
+  </button>
+</div>
+
+          <ul class="go-Header-menu">
+            <li class="go-Header-menuItem">
+              <a class="js-desktop-menu-hover" href="#" data-gtmc="nav link">
+                Why Go
+                <img class="go-Icon" height="24" width="24" src="/static/shared/icon/arrow_drop_down_gm_grey_24dp.svg" alt="submenu dropdown icon">
+              </a>
+              <ul class="go-Header-submenu go-Header-submenu--why js-desktop-submenu-hover" aria-label="submenu">
+                  <li class="go-Header-submenuItem">
+                    <div>
+                      <a href="https://go.dev/solutions/case-studies">
+                        <span>Case Studies</span>
+                      </a>
+                    </div>
+                    <p>Common problems companies solve with Go</p>
+                  </li>
+                  <li class="go-Header-submenuItem">
+                    <div>
+                      <a href="https://go.dev/solutions/use-cases">
+                        <span>Use Cases</span>
+                      </a>
+                    </div>
+                    <p>Stories about how and why companies use Go</p>
+                  </li>
+                  <li class="go-Header-submenuItem">
+                    <div>
+                      <a href="https://go.dev/security/">
+                        <span>Security</span>
+                      </a>
+                    </div>
+                    <p>How Go can help keep you secure by default</p>
+                  </li>
+              </ul>
+            </li>
+            <li class="go-Header-menuItem">
+              <a href="https://go.dev/learn/" data-gtmc="nav link">Learn</a>
+            </li>
+            <li class="go-Header-menuItem">
+              <a class="js-desktop-menu-hover" href="#" data-gtmc="nav link">
+                Docs
+                <img class="go-Icon" height="24" width="24" src="/static/shared/icon/arrow_drop_down_gm_grey_24dp.svg" alt="submenu dropdown icon">
+              </a>
+              <ul class="go-Header-submenu go-Header-submenu--docs js-desktop-submenu-hover" aria-label="submenu">
+                <li class="go-Header-submenuItem">
+                  <div>
+                    <a href="https://go.dev/doc/effective_go">
+                      <span>Effective Go</span>
+                    </a>
+                  </div>
+                  <p>Tips for writing clear, performant, and idiomatic Go code</p>
+                </li>
+                <li class="go-Header-submenuItem">
+                  <div>
+                    <a href="https://go.dev/doc/">
+                      <span>Go User Manual</span>
+                    </a>
+                  </div>
+                  <p>A complete introduction to building software with Go</p>
+                </li>
+                <li class="go-Header-submenuItem">
+                  <div>
+                    <a href="https://pkg.go.dev/std">
+                      <span>Standard library</span>
+                    </a>
+                  </div>
+                  <p>Reference documentation for Go's standard library</p>
+                </li>
+                <li class="go-Header-submenuItem">
+                  <div>
+                    <a href="https://go.dev/doc/devel/release">
+                      <span>Release Notes</span>
+                    </a>
+                  </div>
+                  <p>Learn what's new in each Go release</p>
+                </li>
+                <li class="go-Header-submenuItem">
+                  <div>
+                    <a href="/api">
+                      <span>API</span>
+                    </a>
+                  </div>
+                  <p>Reference documentation for the pkg.go.dev API</p>
+                </li>
+              </ul>
+            </li>
+            <li class="go-Header-menuItem go-Header-menuItem--active">
+              <a href="/" data-gtmc="nav link">Packages</a>
+            </li>
+            <li class="go-Header-menuItem">
+              <a class="js-desktop-menu-hover" href="#" data-gtmc="nav link">
+                Community
+                <img class="go-Icon" height="24" width="24" src="/static/shared/icon/arrow_drop_down_gm_grey_24dp.svg" alt="submenu dropdown icon">
+              </a>
+              <ul class="go-Header-submenu go-Header-submenu--community js-desktop-submenu-hover" aria-label="submenu">
+                <li class="go-Header-submenuItem">
+                  <div>
+                    <a href="https://go.dev/talks/">
+                      <span>Recorded Talks</span>
+                    </a>
+                  </div>
+                  <p>Videos from prior events</p>
+                </li>
+                <li class="go-Header-submenuItem">
+                  <div>
+                    <a href="https://www.meetup.com/pro/go">
+                      <span>Meetups</span>
+                      <i class="material-icons">
+                        <img class="go-Icon" height="24" width="24"
+                            src="/static/shared/icon/launch_gm_grey_24dp.svg" alt="">
+                      </i>
+                    </a>
+                  </div>
+                  <p>Meet other local Go developers</p>
+                </li>
+                <li class="go-Header-submenuItem">
+                  <div>
+                    <a href="https://github.com/golang/go/wiki/Conferences">
+                      <span>Conferences</span>
+                      <i class="material-icons">
+                        <img class="go-Icon" height="24" width="24"
+                            src="/static/shared/icon/launch_gm_grey_24dp.svg" alt="">
+                      </i>
+                    </a>
+                  </div>
+                  <p>Learn and network with Go developers from around the world</p>
+                </li>
+                <li class="go-Header-submenuItem">
+                  <div>
+                    <a href="https://go.dev/blog">
+                      <span>Go blog</span>
+                    </a>
+                  </div>
+                  <p>The Go project's official blog.</p>
+                </li>
+                <li class="go-Header-submenuItem">
+                  <div>
+                    <a href="https://go.dev/help">
+                      <span>Go project</span>
+                    </a>
+                  </div>
+                  <p>Get help and stay informed from Go</p>
+                </li>
+                <li class="go-Header-submenuItem">
+                  <div>
+                    Get connected
+                  </div>
+                  <p></p>
+                  <div class="go-Header-socialIcons">
+                      <a
+                        class="go-Header-socialIcon"
+                        aria-label="Get connected with google-groups (Opens in new window)"
+                        title="Get connected with google-groups (Opens in new window)"
+                        href="https://groups.google.com/g/golang-nuts">
+                        <img src="/static/shared/logo/social/google-groups.svg" />
+                      </a>
+                      <a
+                        class="go-Header-socialIcon"
+                        aria-label="Get connected with github (Opens in new window)"
+                        title="Get connected with github (Opens in new window)"
+                        href="https://github.com/golang">
+                        <img src="/static/shared/logo/social/github.svg" />
+                      </a>
+                      <a
+                        class="go-Header-socialIcon"
+                        aria-label="Get connected with twitter (Opens in new window)"
+                        title="Get connected with twitter (Opens in new window)"
+                        href="https://twitter.com/golang">
+                        <img src="/static/shared/logo/social/twitter.svg" />
+                      </a>
+                      <a
+                        class="go-Header-socialIcon"
+                        aria-label="Get connected with reddit (Opens in new window)"
+                        title="Get connected with reddit (Opens in new window)"
+                        href="https://www.reddit.com/r/golang/">
+                        <img src="/static/shared/logo/social/reddit.svg" />
+                      </a>
+                      <a
+                        class="go-Header-socialIcon"
+                        aria-label="Get connected with slack (Opens in new window)"
+                        title="Get connected with slack (Opens in new window)"
+                        href="https://invite.slack.golangbridge.org/">
+                        <img src="/static/shared/logo/social/slack.svg" />
+                      </a>
+                      <a
+                        class="go-Header-socialIcon"
+                        aria-label="Get connected with stack-overflow (Opens in new window)"
+                        title=""
+                        href="https://stackoverflow.com/collectives/go">
+                        <img src="/static/shared/logo/social/stack-overflow.svg" />
+                      </a>
+                  </div>
+                </li>
+              </ul>
+            </li>
+          </ul>
+          <button class="go-Header-navOpen js-headerMenuButton go-Header-navOpen--white" data-gtmc="nav button" aria-label="Open navigation">
+          </button>
+        </div>
+      </nav>
+    </div>
+  </header>
+  <aside class="go-NavigationDrawer js-header">
+    <nav class="go-NavigationDrawer-nav">
+      <div class="go-NavigationDrawer-header">
+        <a href="https://go.dev/">
+          <img class="go-NavigationDrawer-logo" src="/static/shared/logo/go-blue.svg" alt="Go.">
+        </a>
+      </div>
+      <ul class="go-NavigationDrawer-list">
+          <li class="go-NavigationDrawer-listItem js-mobile-subnav-trigger go-NavigationDrawer-hasSubnav">
+            <a href="#">
+              <span>Why Go</span>
+              <i class="material-icons">
+                <img class="go-Icon" height="24" width="24"
+                  src="/static/shared/icon/navigate_next_gm_grey_24dp.svg" alt="">
+              </i>
+            </a>
+
+            <div class="go-NavigationDrawer go-NavigationDrawer-submenuItem">
+              <div class="go-NavigationDrawer-nav">
+                <div class="go-NavigationDrawer-header">
+                  <a href="#">
+                    <i class="material-icons">
+                      <img class="go-Icon" height="24" width="24"
+                        src="/static/shared/icon/navigate_before_gm_grey_24dp.svg" alt="">
+                      </i>
+                      Why Go
+                  </a>
+                </div>
+                <ul class="go-NavigationDrawer-list">
+                  <li class="go-NavigationDrawer-listItem">
+                    <a href="https://go.dev/solutions/case-studies">
+                      Case Studies
+                    </a>
+                  </li>
+                  <li class="go-NavigationDrawer-listItem">
+                    <a href="https://go.dev/solutions/use-cases">
+                      Use Cases
+                    </a>
+                  </li>
+                  <li class="go-NavigationDrawer-listItem">
+                    <a href="https://go.dev/security/">
+                      Security
+                    </a>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </li>
+          <li class="go-NavigationDrawer-listItem">
+            <a href="https://go.dev/learn/">Learn</a>
+          </li>
+          <li class="go-NavigationDrawer-listItem js-mobile-subnav-trigger go-NavigationDrawer-hasSubnav">
+            <a href="#">
+              <span>Docs</span>
+              <i class="material-icons">
+                <img class="go-Icon" height="24" width="24"
+                  src="/static/shared/icon/navigate_next_gm_grey_24dp.svg" alt="">
+              </i>
+            </a>
+
+            <div class="go-NavigationDrawer go-NavigationDrawer-submenuItem">
+              <div class="go-NavigationDrawer-nav">
+                <div class="go-NavigationDrawer-header">
+                  <a href="#"><i class="material-icons">
+                    <img class="go-Icon" height="24" width="24"
+                      src="/static/shared/icon/navigate_before_gm_grey_24dp.svg" alt="">
+                    </i>
+                    Docs
+                  </a>
+                </div>
+                <ul class="go-NavigationDrawer-list">
+                  <li class="go-NavigationDrawer-listItem">
+                    <a href="https://go.dev/doc/effective_go">
+                      Effective Go
+                    </a>
+                  </li>
+                  <li class="go-NavigationDrawer-listItem">
+                    <a href="https://go.dev/doc/">
+                      Go User Manual
+                    </a>
+                  </li>
+                  <li class="go-NavigationDrawer-listItem">
+                    <a href="https://pkg.go.dev/std">
+                      Standard library
+                    </a>
+                  </li>
+                  <li class="go-NavigationDrawer-listItem">
+                    <a href="https://go.dev/doc/devel/release">
+                      Release Notes
+                    </a>
+                  </li>
+                  <li class="go-NavigationDrawer-listItem">
+                    <a href="/api">
+                      API
+                    </a>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </li>
+          <li class="go-NavigationDrawer-listItem go-NavigationDrawer-listItem--active">
+            <a href="/">Packages</a>
+          </li>
+          <li class="go-NavigationDrawer-listItem js-mobile-subnav-trigger go-NavigationDrawer-hasSubnav">
+            <a href="#">
+              <span>Community</span>
+              <i class="material-icons">
+                <img class="go-Icon" height="24" width="24"
+                  src="/static/shared/icon/navigate_next_gm_grey_24dp.svg" alt="">
+              </i>
+            </a>
+            <div class="go-NavigationDrawer go-NavigationDrawer-submenuItem">
+              <div class="go-NavigationDrawer-nav">
+                <div class="go-NavigationDrawer-header">
+                  <a href="#">
+                    <i class="material-icons">
+                      <img class="go-Icon" height="24" width="24"
+                        src="/static/shared/icon/navigate_before_gm_grey_24dp.svg" alt="">
+                    </i>
+                    Community
+                  </a>
+                </div>
+                <ul class="go-NavigationDrawer-list">
+                  <li class="go-NavigationDrawer-listItem">
+                    <a href="https://go.dev/talks/">
+                      Recorded Talks
+                    </a>
+                  </li>
+                  <li class="go-NavigationDrawer-listItem">
+                    <a href="https://www.meetup.com/pro/go">
+                      Meetups
+                      <i class="material-icons">
+                      <img class="go-Icon" height="24" width="24"
+                          src="/static/shared/icon/launch_gm_grey_24dp.svg" alt="">
+                      </i>
+                    </a>
+                  </li>
+                  <li class="go-NavigationDrawer-listItem">
+                    <a href="https://github.com/golang/go/wiki/Conferences">
+                      Conferences
+                      <i class="material-icons">
+                        <img class="go-Icon" height="24" width="24" src="/static/shared/icon/launch_gm_grey_24dp.svg" alt="">
+                      </i>
+                    </a>
+                  </li>
+                  <li class="go-NavigationDrawer-listItem">
+                    <a href="https://go.dev/blog">
+                      Go blog
+                    </a>
+                  </li>
+                  <li class="go-NavigationDrawer-listItem">
+                    <a href="https://go.dev/help">
+                      Go project
+                    </a>
+                  </li>
+                  <li class="go-NavigationDrawer-listItem">
+                    <div>Get connected</div>
+                    <div class="go-Header-socialIcons">
+                        <a class="go-Header-socialIcon" href="https://groups.google.com/g/golang-nuts"><img src="/static/shared/logo/social/google-groups.svg" /></a>
+                        <a class="go-Header-socialIcon" href="https://github.com/golang"><img src="/static/shared/logo/social/github.svg" /></a>
+                        <a class="go-Header-socialIcon" href="https://twitter.com/golang"><img src="/static/shared/logo/social/twitter.svg" /></a>
+                        <a class="go-Header-socialIcon" href="https://www.reddit.com/r/golang/"><img src="/static/shared/logo/social/reddit.svg" /></a>
+                        <a class="go-Header-socialIcon" href="https://invite.slack.golangbridge.org/"><img src="/static/shared/logo/social/slack.svg" /></a>
+                        <a class="go-Header-socialIcon" href="https://stackoverflow.com/collectives/go"><img src="/static/shared/logo/social/stack-overflow.svg" /></a>
+                    </div>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </li>
+      </ul>
+    </nav>
+  </aside>
+  <div class="go-NavigationDrawer-scrim js-scrim" role="presentation"></div>
+
+    
+  <main class="go-Main" id="main-content">
+    <div class="go-Main-banner" role="alert"></div>
+    <header class="go-Main-header js-mainHeader">
+  
+  
+  <nav class="go-Main-headerBreadcrumb go-Breadcrumb" aria-label="Breadcrumb" data-test-id="UnitHeader-breadcrumb">
+    <ol>
+      
+        
+          <li data-test-id="UnitHeader-breadcrumbItem">
+            <a href="/" data-gtmc="breadcrumb link">Discover Packages</a>
+          </li>
+        
+          <li data-test-id="UnitHeader-breadcrumbItem">
+            <a href="/github.com/davidlukac/escp-go" data-gtmc="breadcrumb link">github.com/davidlukac/escp-go</a>
+          </li>
+        
+        <li>
+          <a href="/github.com/davidlukac/escp-go@v0.0.0/escptest" data-gtmc="breadcrumb link" aria-current="location"
+              data-test-id="UnitHeader-breadcrumbCurrent">
+            escptest
+          </a>
+          
+            <button
+              class="go-Button go-Button--inline go-Clipboard js-clipboard"
+              title="Copy path to clipboard.&#10;&#10;github.com/davidlukac/escp-go/escptest"
+              aria-label="Copy Path to Clipboard"
+              data-to-copy="github.com/davidlukac/escp-go/escptest"
+              data-gtmc="breadcrumbs button"
+            >
+              <img
+                class="go-Icon go-Icon--accented"
+                height="24"
+                width="24"
+                src="/static/shared/icon/content_copy_gm_grey_24dp.svg"
+                alt=""
+              >
+            </button>
+          
+        
+      </li>
+    </ol>
+  </nav>
+
+  <div class="go-Main-headerContent">
+    
+  <div class="go-Main-headerTitle js-stickyHeader">
+    <a class="go-Main-headerLogo" href="/" aria-hidden="true" tabindex="-1" data-gtmc="header link" aria-label="Link to Go Homepage">
+      <img height="78" width="207" src="/static/shared/logo/go-blue.svg" alt="Go">
+    </a>
+    <h1 class="UnitHeader-titleHeading" data-test-id="UnitHeader-title">escptest</h1>
+    
+      <span class="go-Chip go-Chip--inverted">package</span>
+    
+    
+      
+        <button
+          class="go-Button go-Button--inline go-Clipboard js-clipboard"
+          title="Copy path to clipboard.&#10;&#10;github.com/davidlukac/escp-go/escptest"
+          aria-label="Copy Path to Clipboard"
+          data-to-copy="github.com/davidlukac/escp-go/escptest"
+          data-gtmc="title button"
+          tabindex="-1"
+        >
+          <img
+            class="go-Icon go-Icon--accented"
+            height="24"
+            width="24"
+            src="/static/shared/icon/content_copy_gm_grey_24dp.svg"
+            alt=""
+          />
+        </button>
+      
+    
+  </div>
+
+    
+      
+  <div class="go-Main-headerDetails">
+    
+      
+  <span class="go-Main-headerDetailItem" data-test-id="UnitHeader-version">
+    <a href="?tab=versions" aria-label="Version: v0.0.0" 
+    data-gtmc="header link" aria-describedby="version-description">
+      <span class="go-textSubtle" aria-hidden="true">Version: </span>
+        v0.0.0
+    </a>
+    <div class="screen-reader-only" id="version-description" hidden>
+      Opens a new window with list of versions in this module.
+    </div>
+    
+    <span class="DetailsHeader-badge--unknown" data-test-id="UnitHeader-minorVersionBanner">
+      <span class="go-Chip DetailsHeader-span--latest">Latest</span>
+      <span class="go-Chip DetailsHeader-span--notAtLatest">
+        Latest
+        
+  <details class="go-Tooltip js-tooltip" data-gtmc="tooltip">
+    <summary>
+      <img class="go-Icon go-Icon--inverted" height="24" width="24" src="/static/shared/icon/alert_gm_grey_24dp.svg" alt="Warning">
+    </summary>
+    <p>This package is not in the latest version of its module.</p>
+  </details>
+
+      </span>
+      <a href="/github.com/davidlukac/escp-go/escptest" aria-label="Go to Latest Version" data-gtmc="header link">
+        <span class="go-Chip go-Chip--alert DetailsHeader-span--goToLatest">Go to latest</span>
+      </a>
+    </span>
+  </span>
+
+      
+  <span class="go-Main-headerDetailItem" data-test-id="UnitHeader-commitTime">
+    Published: Oct 31, 2026
+  </span>
+
+      
+  <span class="go-Main-headerDetailItem" data-test-id="UnitHeader-licenses">
+    License: <a href="/github.com/davidlukac/escp-go/escptest?tab=licenses" data-test-id="UnitHeader-license" 
+        data-gtmc="header link" aria-describedby="license-description">MIT</a>
+      
+    
+  </span>
+  <div class="screen-reader-only" id="license-description" hidden>
+    Opens a new window with license information.
+  </div>
+
+      
+        
+  <span class="go-Main-headerDetailItem" data-test-id="UnitHeader-imports">
+    <a href="/github.com/davidlukac/escp-go/escptest?tab=imports" aria-label="Imports: 0"
+        data-gtmc="header link" aria-describedby="imports-description">
+      <span class="go-textSubtle">Imports: </span>0
+    </a>
+  </span>
+  <div class="screen-reader-only" id="imports-description" hidden>
+    Opens a new window with list of imports.
+  </div>
+
+        
+  <span class="go-Main-headerDetailItem" data-test-id="UnitHeader-importedby">
+    <a href="/github.com/davidlukac/escp-go/escptest?tab=importedby" aria-label="Imported By: 0"
+        data-gtmc="header link" aria-describedby="importedby-description">
+       <span class="go-textSubtle">Imported by: </span>0
+    </a>
+  </span>
+  <div class="screen-reader-only" id="importedby-description" hidden>
+    Opens a new window with list of known importers.
+  </div>
+
+      
+    
+  </div>
+  
+  <div class="UnitHeader-overflowContainer">
+    <svg class="UnitHeader-overflowImage" xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24">
+      <path d="M0 0h24v24H0z" fill="none"/>
+      <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+    </svg>
+    <select class="UnitHeader-overflowSelect js-selectNav" tabindex="-1">
+      <option value="/">Main</option>
+      <option value="/github.com/davidlukac/escp-go/escptest?tab=versions">
+        Versions
+      </option>
+      <option value="/github.com/davidlukac/escp-go/escptest?tab=licenses">
+        Licenses
+      </option>
+      
+        <option value="/github.com/davidlukac/escp-go/escptest?tab=imports">
+          Imports
+        </option>
+        <option value="/github.com/davidlukac/escp-go/escptest?tab=importedby">
+          Imported By
+        </option>
+      
+    </select>
+  </div>
+
+
+    
+  </div>
+
+</header>
+    
+      <aside class="go-Main-aside  js-mainAside">
+  
+  <div class="UnitMeta">
+    <h2 class="go-textLabel">Details</h2>
+    
+  <ul class="UnitMeta-details">
+    <li>
+      <details class="go-Tooltip js-tooltip" data-gtmc="tooltip">
+        <summary class="go-textSubtle">
+          
+  <img class="go-Icon go-Icon--accented"
+    tabindex="0"
+    role="button"src="/static/shared/icon/check_circle_gm_grey_24dp.svg" alt="checked" aria-label="Valid file, toggle tooltip"height="24" width="24">
+
+          Valid <a href="/files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go//go.mod" target="_blank" rel="noopener">go.mod</a> file
+          <img class="go-Icon" role="button" tabindex="0" src="/static/shared/icon/help_gm_grey_24dp.svg" alt="" aria-label="Toggle go.mod validity tooltip" height="24" width="24">
+        </summary>
+        <p aria-live="polite" role="tooltip">
+          The Go module system was introduced in Go 1.11 and is the official dependency management
+          solution for Go.
+        </p>
+      </details>
+    </li>
+    <li>
+      <details class="go-Tooltip js-tooltip" data-gtmc="tooltip">
+        <summary class="go-textSubtle">
+          
+  <img class="go-Icon go-Icon--accented"
+    tabindex="0"
+    role="button"src="/static/shared/icon/check_circle_gm_grey_24dp.svg" alt="checked" aria-label="Valid file, toggle tooltip"height="24" width="24">
+
+          Redistributable license
+          <img class="go-Icon" role="button" tabindex="0" src="/static/shared/icon/help_gm_grey_24dp.svg" alt="" aria-label="Toggle redistributable help tooltip" height="24" width="24">
+        </summary>
+        <p aria-live="polite" role="tooltip">
+          Redistributable licenses place minimal restrictions on how software can be used,
+          modified, and redistributed.
+        </p>
+      </details>
+    </li>
+    <li>
+      <details class="go-Tooltip js-tooltip" data-gtmc="tooltip">
+        <summary class="go-textSubtle">
+          
+  <img class="go-Icon go-Icon--accented"
+    tabindex="0"
+    role="button"src="/static/shared/icon/check_circle_gm_grey_24dp.svg" alt="checked" aria-label="Valid file, toggle tooltip"height="24" width="24">
+
+          Tagged version
+          <img class="go-Icon" role="button" tabindex="0" src="/static/shared/icon/help_gm_grey_24dp.svg" alt="" aria-label="Toggle tagged version tooltip" height="24" width="24">
+        </summary>
+        <p aria-live="polite" role="tooltip">Modules with tagged versions give importers more predictable builds.</p>
+      </details>
+    </li>
+    <li>
+      <details class="go-Tooltip js-tooltip" data-gtmc="tooltip">
+        <summary class="go-textSubtle">
+          
+  <img class="go-Icon"
+    tabindex="0"
+    role="button"src="/static/shared/icon/cancel_gm_grey_24dp.svg" alt="unchecked" aria-label="Missing or invalid file, toggle tooltip"height="24" width="24">
+
+          Stable version
+          <img class="go-Icon" role="button" tabindex="0" aria-label="Toggle stable version tooltip" src="/static/shared/icon/help_gm_grey_24dp.svg" alt="" height="24" width="24">
+        </summary>
+        <p aria-live="polite" role="tooltip">When a project reaches major version v1 it is considered stable.</p>
+      </details>
+    </li>
+    <li class="UnitMeta-detailsLearn">
+      <a href="/about#best-practices" data-gtmc="meta link">Learn more about best practices</a>
+    </li>
+  </ul>
+
+    <h2 class="go-textLabel">Repository</h2>
+    <div class="UnitMeta-repo">
+      
+        <a href="/files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/" title="/files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/" target="_blank" rel="noopener">
+          /files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/
+        </a>
+      
+    </div>
+    
+  </div>
+
+</aside>
+    
+    <nav class="go-Main-nav go-Main-nav--sticky js-mainNav" aria-label="Outline">
+  <div class="go-Main-navDesktop">
+    
+  <div class="UnitOutline-jumpTo">
+    <button class="UnitOutline-jumpToInput go-ShortcutKey js-jumpToInput"
+        aria-controls="jump-to-modal"
+        aria-label="Open Jump to Identifier"
+        data-shortcut="f"
+        data-shortcut-alt="find"
+        data-test-id="jump-to-button" data-gtmc="outline button">
+      Jump to ...
+    </button>
+  </div>
+  <ul class="go-Tree js-tree" role="tree" aria-label="Outline">
+    
+    
+      <li>
+        <a href="#section-documentation" data-gtmc="outline link">
+          Documentation
+        </a>
+        
+<ul>
+  
+    <li>
+      <a href="#pkg-overview" data-gtmc="doc outline link">Overview</a>
+    </li>
+  <li class="DocNav-overview">
+      <a href="#pkg-index" data-gtmc="doc outline link">
+        Index
+      </a>
+    </li>
+    <li class="DocNav-constants">
+      <a href="#pkg-constants" data-gtmc="doc outline link">
+        Constants
+      </a>
+    </li>
+    <li class="DocNav-variables">
+      <a href="#pkg-variables" data-gtmc="doc outline link">
+        Variables
+      </a>
+    </li>
+    <li class="DocNav-functions">
+      <a href="#pkg-functions" data-gtmc="doc outline link">
+        Functions
+      </a>
+      
+        <ul>
+          
+            <li>
+              <a href="#ConfigFile" title="ConfigFile()" data-gtmc="doc outline link">
+                ConfigFile()
+              </a>
+            </li>
+          
+            <li>
+              <a href="#DecryptSessionKey" title="DecryptSessionKey(v)" data-gtmc="doc outline link">
+                DecryptSessionKey(v)
+              </a>
+            </li>
+          
+            <li>
+              <a href="#FreeUDPPort" title="FreeUDPPort(t)" data-gtmc="doc outline link">
+                FreeUDPPort(t)
+              </a>
+            </li>
+          
+        </ul>
+      
+    </li>
+    <li class="DocNav-types">
+      <a href="#pkg-types" data-gtmc="doc outline link">
+        Types
+      </a>
+      <ul>
+        
+          
+          <li>
+            <a href="#BackupMode" title="type BackupMode" data-gtmc="doc outline link">
+              type BackupMode
+            </a>
+             
+          </li>
+        
+          
+          <li>
+            <a href="#Lease" title="type Lease" data-gtmc="doc outline link">
+              type Lease
+            </a>
+             
+          </li>
+        
+          
+          <li>
+            <a href="#LinkSpeed" title="type LinkSpeed" data-gtmc="doc outline link">
+              type LinkSpeed
+            </a>
+             
+          </li>
+        
+          
+          <li>
+            <a href="#Setting" title="type Setting" data-gtmc="doc outline link">
+              type Setting
+            </a>
+             
+          </li>
+        
+          
+          <li>
+            <a href="#Switch" title="type Switch" data-gtmc="doc outline link">
+              type Switch
+            </a>
+            
+              <ul>
+                
+                  <li>
+                    <a href="#Start" title="Start(t)"
+                        data-gtmc="doc outline link">
+                      Start(t)
+                    </a>
+                  </li>
+                
+                
+                  <li>
+                    <a href="#Switch.AllSets" title="(f) AllSets()"
+                        data-gtmc="doc outline link">
+                      (f) AllSets()
+                    </a>
+                  </li>
+                
+                  <li>
+                    <a href="#Switch.ClearSession" title="(f) ClearSession()"
+                        data-gtmc="doc outline link">
+                      (f) ClearSession()
+                    </a>
+                  </li>
+                
+                  <li>
+                    <a href="#Switch.Configure" title="(f) Configure(fn)"
+                        data-gtmc="doc outline link">
+                      (f) Configure(fn)
+                    </a>
+                  </li>
+                
+                  <li>
+                    <a href="#Switch.DropFirst" title="(f) DropFirst(n)"
+                        data-gtmc="doc outline link">
+                      (f) DropFirst(n)
+                    </a>
+                  </li>
+                
+                  <li>
+                    <a href="#Switch.DropPacket" title="(f) DropPacket(n)"
+                        data-gtmc="doc outline link">
+                      (f) DropPacket(n)
+                    </a>
+                  </li>
+                
+                  <li>
+                    <a href="#Switch.EnableModel" title="(f) EnableModel(links)"
+                        data-gtmc="doc outline link">
+                      (f) EnableModel(links)
+                    </a>
+                  </li>
+                
+                  <li>
+                    <a href="#Switch.EnableRows" title="(f) EnableRows(typ, rows)"
+                        data-gtmc="doc outline link">
+                      (f) EnableRows(typ, rows)
+                    </a>
+                  </li>
+                
+                  <li>
+                    <a href="#Switch.EnableState" title="(f) EnableState(seed)"
+                        data-gtmc="doc outline link">
+                      (f) EnableState(seed)
+                    </a>
+                  </li>
+                
+                  <li>
+                    <a href="#Switch.Hostname" title="(f) Hostname()"
+                        data-gtmc="doc outline link">
+                      (f) Hostname()
+                    </a>
+                  </li>
+                
+                  <li>
+                    <a href="#Switch.IPSent" title="(f) IPSent()"
+                        data-gtmc="doc outline link">
+                      (f) IPSent()
+                    </a>
+                  </li>
+                
+                  <li>
+                    <a href="#Switch.LED" title="(f) LED()"
+                        data-gtmc="doc outline link">
+                      (f) LED()
+                    </a>
+                  </li>
+                
+                  <li>
+                    <a href="#Switch.LastSet" title="(f) LastSet()"
+                        data-gtmc="doc outline link">
+                      (f) LastSet()
+                    </a>
+                  </li>
+                
+                  <li>
+                    <a href="#Switch.Mute" title="(f) Mute()"
+                        data-gtmc="doc outline link">
+                      (f) Mute()
+                    </a>
+                  </li>
+                
+                  <li>
+                    <a href="#Switch.Port" title="(f) Port()"
+                        data-gtmc="doc outline link">
+                      (f) Port()
+                    </a>
+                  </li>
+                
+                  <li>
+                    <a href="#Switch.PortSetting" title="(f) PortSetting(port)"
+                        data-gtmc="doc outline link">
+                      (f) PortSetting(port)
+                    </a>
+                  </li>
+                
+                  <li>
+                    <a href="#Switch.Received" title="(f) Received()"
+                        data-gtmc="doc outline link">
+                      (f) Received()
+                    </a>
+                  </li>
+                
+                  <li>
+                    <a href="#Switch.SetBackupMode" title="(f) SetBackupMode(mode)"
+                        data-gtmc="doc outline link">
+                      (f) SetBackupMode(mode)
+                    </a>
+                  </li>
+                
+                  <li>
+                    <a href="#Switch.SetBackupScript" title="(f) SetBackupScript(modes)"
+                        data-gtmc="doc outline link">
+                      (f) SetBackupScript(modes)
+                    </a>
+                  </li>
+                
+                  <li>
+                    <a href="#Switch.SetFirmware" title="(f) SetFirmware(version)"
+                        data-gtmc="doc outline link">
+                      (f) SetFirmware(version)
+                    </a>
+                  </li>
+                
+                  <li>
+                    <a href="#Switch.SetLease" title="(f) SetLease(l)"
+                        data-gtmc="doc outline link">
+                      (f) SetLease(l)
+                    </a>
+                  </li>
+                
+                  <li>
+                    <a href="#Switch.SetMAC" title="(f) SetMAC(mac)"
+                        data-gtmc="doc outline link">
+                      (f) SetMAC(mac)
+                    </a>
+                  </li>
+                
+                  <li>
+                    <a href="#Switch.SetsDropped" title="(f) SetsDropped()"
+                        data-gtmc="doc outline link">
+                      (f) SetsDropped()
+                    </a>
+                  </li>
+                
+                  <li>
+                    <a href="#Switch.WriteCount" title="(f) WriteCount()"
+                        data-gtmc="doc outline link">
+                      (f) WriteCount()
+                    </a>
+                  </li>
+                
+              </ul>
+             
+          </li>
+        
+          
+          <li>
+            <a href="#SystemSetBehaviour" title="type SystemSetBehaviour" data-gtmc="doc outline link">
+              type SystemSetBehaviour
+            </a>
+             
+          </li>
+        
+          
+          <li>
+            <a href="#TLVType" title="type TLVType" data-gtmc="doc outline link">
+              type TLVType
+            </a>
+             
+          </li>
+         
+      </ul>
+    </li>
+  
+  
+</ul>
+
+      </li>
+    
+    
+      <li>
+        <a href="#section-sourcefiles" data-gtmc="outline link">
+          Source Files
+        </a>
+      </li>
+    
+    
+  </ul>
+
+  </div>
+  <div class="go-Main-navMobile js-mainNavMobile">
+    <label class="go-Label">
+      <select class="go-Select">
+        
+          <option selected disabled>Documentation</option>
+        
+      </select>
+    </label>
+  </div>
+</nav>
+    <article class="go-Main-article js-mainContent">
+  <div class="UnitDetails" data-test-id="UnitDetails" style="display: block;">
+    <div class="UnitDetails-content js-unitDetailsContent" data-test-id="UnitDetails-content">
+      
+      
+        
+          
+  <div class="UnitDoc">
+    <h2 class="UnitDoc-title" id="section-documentation">
+      <img class="go-Icon" height="24" width="24" src="/static/shared/icon/code_gm_grey_24dp.svg" alt="">
+      Documentation
+      <a class="UnitDoc-idLink" href="#section-documentation" title="Go to Documentation" aria-label="Go to Documentation">¶</a>
+    </h2>
+    
+  
+    
+  
+
+    <div class="Documentation js-documentation">
+      
+        
+
+<div class="Documentation-content js-docContent"> <section class="Documentation-overview">
+    <h3 tabindex="-1" id="pkg-overview" class="Documentation-overviewHeader">Overview <a href="#pkg-overview" title="Go to Overview" aria-label="Go to Overview">¶</a></h3>
+
+<div role="navigation" aria-label="Table of Contents">
+  <ul class="Documentation-toc">
+      <li class="Documentation-tocItem"><a href="#hdr-Stability">Stability</a></li>
+  </ul>
+</div>
+<p>Package escptest is an in-process TL-SG108E that speaks ESCP over loopback UDP, for
+tests of code that uses the escp client. It imports only the wire codec, never the
+client, so the escp package&#39;s own tests can use it without an import cycle.
+</p><p>It models firmware 20230218 closely enough for the client&#39;s reads and writes (key
+exchange, credentials on every SET, fragmented configuration backup) and offers
+switches for the failures the client must survive: silence, dropped packets, rejected
+writes and stale discovery replies. It is a test double: it keeps almost no settings
+state, and it is no substitute for the real switch.
+</p><p>A test starts one switch and aims a client at it:
+</p><pre>sw := escptest.Start(t)
+c, err := escp.Dial(escp.Config{
+	Host: &#34;127.0.0.1&#34;, Username: escptest.Username, Password: escptest.Password,
+	SwitchPort: sw.Port(), HostPort: escptest.FreeUDPPort(t), BroadcastAddr: escptest.Loopback,
+})
+</pre><p>Faults are set inside Configure, which holds the switch&#39;s lock; what the switch
+received is read back through WriteCount, AllSets, LastSet and the other accessors, in
+the package&#39;s own Setting type.
+</p><h4 id="hdr-Stability">Stability <a class="Documentation-idLink" href="#hdr-Stability" title="Go to Stability" aria-label="Go to Stability">¶</a></h4><p>Version 0, like the escp package: names may change without notice. The switch must
+never be used outside tests.
+</p>
+</section><section class="Documentation-index">
+    <h3 id="pkg-index" class="Documentation-indexHeader">Index <a href="#pkg-index" title="Go to Index" aria-label="Go to Index">¶</a></h3>
+
+<ul class="Documentation-indexList">
+<li class="Documentation-indexConstants"><a href="#pkg-constants">Constants</a></li>
+<li class="Documentation-indexVariables"><a href="#pkg-variables">Variables</a></li>
+<li class="Documentation-indexFunction">
+        <a href="#ConfigFile">func ConfigFile() []byte</a></li>
+<li class="Documentation-indexFunction">
+        <a href="#DecryptSessionKey">func DecryptSessionKey(v []byte) []byte</a></li>
+<li class="Documentation-indexFunction">
+        <a href="#FreeUDPPort">func FreeUDPPort(t testing.TB) int</a></li>
+<li class="Documentation-indexType">
+          <a href="#BackupMode">type BackupMode</a></li>
+<li class="Documentation-indexType">
+          <a href="#Lease">type Lease</a></li>
+<li class="Documentation-indexType">
+          <a href="#LinkSpeed">type LinkSpeed</a></li>
+<li class="Documentation-indexType">
+          <a href="#Setting">type Setting</a></li>
+<li class="Documentation-indexType">
+          <a href="#Switch">type Switch</a></li>
+<li><ul class="Documentation-indexTypeFunctions">
+<li>
+            <a href="#Start">func Start(t testing.TB) *Switch</a></li>
+</ul></li>
+<li><ul class="Documentation-indexTypeMethods">
+<li>
+            <a href="#Switch.AllSets">func (f *Switch) AllSets() [][]Setting</a></li>
+<li>
+            <a href="#Switch.ClearSession">func (f *Switch) ClearSession()</a></li>
+<li>
+            <a href="#Switch.Configure">func (f *Switch) Configure(fn func(f *Switch))</a></li>
+<li>
+            <a href="#Switch.DropFirst">func (f *Switch) DropFirst(n int)</a></li>
+<li>
+            <a href="#Switch.DropPacket">func (f *Switch) DropPacket(n int)</a></li>
+<li>
+            <a href="#Switch.EnableModel">func (f *Switch) EnableModel(links map[int]LinkSpeed)</a></li>
+<li>
+            <a href="#Switch.EnableRows">func (f *Switch) EnableRows(typ wire.TLVType, rows ...[]byte)</a></li>
+<li>
+            <a href="#Switch.EnableState">func (f *Switch) EnableState(seed ...Setting)</a></li>
+<li>
+            <a href="#Switch.Hostname">func (f *Switch) Hostname() string</a></li>
+<li>
+            <a href="#Switch.IPSent">func (f *Switch) IPSent() []byte</a></li>
+<li>
+            <a href="#Switch.LED">func (f *Switch) LED() bool</a></li>
+<li>
+            <a href="#Switch.LastSet">func (f *Switch) LastSet() []Setting</a></li>
+<li>
+            <a href="#Switch.Mute">func (f *Switch) Mute()</a></li>
+<li>
+            <a href="#Switch.Port">func (f *Switch) Port() int</a></li>
+<li>
+            <a href="#Switch.PortSetting">func (f *Switch) PortSetting(port int) []byte</a></li>
+<li>
+            <a href="#Switch.Received">func (f *Switch) Received() int</a></li>
+<li>
+            <a href="#Switch.SetBackupMode">func (f *Switch) SetBackupMode(mode BackupMode)</a></li>
+<li>
+            <a href="#Switch.SetBackupScript">func (f *Switch) SetBackupScript(modes ...BackupMode)</a></li>
+<li>
+            <a href="#Switch.SetFirmware">func (f *Switch) SetFirmware(version string)</a></li>
+<li>
+            <a href="#Switch.SetLease">func (f *Switch) SetLease(l Lease)</a></li>
+<li>
+            <a href="#Switch.SetMAC">func (f *Switch) SetMAC(mac [6]byte)</a></li>
+<li>
+            <a href="#Switch.SetsDropped">func (f *Switch) SetsDropped() int</a></li>
+<li>
+            <a href="#Switch.WriteCount">func (f *Switch) WriteCount() int</a></li>
+</ul></li>
+<li class="Documentation-indexType">
+          <a href="#SystemSetBehaviour">type SystemSetBehaviour</a></li>
+<li class="Documentation-indexType">
+          <a href="#TLVType">type TLVType</a></li>
+</ul>
+</section><h3 tabindex="-1" id="pkg-constants" class="Documentation-constantsHeader">Constants <a href="#pkg-constants" title="Go to Constants" aria-label="Go to Constants">¶</a></h3>
+
+  <section class="Documentation-constants">
+    <div class="Documentation-declaration">
+      <span class="Documentation-declarationLink"><a class="Documentation-source" href="/files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/escptest/switch.go#L16">View Source</a></span>
+      <pre>const (
+<span id="Username" data-kind="constant">	Username = &#34;admin&#34;
+</span><span id="Password" data-kind="constant">	Password = &#34;secret&#34;
+</span>)</pre>
+    </div>
+  <p>Credentials the switch accepts.
+</p>
+
+    <div class="Documentation-declaration">
+      <span class="Documentation-declarationLink"><a class="Documentation-source" href="/files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/escptest/switch.go#L23">View Source</a></span>
+      <pre><span id="DefaultFirmware" data-kind="constant">const DefaultFirmware = &#34;1.0.0 Build 20230218 Rel.50633&#34;</span></pre>
+    </div>
+  <p>DefaultFirmware is the firmware version the switch reports until SetFirmware changes it:
+the build the client was verified against first.
+</p>
+</section>
+
+  <h3 tabindex="-1" id="pkg-variables" class="Documentation-variablesHeader">Variables <a href="#pkg-variables" title="Go to Variables" aria-label="Go to Variables">¶</a></h3>
+
+  <section class="Documentation-variables">
+    <div class="Documentation-declaration">
+      <span class="Documentation-declarationLink"><a class="Documentation-source" href="/files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/escptest/switch.go#L818">View Source</a></span>
+      <pre><span id="DefaultLease" data-kind="variable">var DefaultLease = <a href="#Lease">Lease</a>{IP: [4]<a href="/builtin#byte">byte</a>{127, 0, 0, 1}, Mask: [4]<a href="/builtin#byte">byte</a>{255, 255, 0, 0}, Gateway: [4]<a href="/builtin#byte">byte</a>{127, 0, 0, 2}}</span></pre>
+    </div>
+  <p>DefaultLease is the lease EnableModel gives the switch: the fake&#39;s own address with another mask
+and gateway.
+</p>
+
+    <div class="Documentation-declaration">
+      <span class="Documentation-declarationLink"><a class="Documentation-source" href="/files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/escptest/switch.go#L827">View Source</a></span>
+      <pre><span id="DefaultMAC" data-kind="variable">var DefaultMAC = [6]<a href="/builtin#byte">byte</a>{0x00, 0x00, 0x5e, 0x00, 0x53, 0x02}</span></pre>
+    </div>
+  <p>DefaultMAC is the address the fake reports unless SetMAC says otherwise (the documentation range, <a href="https://rfc-editor.org/rfc/rfc7042.html">RFC 7042</a>).
+</p>
+
+    <div class="Documentation-declaration">
+      <span class="Documentation-declarationLink"><a class="Documentation-source" href="/files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/escptest/switch.go#L128">View Source</a></span>
+      <pre><span id="Loopback" data-kind="variable">var Loopback = <a href="/net/netip">netip</a>.<a href="/net/netip#MustParseAddr">MustParseAddr</a>(&#34;127.0.0.1&#34;)</span></pre>
+    </div>
+  <p>Loopback is the address a fake switch listens on: a Config that aims at the fake gives it as
+BroadcastAddr, so discovery stays on this machine.
+</p>
+</section>
+
+  <h3 tabindex="-1" id="pkg-functions" class="Documentation-functionsHeader">Functions <a href="#pkg-functions" title="Go to Functions" aria-label="Go to Functions">¶</a></h3>
+
+  <section class="Documentation-functions"><div class="Documentation-function">
+	  
+  
+  
+    <h4 tabindex="-1" id="ConfigFile" data-kind="function" class="Documentation-functionHeader">
+      <span>func <a class="Documentation-source" href="/files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/escptest/switch.go#L407">ConfigFile</a> <a class="Documentation-idLink" href="#ConfigFile" title="Go to ConfigFile" aria-label="Go to ConfigFile">¶</a></span>
+  <span class="Documentation-sinceVersion">
+    
+  </span>
+</h4>
+
+    
+    <div class="Documentation-declaration">
+      <pre>func ConfigFile() []<a href="/builtin#byte">byte</a></pre>
+    </div>
+  <p>ConfigFile is a 2258-byte stand-in for the switch&#39;s configuration file.
+</p>
+
+  
+
+        </div><div class="Documentation-function">
+	  
+  
+  
+    <h4 tabindex="-1" id="DecryptSessionKey" data-kind="function" class="Documentation-functionHeader">
+      <span>func <a class="Documentation-source" href="/files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/escptest/switch.go#L352">DecryptSessionKey</a> <a class="Documentation-idLink" href="#DecryptSessionKey" title="Go to DecryptSessionKey" aria-label="Go to DecryptSessionKey">¶</a></span>
+  <span class="Documentation-sinceVersion">
+    
+  </span>
+</h4>
+
+    
+    <div class="Documentation-declaration">
+      <pre>func DecryptSessionKey(v []<a href="/builtin#byte">byte</a>) []<a href="/builtin#byte">byte</a></pre>
+    </div>
+  <p>DecryptSessionKey recovers the session key from the RSA key-exchange value a client sent.
+It returns nil for a value too short to be one.
+</p>
+
+  
+
+        </div><div class="Documentation-function">
+	  
+  
+  
+    <h4 tabindex="-1" id="FreeUDPPort" data-kind="function" class="Documentation-functionHeader">
+      <span>func <a class="Documentation-source" href="/files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/escptest/switch.go#L136">FreeUDPPort</a> <a class="Documentation-idLink" href="#FreeUDPPort" title="Go to FreeUDPPort" aria-label="Go to FreeUDPPort">¶</a></span>
+  <span class="Documentation-sinceVersion">
+    
+  </span>
+</h4>
+
+    
+    <div class="Documentation-declaration">
+      <pre>func FreeUDPPort(t <a href="/testing">testing</a>.<a href="/testing#TB">TB</a>) <a href="/builtin#int">int</a></pre>
+    </div>
+  <p>FreeUDPPort returns a currently unused UDP port so tests never bind the
+protocol&#39;s real client port 29809. The port is not handed out again by this package: the kernel
+may give a port it has just released to the very next bind (measured: about 1 in 10,000 when
+several goroutines bind at once), which would let a fake switch take the port a test was told to
+use and fail the client&#39;s bind with &#34;address already in use&#34;. A port taken by something outside
+this package can still collide; a client that binds late cannot rule that out.
+</p>
+
+  
+
+        </div></section>
+
+  <h3 tabindex="-1" id="pkg-types" class="Documentation-typesHeader">Types <a href="#pkg-types" title="Go to Types" aria-label="Go to Types">¶</a></h3>
+
+  <section class="Documentation-types"><div class="Documentation-type">
+      
+  
+  
+    <h4 tabindex="-1" id="BackupMode" data-kind="type" class="Documentation-typeHeader">
+      <span>type <a class="Documentation-source" href="/files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/escptest/switch.go#L26">BackupMode</a> <a class="Documentation-idLink" href="#BackupMode" title="Go to BackupMode" aria-label="Go to BackupMode">¶</a></span>
+  <span class="Documentation-sinceVersion">
+    
+  </span>
+</h4>
+
+    
+    <div class="Documentation-declaration">
+      <pre>type BackupMode <a href="/builtin#string">string</a></pre>
+    </div>
+  <p>BackupMode selects how the switch misbehaves when the configuration is read.
+</p>
+<div class="Documentation-typeConstant">
+    <div class="Documentation-declaration">
+      <pre>const (
+<span id="BackupOK" data-kind="constant">	BackupOK         <a href="#BackupMode">BackupMode</a> = &#34;&#34;
+</span><span id="BackupBadMagic" data-kind="constant">	BackupBadMagic   <a href="#BackupMode">BackupMode</a> = &#34;badmagic&#34;   <span class="comment">// the file does not start with the configuration magic</span>
+</span><span id="BackupShort" data-kind="constant">	BackupShort      <a href="#BackupMode">BackupMode</a> = &#34;short&#34;      <span class="comment">// only the magic, no body</span>
+</span><span id="BackupDropSecond" data-kind="constant">	BackupDropSecond <a href="#BackupMode">BackupMode</a> = &#34;dropsecond&#34; <span class="comment">// the last fragment never arrives</span>
+</span><span id="BackupDropFirst" data-kind="constant">	BackupDropFirst  <a href="#BackupMode">BackupMode</a> = &#34;dropfirst&#34;  <span class="comment">// only the last fragment arrives</span>
+</span><span id="BackupSilent" data-kind="constant">	BackupSilent     <a href="#BackupMode">BackupMode</a> = &#34;silent&#34;     <span class="comment">// no reply at all</span>
+</span><span id="BackupFlood" data-kind="constant">	BackupFlood      <a href="#BackupMode">BackupMode</a> = &#34;flood&#34;      <span class="comment">// fragments that never end</span>
+</span><span id="BackupCorrupt" data-kind="constant">	BackupCorrupt    <a href="#BackupMode">BackupMode</a> = &#34;corrupt&#34;    <span class="comment">// every packet arrives, but one byte of the file is wrong</span>
+</span><span id="BackupDuplicate" data-kind="constant">	BackupDuplicate  <a href="#BackupMode">BackupMode</a> = &#34;duplicate&#34;  <span class="comment">// the first fragment arrives twice</span>
+</span>)</pre>
+    </div>
+  <p>The ways a configuration backup can go wrong; BackupOK is the well-behaved switch.
+</p>
+</div>
+  
+
+    </div><div class="Documentation-type">
+      
+  
+  
+    <h4 tabindex="-1" id="Lease" data-kind="type" class="Documentation-typeHeader">
+      <span>type <a class="Documentation-source" href="/files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/escptest/switch.go#L809">Lease</a> <a class="Documentation-idLink" href="#Lease" title="Go to Lease" aria-label="Go to Lease">¶</a></span>
+  <span class="Documentation-sinceVersion">
+    
+  </span>
+</h4>
+
+    
+    <div class="Documentation-declaration">
+      <pre>type Lease struct {
+<span id="Lease.IP" data-kind="field"><span id="Lease.Mask" data-kind="field"><span id="Lease.Gateway" data-kind="field">	IP, Mask, Gateway [4]<a href="/builtin#byte">byte</a>
+</span><span id="Lease.Silence" data-kind="field">	<span class="comment">// Silence is how many packets the switch swallows after DHCP is switched on, while it asks for</span>
+</span>	<span class="comment">// the lease (a real switch was silent for about two seconds).</span>
+	Silence <a href="/builtin#int">int</a>
+}</pre>
+    </div>
+  <p>Lease is what the modelled switch gets from its DHCP server when its DHCP flag is switched on.
+The fake can only answer from 127.0.0.1, so a lease that differs from the static address in
+the mask or the gateway is what tells the two apart, as in SetIPConfig&#39;s tests.
+</p>
+
+  
+
+    </div><div class="Documentation-type">
+      
+  
+  
+    <h4 tabindex="-1" id="LinkSpeed" data-kind="type" class="Documentation-typeHeader">
+      <span>type <a class="Documentation-source" href="/files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/escptest/model.go#L11">LinkSpeed</a> <a class="Documentation-idLink" href="#LinkSpeed" title="Go to LinkSpeed" aria-label="Go to LinkSpeed">¶</a></span>
+  <span class="Documentation-sinceVersion">
+    
+  </span>
+</h4>
+
+    
+    <div class="Documentation-declaration">
+      <pre>type LinkSpeed <a href="/builtin#byte">byte</a></pre>
+    </div>
+  <p>LinkSpeed is the actual speed code of a port that has a link, as the switch reports it
+(0 means no link).
+</p>
+<div class="Documentation-typeConstant">
+    <div class="Documentation-declaration">
+      <pre>const (
+<span id="Link100Full" data-kind="constant">	Link100Full  <a href="#LinkSpeed">LinkSpeed</a> = 5
+</span><span id="Link1000Full" data-kind="constant">	Link1000Full <a href="#LinkSpeed">LinkSpeed</a> = 6
+</span>)</pre>
+    </div>
+  <p>Link speeds a model port can have.
+</p>
+</div>
+  
+
+    </div><div class="Documentation-type">
+      
+  
+  
+    <h4 tabindex="-1" id="Setting" data-kind="type" class="Documentation-typeHeader">
+      <span>type <a class="Documentation-source" href="/files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/escptest/switch.go#L269">Setting</a> <a class="Documentation-idLink" href="#Setting" title="Go to Setting" aria-label="Go to Setting">¶</a></span>
+  <span class="Documentation-sinceVersion">
+    
+  </span>
+</h4>
+
+    
+    <div class="Documentation-declaration">
+      <pre>type Setting struct {
+<span id="Setting.Type" data-kind="field">	Type  <a href="/github.com/davidlukac/escp-go@v0.0.0/internal/wire">wire</a>.<a href="/github.com/davidlukac/escp-go@v0.0.0/internal/wire#TLVType">TLVType</a>
+</span><span id="Setting.Value" data-kind="field">	Value []<a href="/builtin#byte">byte</a>
+</span>}</pre>
+    </div>
+  <p>Setting is one entry of a request or a reply: a protocol type number (the numbers of
+internal/escp/PROTOCOL.md) and its value. It is the fake&#39;s own type, so a test outside the
+escp module needs nothing from the client&#39;s internals to read or script traffic.
+</p>
+
+  
+
+    </div><div class="Documentation-type">
+      
+  
+  
+    <h4 tabindex="-1" id="Switch" data-kind="type" class="Documentation-typeHeader">
+      <span>type <a class="Documentation-source" href="/files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/escptest/switch.go#L62">Switch</a> <a class="Documentation-idLink" href="#Switch" title="Go to Switch" aria-label="Go to Switch">¶</a></span>
+  <span class="Documentation-sinceVersion">
+    
+  </span>
+</h4>
+
+    
+    <div class="Documentation-declaration">
+      <pre>type Switch struct {
+
+<span id="Switch.GetFn" data-kind="field">	<span class="comment">// GetFn scripts the reply to GETs: the settings, the error code, and whether to stay silent.</span>
+</span>	GetFn func(types []<a href="/github.com/davidlukac/escp-go@v0.0.0/internal/wire">wire</a>.<a href="/github.com/davidlukac/escp-go@v0.0.0/internal/wire#TLVType">TLVType</a>) (settings []<a href="#Setting">Setting</a>, code <a href="/builtin#int32">int32</a>, drop <a href="/builtin#bool">bool</a>)
+<span id="Switch.RSADrop" data-kind="field">	<span class="comment">// RSADrop makes the switch ignore the key exchange.</span>
+</span>	RSADrop <a href="/builtin#bool">bool</a>
+<span id="Switch.RSACode" data-kind="field">	<span class="comment">// RSACode answers the key exchange with this code instead of the success code.</span>
+</span>	RSACode <a href="/builtin#int32">int32</a>
+<span id="Switch.DropSets" data-kind="field">	<span class="comment">// DropSets makes the switch ignore authenticated SETs.</span>
+</span>	DropSets <a href="/builtin#bool">bool</a>
+<span id="Switch.DiscoverReply" data-kind="field">	<span class="comment">// DiscoverReply replaces the discovery reply; nil keeps the default TL-SG108E reply.</span>
+</span>	DiscoverReply []<a href="#Setting">Setting</a>
+<span id="Switch.RejectSetsFrom" data-kind="field">	<span class="comment">// RejectSetsFrom rejects the nth and every later authenticated SET (1-based); 0 accepts all.</span>
+</span>	RejectSetsFrom <a href="/builtin#int">int</a>
+<span id="Switch.RejectCode" data-kind="field">	<span class="comment">// RejectCode is the reply code of a rejected SET; 0 means 9.</span>
+</span>	RejectCode <a href="/builtin#int32">int32</a>
+<span id="Switch.StaleAfterSet" data-kind="field">	<span class="comment">// StaleAfterSet makes the next n discoveries after a system SET still report the old address.</span>
+</span>	StaleAfterSet <a href="/builtin#int">int</a>
+<span id="Switch.OnSystemSet" data-kind="field">	<span class="comment">// OnSystemSet is what the switch does after applying a system SET; the default replies.</span>
+</span>	OnSystemSet <a href="#SystemSetBehaviour">SystemSetBehaviour</a>
+<span id="Switch.AfterSystemSet" data-kind="field">	<span class="comment">// AfterSystemSet, when set, is called (without the lock) once a system SET has been applied</span>
+</span>	<span class="comment">// and before the switch replies or leaves, so a test can act at exactly that moment.</span>
+	AfterSystemSet func()
+	<span class="comment">// contains filtered or unexported fields</span>
+}</pre>
+    </div>
+  <p>Switch is the fake. Create it with Start; change its behaviour with Configure.
+It can decrypt the session key because the switch&#39;s 64-bit RSA modulus factors
+trivially (p=3443843009, q=3765816959), which is also why ESCP offers no real secrecy.
+</p>
+<div class="Documentation-typeFunc">
+    
+  
+  
+    <h4 tabindex="-1" id="Start" data-kind="function" class="Documentation-typeFuncHeader">
+      <span>func <a class="Documentation-source" href="/files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/escptest/switch.go#L183">Start</a> <a class="Documentation-idLink" href="#Start" title="Go to Start" aria-label="Go to Start">¶</a></span>
+  <span class="Documentation-sinceVersion">
+    
+  </span>
+</h4>
+
+    
+    <div class="Documentation-declaration">
+      <pre>func Start(t <a href="/testing">testing</a>.<a href="/testing#TB">TB</a>) *<a href="#Switch">Switch</a></pre>
+    </div>
+  <p>Start runs a fake switch on a free loopback UDP port until the test ends. The LED starts on.
+</p>
+
+  
+
+  </div><div class="Documentation-typeMethod">
+    
+  
+  
+    <h4 tabindex="-1" id="Switch.AllSets" data-kind="method" class="Documentation-typeMethodHeader">
+      <span>func (*Switch) <a class="Documentation-source" href="/files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/escptest/switch.go#L298">AllSets</a> <a class="Documentation-idLink" href="#Switch.AllSets" title="Go to Switch.AllSets" aria-label="Go to Switch.AllSets">¶</a></span>
+  <span class="Documentation-sinceVersion">
+    
+  </span>
+</h4>
+
+    
+    <div class="Documentation-declaration">
+      <pre>func (f *<a href="#Switch">Switch</a>) AllSets() [][]<a href="#Setting">Setting</a></pre>
+    </div>
+  <p>AllSets returns the settings of every accepted SET in order, credentials removed.
+</p>
+
+  
+
+  </div><div class="Documentation-typeMethod">
+    
+  
+  
+    <h4 tabindex="-1" id="Switch.ClearSession" data-kind="method" class="Documentation-typeMethodHeader">
+      <span>func (*Switch) <a class="Documentation-source" href="/files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/escptest/switch.go#L239">ClearSession</a> <a class="Documentation-idLink" href="#Switch.ClearSession" title="Go to Switch.ClearSession" aria-label="Go to Switch.ClearSession">¶</a></span>
+  <span class="Documentation-sinceVersion">
+    
+  </span>
+</h4>
+
+    
+    <div class="Documentation-declaration">
+      <pre>func (f *<a href="#Switch">Switch</a>) ClearSession()</pre>
+    </div>
+  <p>ClearSession forgets the session key, as after a reboot: the client must exchange keys again.
+</p>
+
+  
+
+  </div><div class="Documentation-typeMethod">
+    
+  
+  
+    <h4 tabindex="-1" id="Switch.Configure" data-kind="method" class="Documentation-typeMethodHeader">
+      <span>func (*Switch) <a class="Documentation-source" href="/files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/escptest/switch.go#L242">Configure</a> <a class="Documentation-idLink" href="#Switch.Configure" title="Go to Switch.Configure" aria-label="Go to Switch.Configure">¶</a></span>
+  <span class="Documentation-sinceVersion">
+    
+  </span>
+</h4>
+
+    
+    <div class="Documentation-declaration">
+      <pre>func (f *<a href="#Switch">Switch</a>) Configure(fn func(f *<a href="#Switch">Switch</a>))</pre>
+    </div>
+  <p>Configure changes the fake&#39;s behaviour under its lock.
+</p>
+
+  
+
+  </div><div class="Documentation-typeMethod">
+    
+  
+  
+    <h4 tabindex="-1" id="Switch.DropFirst" data-kind="method" class="Documentation-typeMethodHeader">
+      <span>func (*Switch) <a class="Documentation-source" href="/files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/escptest/switch.go#L233">DropFirst</a> <a class="Documentation-idLink" href="#Switch.DropFirst" title="Go to Switch.DropFirst" aria-label="Go to Switch.DropFirst">¶</a></span>
+  <span class="Documentation-sinceVersion">
+    
+  </span>
+</h4>
+
+    
+    <div class="Documentation-declaration">
+      <pre>func (f *<a href="#Switch">Switch</a>) DropFirst(n <a href="/builtin#int">int</a>)</pre>
+    </div>
+  <p>DropFirst makes the switch ignore the first n packets it receives. A discovery probe is sent
+twice per attempt (to the switch and to the broadcast address, which a test points at the same
+fake), so DropFirst(2) loses exactly one whole attempt of a probe.
+</p>
+
+  
+
+  </div><div class="Documentation-typeMethod">
+    
+  
+  
+    <h4 tabindex="-1" id="Switch.DropPacket" data-kind="method" class="Documentation-typeMethodHeader">
+      <span>func (*Switch) <a class="Documentation-source" href="/files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/escptest/switch.go#L200">DropPacket</a> <a class="Documentation-idLink" href="#Switch.DropPacket" title="Go to Switch.DropPacket" aria-label="Go to Switch.DropPacket">¶</a></span>
+  <span class="Documentation-sinceVersion">
+    
+  </span>
+</h4>
+
+    
+    <div class="Documentation-declaration">
+      <pre>func (f *<a href="#Switch">Switch</a>) DropPacket(n <a href="/builtin#int">int</a>)</pre>
+    </div>
+  <p>DropPacket makes the switch ignore the nth packet it receives (1-based), to test retries.
+</p>
+
+  
+
+  </div><div class="Documentation-typeMethod">
+    
+  
+  
+    <h4 tabindex="-1" id="Switch.EnableModel" data-kind="method" class="Documentation-typeMethodHeader">
+      <span>func (*Switch) <a class="Documentation-source" href="/files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/escptest/model.go#L55">EnableModel</a> <a class="Documentation-idLink" href="#Switch.EnableModel" title="Go to Switch.EnableModel" aria-label="Go to Switch.EnableModel">¶</a></span>
+  <span class="Documentation-sinceVersion">
+    
+  </span>
+</h4>
+
+    
+    <div class="Documentation-declaration">
+      <pre>func (f *<a href="#Switch">Switch</a>) EnableModel(links map[<a href="/builtin#int">int</a>]<a href="#LinkSpeed">LinkSpeed</a>)</pre>
+    </div>
+  <p>EnableModel turns the switch into a model of a freshly reset TL-SG108E: eight ports on auto
+speed (those in links have a link at that speed), no LAG, every port in the default
+port-based VLAN, IGMP and loop prevention on, QoS in DSCP mode, no limits and no mirror. It
+also enforces the cross-setting rules the real switch enforces, with the refusal codes
+measured on firmware 20250710: LAG members must agree on speed, flow control and admin
+state and may not be mirrored, limited or in another VLAN; port-based VLAN membership is
+exclusive, and a port left in none returns to VLAN 1.
+</p>
+
+  
+
+  </div><div class="Documentation-typeMethod">
+    
+  
+  
+    <h4 tabindex="-1" id="Switch.EnableRows" data-kind="method" class="Documentation-typeMethodHeader">
+      <span>func (*Switch) <a class="Documentation-source" href="/files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/escptest/switch.go#L714">EnableRows</a> <a class="Documentation-idLink" href="#Switch.EnableRows" title="Go to Switch.EnableRows" aria-label="Go to Switch.EnableRows">¶</a></span>
+  <span class="Documentation-sinceVersion">
+    
+  </span>
+</h4>
+
+    
+    <div class="Documentation-declaration">
+      <pre>func (f *<a href="#Switch">Switch</a>) EnableRows(typ <a href="/github.com/davidlukac/escp-go@v0.0.0/internal/wire">wire</a>.<a href="/github.com/davidlukac/escp-go@v0.0.0/internal/wire#TLVType">TLVType</a>, rows ...[]<a href="/builtin#byte">byte</a>)</pre>
+    </div>
+  <p>EnableRows declares a table the switch keeps one TLV per row of (the ports, the QoS priorities,
+the bandwidth and storm rates) and seeds it. A row is identified by its first byte, the port
+number: a SET replaces the row with the same first byte, a GET returns every row in order.
+A write of the port table (TLV 4096) keeps what only the switch decides, the LAG and the
+actual speed, and derives the actual flow control from the configured one. Call EnableState
+first.
+</p>
+
+  
+
+  </div><div class="Documentation-typeMethod">
+    
+  
+  
+    <h4 tabindex="-1" id="Switch.EnableState" data-kind="method" class="Documentation-typeMethodHeader">
+      <span>func (*Switch) <a class="Documentation-source" href="/files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/escptest/switch.go#L217">EnableState</a> <a class="Documentation-idLink" href="#Switch.EnableState" title="Go to Switch.EnableState" aria-label="Go to Switch.EnableState">¶</a></span>
+  <span class="Documentation-sinceVersion">
+    
+  </span>
+</h4>
+
+    
+    <div class="Documentation-declaration">
+      <pre>func (f *<a href="#Switch">Switch</a>) EnableState(seed ...<a href="#Setting">Setting</a>)</pre>
+    </div>
+  <p>EnableState makes the switch remember settings: every accepted SET stores the value of each
+TLV it carries, and a GET for a type it holds (seeded here or written since) answers with that
+value, so a write can be read back the way the real switch does it. Types it holds nothing
+for fall through to the scripted replies (LED, QoS, port count), and GetFn still wins. The
+seeds are the settings the switch starts with.
+</p>
+
+  
+
+  </div><div class="Documentation-typeMethod">
+    
+  
+  
+    <h4 tabindex="-1" id="Switch.Hostname" data-kind="method" class="Documentation-typeMethodHeader">
+      <span>func (*Switch) <a class="Documentation-source" href="/files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/escptest/switch.go#L330">Hostname</a> <a class="Documentation-idLink" href="#Switch.Hostname" title="Go to Switch.Hostname" aria-label="Go to Switch.Hostname">¶</a></span>
+  <span class="Documentation-sinceVersion">
+    
+  </span>
+</h4>
+
+    
+    <div class="Documentation-declaration">
+      <pre>func (f *<a href="#Switch">Switch</a>) Hostname() <a href="/builtin#string">string</a></pre>
+    </div>
+  <p>Hostname is the device description set by the last hostname SET (&#34;&#34; before any).
+</p>
+
+  
+
+  </div><div class="Documentation-typeMethod">
+    
+  
+  
+    <h4 tabindex="-1" id="Switch.IPSent" data-kind="method" class="Documentation-typeMethodHeader">
+      <span>func (*Switch) <a class="Documentation-source" href="/files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/escptest/switch.go#L337">IPSent</a> <a class="Documentation-idLink" href="#Switch.IPSent" title="Go to Switch.IPSent" aria-label="Go to Switch.IPSent">¶</a></span>
+  <span class="Documentation-sinceVersion">
+    
+  </span>
+</h4>
+
+    
+    <div class="Documentation-declaration">
+      <pre>func (f *<a href="#Switch">Switch</a>) IPSent() []<a href="/builtin#byte">byte</a></pre>
+    </div>
+  <p>IPSent is the IP address carried by the last hostname SET (nil before any).
+</p>
+
+  
+
+  </div><div class="Documentation-typeMethod">
+    
+  
+  
+    <h4 tabindex="-1" id="Switch.LED" data-kind="method" class="Documentation-typeMethodHeader">
+      <span>func (*Switch) <a class="Documentation-source" href="/files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/escptest/switch.go#L316">LED</a> <a class="Documentation-idLink" href="#Switch.LED" title="Go to Switch.LED" aria-label="Go to Switch.LED">¶</a></span>
+  <span class="Documentation-sinceVersion">
+    
+  </span>
+</h4>
+
+    
+    <div class="Documentation-declaration">
+      <pre>func (f *<a href="#Switch">Switch</a>) LED() <a href="/builtin#bool">bool</a></pre>
+    </div>
+  <p>LED is the LED state the switch holds: the last LED SET it accepted.
+</p>
+
+  
+
+  </div><div class="Documentation-typeMethod">
+    
+  
+  
+    <h4 tabindex="-1" id="Switch.LastSet" data-kind="method" class="Documentation-typeMethodHeader">
+      <span>func (*Switch) <a class="Documentation-source" href="/files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/escptest/switch.go#L309">LastSet</a> <a class="Documentation-idLink" href="#Switch.LastSet" title="Go to Switch.LastSet" aria-label="Go to Switch.LastSet">¶</a></span>
+  <span class="Documentation-sinceVersion">
+    
+  </span>
+</h4>
+
+    
+    <div class="Documentation-declaration">
+      <pre>func (f *<a href="#Switch">Switch</a>) LastSet() []<a href="#Setting">Setting</a></pre>
+    </div>
+  <p>LastSet returns the settings of the most recent accepted SET, credentials removed.
+</p>
+
+  
+
+  </div><div class="Documentation-typeMethod">
+    
+  
+  
+    <h4 tabindex="-1" id="Switch.Mute" data-kind="method" class="Documentation-typeMethodHeader">
+      <span>func (*Switch) <a class="Documentation-source" href="/files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/escptest/switch.go#L236">Mute</a> <a class="Documentation-idLink" href="#Switch.Mute" title="Go to Switch.Mute" aria-label="Go to Switch.Mute">¶</a></span>
+  <span class="Documentation-sinceVersion">
+    
+  </span>
+</h4>
+
+    
+    <div class="Documentation-declaration">
+      <pre>func (f *<a href="#Switch">Switch</a>) Mute()</pre>
+    </div>
+  <p>Mute makes the switch ignore everything from now on, as if it had gone away.
+</p>
+
+  
+
+  </div><div class="Documentation-typeMethod">
+    
+  
+  
+    <h4 tabindex="-1" id="Switch.Port" data-kind="method" class="Documentation-typeMethodHeader">
+      <span>func (*Switch) <a class="Documentation-source" href="/files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/escptest/switch.go#L197">Port</a> <a class="Documentation-idLink" href="#Switch.Port" title="Go to Switch.Port" aria-label="Go to Switch.Port">¶</a></span>
+  <span class="Documentation-sinceVersion">
+    
+  </span>
+</h4>
+
+    
+    <div class="Documentation-declaration">
+      <pre>func (f *<a href="#Switch">Switch</a>) Port() <a href="/builtin#int">int</a></pre>
+    </div>
+  <p>Port is the UDP port the switch listens on; give it to the client as its switch port.
+</p>
+
+  
+
+  </div><div class="Documentation-typeMethod">
+    
+  
+  
+    <h4 tabindex="-1" id="Switch.PortSetting" data-kind="method" class="Documentation-typeMethodHeader">
+      <span>func (*Switch) <a class="Documentation-source" href="/files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/escptest/switch.go#L344">PortSetting</a> <a class="Documentation-idLink" href="#Switch.PortSetting" title="Go to Switch.PortSetting" aria-label="Go to Switch.PortSetting">¶</a></span>
+  <span class="Documentation-sinceVersion">
+    
+  </span>
+</h4>
+
+    
+    <div class="Documentation-declaration">
+      <pre>func (f *<a href="#Switch">Switch</a>) PortSetting(port <a href="/builtin#int">int</a>) []<a href="/builtin#byte">byte</a></pre>
+    </div>
+  <p>PortSetting is the 7-byte value of the last port SET addressed to port (nil before any).
+</p>
+
+  
+
+  </div><div class="Documentation-typeMethod">
+    
+  
+  
+    <h4 tabindex="-1" id="Switch.Received" data-kind="method" class="Documentation-typeMethodHeader">
+      <span>func (*Switch) <a class="Documentation-source" href="/files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/escptest/switch.go#L210">Received</a> <a class="Documentation-idLink" href="#Switch.Received" title="Go to Switch.Received" aria-label="Go to Switch.Received">¶</a></span>
+  <span class="Documentation-sinceVersion">
+    
+  </span>
+</h4>
+
+    
+    <div class="Documentation-declaration">
+      <pre>func (f *<a href="#Switch">Switch</a>) Received() <a href="/builtin#int">int</a></pre>
+    </div>
+  <p>Received is the number of datagrams that have reached the switch so far, whatever it did with
+them. A discovery probe is two datagrams (see DropFirst). Datagrams on one socket arrive in
+order, so a count read after a reply to a later request includes every earlier one.
+</p>
+
+  
+
+  </div><div class="Documentation-typeMethod">
+    
+  
+  
+    <h4 tabindex="-1" id="Switch.SetBackupMode" data-kind="method" class="Documentation-typeMethodHeader">
+      <span>func (*Switch) <a class="Documentation-source" href="/files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/escptest/switch.go#L246">SetBackupMode</a> <a class="Documentation-idLink" href="#Switch.SetBackupMode" title="Go to Switch.SetBackupMode" aria-label="Go to Switch.SetBackupMode">¶</a></span>
+  <span class="Documentation-sinceVersion">
+    
+  </span>
+</h4>
+
+    
+    <div class="Documentation-declaration">
+      <pre>func (f *<a href="#Switch">Switch</a>) SetBackupMode(mode <a href="#BackupMode">BackupMode</a>)</pre>
+    </div>
+  <p>SetBackupMode chooses how the configuration backup misbehaves (BackupOK, the default, is a
+well-behaved switch); it applies to the next backup read.
+</p>
+
+  
+
+  </div><div class="Documentation-typeMethod">
+    
+  
+  
+    <h4 tabindex="-1" id="Switch.SetBackupScript" data-kind="method" class="Documentation-typeMethodHeader">
+      <span>func (*Switch) <a class="Documentation-source" href="/files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/escptest/switch.go#L255">SetBackupScript</a> <a class="Documentation-idLink" href="#Switch.SetBackupScript" title="Go to Switch.SetBackupScript" aria-label="Go to Switch.SetBackupScript">¶</a></span>
+  <span class="Documentation-sinceVersion">
+    
+  </span>
+</h4>
+
+    
+    <div class="Documentation-declaration">
+      <pre>func (f *<a href="#Switch">Switch</a>) SetBackupScript(modes ...<a href="#BackupMode">BackupMode</a>)</pre>
+    </div>
+  <p>SetBackupScript makes the next backup requests misbehave one mode each, in order (BackupOK for a
+request that goes well); after the last one the mode of SetBackupMode applies again. It plays a
+loss that happens once, as on a real network.
+</p>
+
+  
+
+  </div><div class="Documentation-typeMethod">
+    
+  
+  
+    <h4 tabindex="-1" id="Switch.SetFirmware" data-kind="method" class="Documentation-typeMethodHeader">
+      <span>func (*Switch) <a class="Documentation-source" href="/files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/escptest/switch.go#L323">SetFirmware</a> <a class="Documentation-idLink" href="#Switch.SetFirmware" title="Go to Switch.SetFirmware" aria-label="Go to Switch.SetFirmware">¶</a></span>
+  <span class="Documentation-sinceVersion">
+    
+  </span>
+</h4>
+
+    
+    <div class="Documentation-declaration">
+      <pre>func (f *<a href="#Switch">Switch</a>) SetFirmware(version <a href="/builtin#string">string</a>)</pre>
+    </div>
+  <p>SetFirmware changes the firmware version the switch reports in discovery replies.
+</p>
+
+  
+
+  </div><div class="Documentation-typeMethod">
+    
+  
+  
+    <h4 tabindex="-1" id="Switch.SetLease" data-kind="method" class="Documentation-typeMethodHeader">
+      <span>func (*Switch) <a class="Documentation-source" href="/files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/escptest/switch.go#L824">SetLease</a> <a class="Documentation-idLink" href="#Switch.SetLease" title="Go to Switch.SetLease" aria-label="Go to Switch.SetLease">¶</a></span>
+  <span class="Documentation-sinceVersion">
+    
+  </span>
+</h4>
+
+    
+    <div class="Documentation-declaration">
+      <pre>func (f *<a href="#Switch">Switch</a>) SetLease(l <a href="#Lease">Lease</a>)</pre>
+    </div>
+  <p>SetLease changes the lease the fake gives. The fake models the DHCP flag the way switch 03
+behaves (measured, firmware 20250710) from the start, with DefaultLease: it starts static; a system SET that carries the flag on makes it lease l (discovery
+reports the lease and DHCP on; a static address in later SETs is ignored); a SET with the flag
+off gives it the static address of that SET.
+</p>
+
+  
+
+  </div><div class="Documentation-typeMethod">
+    
+  
+  
+    <h4 tabindex="-1" id="Switch.SetMAC" data-kind="method" class="Documentation-typeMethodHeader">
+      <span>func (*Switch) <a class="Documentation-source" href="/files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/escptest/switch.go#L839">SetMAC</a> <a class="Documentation-idLink" href="#Switch.SetMAC" title="Go to Switch.SetMAC" aria-label="Go to Switch.SetMAC">¶</a></span>
+  <span class="Documentation-sinceVersion">
+    
+  </span>
+</h4>
+
+    
+    <div class="Documentation-declaration">
+      <pre>func (f *<a href="#Switch">Switch</a>) SetMAC(mac [6]<a href="/builtin#byte">byte</a>)</pre>
+    </div>
+  <p>SetMAC changes the MAC address the switch reports in its headers and in discovery replies,
+to make several fakes distinguishable or to play a different device at the same address.
+</p>
+
+  
+
+  </div><div class="Documentation-typeMethod">
+    
+  
+  
+    <h4 tabindex="-1" id="Switch.SetsDropped" data-kind="method" class="Documentation-typeMethodHeader">
+      <span>func (*Switch) <a class="Documentation-source" href="/files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/escptest/switch.go#L205">SetsDropped</a> <a class="Documentation-idLink" href="#Switch.SetsDropped" title="Go to Switch.SetsDropped" aria-label="Go to Switch.SetsDropped">¶</a></span>
+  <span class="Documentation-sinceVersion">
+    
+  </span>
+</h4>
+
+    
+    <div class="Documentation-declaration">
+      <pre>func (f *<a href="#Switch">Switch</a>) SetsDropped() <a href="/builtin#int">int</a></pre>
+    </div>
+  <p>SetsDropped is the number of authenticated SET datagrams the switch ignored under DropSets. A
+test of &#34;the write was lost&#34; uses it to show that the write really was sent, so that it does
+not pass for the wrong reason (WriteCount is zero for a write that never left the client too).
+</p>
+
+  
+
+  </div><div class="Documentation-typeMethod">
+    
+  
+  
+    <h4 tabindex="-1" id="Switch.WriteCount" data-kind="method" class="Documentation-typeMethodHeader">
+      <span>func (*Switch) <a class="Documentation-source" href="/files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/escptest/switch.go#L291">WriteCount</a> <a class="Documentation-idLink" href="#Switch.WriteCount" title="Go to Switch.WriteCount" aria-label="Go to Switch.WriteCount">¶</a></span>
+  <span class="Documentation-sinceVersion">
+    
+  </span>
+</h4>
+
+    
+    <div class="Documentation-declaration">
+      <pre>func (f *<a href="#Switch">Switch</a>) WriteCount() <a href="/builtin#int">int</a></pre>
+    </div>
+  <p>WriteCount is the number of SETs the switch accepted: the answer to &#34;was anything written?&#34;.
+</p>
+
+  
+
+  </div>
+  
+
+    </div><div class="Documentation-type">
+      
+  
+  
+    <h4 tabindex="-1" id="SystemSetBehaviour" data-kind="type" class="Documentation-typeHeader">
+      <span>type <a class="Documentation-source" href="/files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/escptest/switch.go#L43">SystemSetBehaviour</a> <a class="Documentation-idLink" href="#SystemSetBehaviour" title="Go to SystemSetBehaviour" aria-label="Go to SystemSetBehaviour">¶</a></span>
+  <span class="Documentation-sinceVersion">
+    
+  </span>
+</h4>
+
+    
+    <div class="Documentation-declaration">
+      <pre>type SystemSetBehaviour <a href="/builtin#int">int</a></pre>
+    </div>
+  <p>SystemSetBehaviour is what the switch does after it applies a system SET, the write that
+carries the hostname and the management address.
+</p>
+<div class="Documentation-typeConstant">
+    <div class="Documentation-declaration">
+      <pre>const (
+<span id="SystemSetReplies" data-kind="constant">	<span class="comment">// SystemSetReplies answers the SET and carries on.</span>
+</span>	SystemSetReplies <a href="#SystemSetBehaviour">SystemSetBehaviour</a> = <a href="/builtin#iota">iota</a>
+<span id="SystemSetLeaves" data-kind="constant">	<span class="comment">// SystemSetLeaves applies the SET without answering it, then ignores every packet except</span>
+</span>	<span class="comment">// discovery, which it still answers: a switch that has moved to its new address, seen from</span>
+	<span class="comment">// the old one. The fake cannot change its source address, so discovery still reports the</span>
+	<span class="comment">// new settings from the same address.</span>
+	SystemSetLeaves
+<span id="SystemSetVanishes" data-kind="constant">	<span class="comment">// SystemSetVanishes applies the SET without answering it, then ignores everything,</span>
+</span>	<span class="comment">// discovery included: a switch that moved and cannot be found.</span>
+	SystemSetVanishes
+)</pre>
+    </div>
+  <p>The behaviours after a system SET. SystemSetReplies is the well-behaved switch.
+</p>
+</div>
+  
+
+    </div><div class="Documentation-type">
+      
+  
+  
+    <h4 tabindex="-1" id="TLVType" data-kind="type" class="Documentation-typeHeader">
+      <span>type <a class="Documentation-source" href="/files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/escptest/switch.go#L264">TLVType</a> <a class="Documentation-idLink" href="#TLVType" title="Go to TLVType" aria-label="Go to TLVType">¶</a></span>
+  <span class="Documentation-sinceVersion">
+    
+  </span>
+</h4>
+
+    
+    <div class="Documentation-declaration">
+      <pre>type TLVType = <a href="/github.com/davidlukac/escp-go@v0.0.0/internal/wire">wire</a>.<a href="/github.com/davidlukac/escp-go@v0.0.0/internal/wire#TLVType">TLVType</a></pre>
+    </div>
+  <p>TLVType is the type number of a Setting. It is the client&#39;s own type, named here so that a test
+outside the escp module can write the func literals the fake takes (GetFn) without importing
+the client&#39;s internals; a plain number is a valid TLVType wherever a constant is expected.
+</p>
+
+  
+
+    </div></section></div> 
+
+
+
+
+
+
+
+      
+    </div>
+  </div>
+
+        
+      
+      
+        
+  <div class="UnitFiles js-unitFiles">
+    <h2 class="UnitFiles-title" id="section-sourcefiles">
+      <img class="go-Icon" height="24" width="24" src="/static/shared/icon/insert_drive_file_gm_grey_24dp.svg" alt="">
+      Source Files
+      <a class="UnitFiles-idLink" href="#section-sourcefiles" title="Go to Source Files" aria-label="Go to Source Files">¶</a>
+    </h2><div class="UnitFiles-titleLink">
+      <a href="/files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/escptest" target="_blank" rel="noopener">View all Source files</a>
+    </div><div>
+      <ul class="UnitFiles-fileList"><li><a href="/files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/escptest/doc.go" target="_blank" rel="noopener" title="doc.go">doc.go</a></li><li><a href="/files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/escptest/model.go" target="_blank" rel="noopener" title="model.go">model.go</a></li><li><a href="/files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/escptest/switch.go" target="_blank" rel="noopener" title="switch.go">switch.go</a></li></ul>
+    </div>
+  </div>
+
+      
+      
+    </div>
+  </div>
+  <div id="showInternal-description" hidden> Click to show internal directories. </div>
+  <div id="hideInternal-description" hidden> Click to hide internal directories. </div>
+</article>
+    <footer class="go-Main-footer"></footer>
+  </main>
+
+    
+  <footer class="go-Footer">
+    
+    <div class="go-Footer-links">
+      <div class="go-Footer-linkColumn">
+        <a href="https://go.dev/solutions" class="go-Footer-link go-Footer-link--primary"
+            data-gtmc="footer link">
+          Why Go
+        </a>
+        <a href="https://go.dev/solutions/use-cases" class="go-Footer-link"
+            data-gtmc="footer link">
+          Use Cases
+        </a>
+        <a href="https://go.dev/solutions/case-studies" class="go-Footer-link"
+            data-gtmc="footer link">
+          Case Studies
+        </a>
+      </div>
+      <div class="go-Footer-linkColumn">
+        <a href="https://learn.go.dev/" class="go-Footer-link go-Footer-link--primary"
+            data-gtmc="footer link">
+          Get Started
+        </a>
+        <a href="https://play.golang.org" class="go-Footer-link" data-gtmc="footer link">
+          Playground
+        </a>
+        <a href="https://tour.golang.org" class="go-Footer-link" data-gtmc="footer link">
+          Tour
+        </a>
+        <a href="https://stackoverflow.com/questions/tagged/go?tab=Newest" class="go-Footer-link"
+            data-gtmc="footer link">
+          Stack Overflow
+        </a>
+        <a href="https://go.dev/help" class="go-Footer-link"
+            data-gtmc="footer link">
+          Help
+        </a>
+      </div>
+      <div class="go-Footer-linkColumn">
+        <a href="https://pkg.go.dev" class="go-Footer-link go-Footer-link--primary"
+            data-gtmc="footer link">
+          Packages
+        </a>
+        <a href="/std" class="go-Footer-link" data-gtmc="footer link">
+          Standard Library
+        </a>
+        <a href="/golang.org/x" class="go-Footer-link" data-gtmc="footer link">
+          Sub-repositories
+        </a>
+        <a href="https://pkg.go.dev/about" class="go-Footer-link" data-gtmc="footer link">
+          About Go Packages
+        </a>
+         <a href="/api" class="go-Footer-link" data-gtmc="footer link">
+          pkg.go.dev API
+        </a>
+      </div>
+      <div class="go-Footer-linkColumn">
+        <a href="https://go.dev/project" class="go-Footer-link go-Footer-link--primary"
+            data-gtmc="footer link">
+          About
+        </a>
+        <a href="https://go.dev/dl/" class="go-Footer-link" data-gtmc="footer link">Download</a>
+        <a href="https://go.dev/blog" class="go-Footer-link" data-gtmc="footer link">Blog</a>
+        <a href="https://github.com/golang/go/issues" class="go-Footer-link" data-gtmc="footer link">
+          Issue Tracker
+        </a>
+        <a href="https://go.dev/doc/devel/release.html" class="go-Footer-link"
+            data-gtmc="footer link">
+          Release Notes
+        </a>
+        <a href="https://go.dev/brand" class="go-Footer-link" data-gtmc="footer link">
+          Brand Guidelines
+        </a>
+        <a href="https://go.dev/conduct" class="go-Footer-link" data-gtmc="footer link">
+          Code of Conduct
+        </a>
+      </div>
+      <div class="go-Footer-linkColumn">
+        <a href="https://www.twitter.com/golang" class="go-Footer-link go-Footer-link--primary"
+            data-gtmc="footer link">
+          Connect
+        </a>
+        <a href="https://www.twitter.com/golang" class="go-Footer-link" data-gtmc="footer link">
+          Twitter
+        </a>
+        <a href="https://github.com/golang" class="go-Footer-link" data-gtmc="footer link">GitHub</a>
+        <a href="https://invite.slack.golangbridge.org/" class="go-Footer-link"
+            data-gtmc="footer link">
+          Slack
+        </a>
+        <a href="https://reddit.com/r/golang" class="go-Footer-link" data-gtmc="footer link">
+          r/golang
+        </a>
+        <a href="https://www.meetup.com/pro/go" class="go-Footer-link" data-gtmc="footer link">
+          Meetup
+        </a>
+        <a href="https://golangweekly.com/" class="go-Footer-link" data-gtmc="footer link">
+          Golang Weekly
+        </a>
+      </div>
+    </div>
+    <div class="go-Footer-bottom">
+      <img class="go-Footer-gopher"  width="1431" height="901"
+          src="/static/shared/gopher/pilot-bust-1431x901.svg" alt="Gopher in flight goggles">
+      <ul class="go-Footer-listRow">
+        <li class="go-Footer-listItem">
+          <a href="https://go.dev/copyright" data-gtmc="footer link">Copyright</a>
+        </li>
+        <li class="go-Footer-listItem">
+          <a href="https://go.dev/tos" data-gtmc="footer link">Terms of Service</a>
+        </li>
+        <li class="go-Footer-listItem">
+          <a href="http://www.google.com/intl/en/policies/privacy/" data-gtmc="footer link"
+              target="_blank" rel="noopener">
+            Privacy Policy
+          </a>
+        </li>
+        <li class="go-Footer-listItem">
+          <a href="https://go.dev/s/pkgsite-feedback" target="_blank" rel="noopener"
+              data-gtmc="footer link">
+            Report an Issue
+          </a>
+        </li>
+        <li class="go-Footer-listItem">
+          <button class="go-Button go-Button--text go-Footer-toggleTheme js-toggleTheme" aria-label="Theme Toggle">
+            <img data-value="auto" class="go-Icon go-Icon--inverted" height="24" width="24" src="/static/shared/icon/brightness_6_gm_grey_24dp.svg" alt="System theme">
+            <img data-value="dark" class="go-Icon go-Icon--inverted" height="24" width="24" src="/static/shared/icon/brightness_2_gm_grey_24dp.svg" alt="Dark theme">
+            <img data-value="light" class="go-Icon go-Icon--inverted" height="24" width="24" src="/static/shared/icon/light_mode_gm_grey_24dp.svg" alt="Light theme">
+            <p> Theme Toggle </p>
+          </button>
+        </li>
+        <li class="go-Footer-listItem">
+          <button class="go-Button go-Button--text go-Footer-keyboard js-openShortcuts" aria-label="Shorcuts Modal">
+            <img class="go-Icon go-Icon--inverted" height="24" width="24" src="/static/shared/icon/keyboard_grey_24dp.svg" alt="">
+            <p> Shortcuts Modal </p>
+          </button>
+        </li>
+      </ul>
+      <a class="go-Footer-googleLogo" href="https://google.com" target="_blank"rel="noopener"
+          data-gtmc="footer link">
+        <img class="go-Footer-googleLogoImg" height="24" width="72"
+            src="/static/shared/logo/google-white.svg" alt="Google logo">
+      </a>
+    </div>
+  </footer>
+
+    
+  <dialog id="jump-to-modal" class="JumpDialog go-Modal go-Modal--md js-modal">
+    <form method="dialog" data-gmtc="jump to form" aria-label="Jump to Identifier">
+      <div class="Dialog-title go-Modal-header">
+        <h2>Jump to</h2>
+        <button
+          class="go-Button go-Button--inline"
+          type="button"
+          data-modal-close
+          data-gtmc="modal button"
+          aria-label="Close"
+        >
+          <img
+            class="go-Icon"
+            height="24"
+            width="24"
+            src="/static/shared/icon/close_gm_grey_24dp.svg"
+            alt=""
+          />
+        </button>
+      </div>
+      <div class="JumpDialog-filter">
+        <input class="JumpDialog-input go-Input" autocomplete="off" type="text">
+      </div>
+      <div class="JumpDialog-body go-Modal-body">
+        <div class="JumpDialog-list"></div>
+      </div>
+      <div class="go-Modal-actions">
+        <button class="go-Button" data-test-id="close-dialog">Close</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="ShortcutsDialog go-Modal go-Modal--sm js-modal">
+    <form method="dialog">
+      <div class="go-Modal-header">
+        <h2>Keyboard shortcuts</h2>
+        <button
+          class="go-Button go-Button--inline"
+          type="button"
+          data-modal-close
+          data-gtmc="modal button"
+          aria-label="Close"
+        >
+          <img
+            class="go-Icon"
+            height="24"
+            width="24"
+            src="/static/shared/icon/close_gm_grey_24dp.svg"
+            alt=""
+          />
+        </button>
+      </div>
+      <div class="go-Modal-body">
+        <table>
+          <tbody>
+            <tr><td class="ShortcutsDialog-key">
+              <strong>?</strong></td><td> : This menu</td>
+            </tr>
+            <tr><td class="ShortcutsDialog-key">
+              <strong>/</strong></td><td> : Search site</td>
+            </tr>
+            <tr><td class="ShortcutsDialog-key">
+              <strong>f</strong> or <strong>F</strong></td><td> : Jump to</td>
+            </tr>
+            <tr>
+              <td class="ShortcutsDialog-key"><strong>y</strong> or <strong>Y</strong></td>
+              <td> : Canonical URL</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="go-Modal-actions">
+        <button class="go-Button" data-test-id="close-dialog">Close</button>
+      </div>
+    </form>
+  </dialog>
+
+    
+    
+    
+  
+  <div class="js-canonicalURLPath" data-canonical-url-path="/github.com/davidlukac/escp-go@v0.0.0/escptest" hidden></div>
+  <div class="js-playgroundVars" data-modulepath="github.com/davidlukac/escp-go" data-version="v0.0.0" hidden></div>
+  <script>
+    loadScript('/static/frontend/unit/main/main.js')
+  </script>
+
+  <script>
+    loadScript('/static/frontend/unit/unit.js')
+  </script>
+
+  </body>
+</html>

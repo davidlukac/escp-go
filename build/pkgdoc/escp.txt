@@ -1,0 +1,3048 @@
+  escp package - github.com/davidlukac/escp-go - Go Packages
+
+#
+
+## Details
+
+          Valid go.mod file
+
+          The Go module system was introduced in Go 1.11 and is the official dependency management
+          solution for Go.
+
+          Redistributable license
+
+          Redistributable licenses place minimal restrictions on how software can be used,
+          modified, and redistributed.
+
+          Tagged version
+
+Modules with tagged versions give importers more predictable builds.
+
+          Stable version
+
+When a project reaches major version v1 it is considered stable.
+
+      Learn more about best practices
+
+## Repository
+
+          /files/Users/Madar/dev/escp-go/github.com/davidlukac/escp-go/
+
+##
+
+      README
+      ¶
+
+### escp: a Go client for TP-Link Easy Smart switches
+
+escp talks the switches' native UDP management protocol (ESCP), as spoken by the vendor's configuration utility. It reads and writes the settings of a TL-SG108E v6, finds switches on the network, validates every value before anything is sent, and ships the safety gates and a fake switch that a front end needs to use it responsibly. It is the library behind the Terraform provider for these switches, and is written to be reused by a command line client and by other programs.
+
+Status: version 0. The API may change in any minor version until 1.0; CHANGELOG.md lists every change (see also the stability section of the package documentation). Which hardware and firmware it was verified on is in the compatibility table; the wire format is in PROTOCOL.md.
+
+The switch is real network equipment with no console. A wrong write can cut the management path or the uplink, and recovery is a physical factory reset. Read Writing safely before the first write.
+
+Packages
+
+Package
+What it is
+Public
+
+escp (the repository root)
+the client, the domain types, validators, Discover
+yes
+
+escp-go/safety
+write gates (firmware, ports, impact, dry run) and the compatibility table
+yes
+
+escp-go/escptest
+a fake switch on a loopback UDP port, for tests
+yes
+
+internal/wire
+packet codec, session crypto, the TLV catalogue
+no
+
+internal/udp
+sharing the reply port between sockets
+no
+
+The file layout inside escp (one file per setting) is described in the package overview, go doc ..
+
+Install
+
+go get github.com/davidlukac/escp-go
+
+import "github.com/davidlukac/escp-go"       // package escp
+import "github.com/davidlukac/escp-go/safety" // write gates and the compatibility table
+
+Go 1.26 or later. The module has one dependency, golang.org/x/sys (to share the reply port). It is tested on Linux, macOS and Windows against a fake switch; FreeBSD builds. On a system without a port-sharing option only one client per host works at a time. Pin an exact version while the module is 0.x (see the stability note above).
+
+Read-only runnable example, which lists the switches on the network (and the ports of one when ESCP_HOST, ESCP_USERNAME and ESCP_PASSWORD are set): examples/discover.
+
+Quick start
+
+c, err := escp.Dial(escp.Config{Host: "192.0.2.11", Username: "admin", Password: escp.Password(pw)})
+if err != nil { /* ... */ }
+defer c.Close()
+
+info, err := c.Info(ctx)     // model, firmware, MAC, address: no credentials needed
+ports, err := c.Ports(ctx)   // reads cannot change the switch
+for _, p := range ports {
+	fmt.Printf("port %d: %s (configured %s)\n", p.ID, p.ActualSpeed, p.ConfiguredSpeed)
+}
+
+Dial sends nothing and binds no socket; the first call does the key exchange.
+
+A Client is safe for concurrent use but sends one request at a time, because the switch answers one at a time. Use one Client per switch. Clients for different switches work side by side; two for the same switch fail (the switch keeps one session).
+
+Every method takes a context.Context. Cancelling it stops the call, and nothing is written once it is done.
+
+Discover(ctx, DiscoverOptions{}) finds the switches on the local network without credentials or addresses.
+
+Finding a switch by MAC address
+
+A switch's address can change; its MAC address does not. Put it in the configuration and the client pins the identity and finds the switch when it has to:
+
+mac, _ := escp.ParseMAC("00:00:5e:00:53:01") // escp.MAC: a comparable value, the zero value means "no MAC"
+c, err := escp.Dial(escp.Config{MAC: mac, Username: user, Password: pw}) // no Host: found by discovery on the first request
+
+With Config.MAC set, a device that answers with another MAC is refused (ErrWrongSwitch, naming both) and nothing is written to it. The MAC is checked on every reply, the key exchange's included.
+
+With no Host, or a Host that stops answering, the client looks the switch up by its MAC (a discovery probe that stops at the first reply from that switch, normally under a second; ErrNotFound when nobody answers, after a second try of the lookup, because one right after a management move once missed a switch that was there). escp.Locate(ctx, mac, opts) is the same lookup for a front end.
+
+Dial still sends nothing; the lookup happens on the first request.
+
+Writing safely
+
+Every write follows the same steps: the arguments are validated and a bad value is refused before anything is sent (errors.Is(err, escp.ErrInvalid)); the optional write gate is asked; the write is sent with the credentials; a refusal by the switch is a *RejectedError.
+
+c, err := escp.Dial(escp.Config{
+	Host: host, Username: user, Password: pw,
+	WriteGate: safety.Chain(
+		safety.FirmwareGate(),               // only firmware builds this client was verified against
+		safety.MaxImpact(escp.ImpactTraffic), // nothing that can cut the management path
+		safety.PortGate(),                    // only ports with no link and no LAG
+	),
+})
+err = c.SetPort(ctx, escp.PortConfig{ID: 3, Enabled: true, Speed: escp.SpeedAuto})
+var refused *safety.PortUseError
+if errors.As(err, &refused) { /* the gate refused; nothing was sent */ }
+
+A gate sees the Operation (the method, the ports it names, its Impact) and returns an error to refuse. Gates are plain functions: write your own, or combine with safety.Chain.
+
+Impact is the worst the method can do with any arguments: ImpactCosmetic (LED, device description), ImpactTraffic (port settings, rate limits, storm control, QoS, IGMP, mirroring, VLAN groups) or ImpactManagement (the IP settings, the VLAN mode, PVIDs, link aggregation, loop prevention).
+
+safety.NewDryRun() records the operations a command would perform and sends none of them; it still needs a reachable switch, because some writers read first.
+
+The client does not know which ports carry traffic and, apart from SetIPConfig, does not read back after a write. Deciding whether a write is prudent (safety.UseOf says what a port is used for) and verifying the result are the caller's job.
+
+Restoring is explicit. There is no "reset": to put a setting back, write the value you recorded.
+
+What it can read and write
+
+Setting (web UI page)
+Read
+Write
+Types
+Impact of the write
+
+Device (System Info)
+Info, System
+SetHostname, SetIPConfig
+Info, System, IPConfig
+cosmetic, management
+
+LED
+LED
+SetLED
+bool
+cosmetic
+
+Ports (Port Setting)
+Ports
+SetPort
+Port, PortConfig, Speed
+traffic
+
+Port statistics
+PortStatistics
+(read only)
+PortStats
+
+Link aggregation (Port Trunk)
+LAGs
+SetLAG
+LAG
+management
+
+Port mirror
+PortMirror
+SetPortMirror
+Mirror
+traffic
+
+Bandwidth control
+Bandwidth
+SetBandwidth
+PortBandwidth
+traffic
+
+Storm control
+StormControl
+SetStormControl
+PortStorm, StormConfig
+traffic
+
+QoS Basic
+QoS
+SetQoSMode, SetPortPriorities
+QoS, QoSMode, Priority
+traffic
+
+IGMP snooping
+IGMP
+SetIGMP
+IGMP, IGMPConfig, IGMPGroup
+traffic
+
+Loop prevention
+LoopPrevention
+SetLoopPrevention
+bool
+management
+
+VLAN mode
+VLANMode
+SetVLANMode
+VLANMode, VLANModeSetting
+management
+
+MTU VLAN
+MTUVLAN
+(through SetVLANMode)
+MTUVLAN
+
+Port-based VLAN
+PortBasedVLAN
+SetPortBasedVLAN
+PortBasedVLAN, PortVLAN
+traffic
+
+802.1Q VLAN and PVID
+Dot1Q
+SetVLAN8021Q, DeleteVLAN8021Q, SetPVIDs
+Dot1Q, VLAN8021Q, PortPVID
+traffic, management
+
+Configuration file
+ConfigBackup
+(restore is not offered)
+ConfigFile
+
+Deliberately not offered: user account, config restore, reboot, factory reset and firmware upgrade.
+
+Data structures
+
+Ports are numbers from 1: a PortID for one, a PortSet for a set (a comparable value held as the wire bitmap: no duplicates, ascending, Union/Minus/Intersect, escp.NewPortSet(2, 3) refuses a port outside 1 to MaxPort). A record that is a port has ID (Port, PortConfig, PortStats); a record that refers to a port has Port (PortBandwidth, PortStorm, PortPVID, PortPriority); a port with a role is named for it (MTUVLAN.UplinkPort, Mirror.MirrorPort).
+
+Closed sets are types with String, Parse..., Valid and a list function: Speed (ConfigurableSpeeds), QoSMode (QoSModes), Priority (1 to 4, as the web UI shows it), VLANMode (VLANModes). The spellings are the web UI's and the Terraform provider's; consumers keep them in saved state, so they do not change.
+
+Readers return values, not pointers. Counters in PortStats are the switch's 32-bit counters and wrap.
+
+Limits and validators are public so a front end can refuse a bad value before it reaches the client: PortID.Validate, VLANID.Validate, Kbps.Validate, VLANName.Validate, Hostname.Validate, ValidateLAG, ValidateIPConfig, and the constants they use (MaxPort, RateStepKbps, MaxBandwidthKbps, LAGGroupCount, ...).
+
+Errors
+
+Test with errors.Is and errors.As, never by message.
+
+Error
+Meaning
+
+ErrInvalid
+an argument was refused before any write was sent; the message names the value and what is allowed
+
+ErrNoReply
+the switch did not answer in time
+
+ErrRejected, *RejectedError
+the switch refused a write; the error carries the code (and, for the known ones, the reason)
+
+ErrMoveUnconfirmed
+SetIPConfig lost track of the switch: look at both addresses before believing either
+
+ErrNoInterface
+Discover has nowhere to send
+
+ErrInvalidConfig
+a configuration backup that is not one
+
+ErrReplyTooLarge
+a fragmented reply bigger than any switch sends
+
+ErrWrongSwitch, *WrongSwitchError
+the device that answered is not the switch Config.MAC names; nothing was written to it
+
+ErrNotFound
+no switch with that MAC answered a discovery probe
+
+*safety.FirmwareError, *safety.PortUseError, *safety.ImpactError
+a gate refused; nothing was sent
+
+Testing against a fake switch
+
+escptest starts a UDP server on a loopback port that speaks the protocol (RSA key exchange, RC4, TLVs, fragments) and can misbehave on request (dropped packets, a mute switch, a switch that leaves after an address change, a broken backup). It is the same fake the library's own tests use.
+
+func TestMyCode(t *testing.T) {
+	f := escptest.Start(t)
+	f.EnableModel(map[int]escptest.LinkSpeed{1: escptest.Link1000Full}) // a stateful switch that enforces the measured rules
+	c, _ := escp.Dial(escp.Config{Host: "127.0.0.1", SwitchPort: f.Port(), HostPort: escptest.FreeUDPPort(t),
+		BroadcastAddr: escptest.Loopback, Username: escptest.Username, Password: escptest.Password})
+	// ... use c, then ask f what it received: f.WriteCount(), f.AllSets()
+}
+
+SwitchPort, HostPort and BroadcastAddr exist only for this; a real switch always uses 29808 and 29809.
+
+Logging
+
+Config.Logger and DiscoverOptions.Logger take a *slog.Logger; the library logs nowhere else, and nil discards. You own the format, destination and level, so the library's lines look like the rest of your logs:
+
+logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
+client, err := escp.Dial(escp.Config{ /* ... */ Logger: logger.With("request_id", id)})
+
+Identification. Every line carries component=escp (the logger name of other frameworks); filter on it to keep or drop the library's lines. A client also attaches host and mac.
+
+Context fields. What you attach with Logger.With comes along on every line. Every message is logged with the call's context (...Context methods), so a handler can add what lives there (trace id, tenant): the mapped diagnostic context of log4j and friends.
+
+Levels are slog's four. Debug is the protocol (each request and reply: operation, sequence number, TLV types and sizes, never values), Info the lifecycle (session, lookup by MAC, writes), Warn a recoverable anomaly (lost packet, repeated download). Error is not used: failures are returned. Handlers for zap, zerolog and logr exist (zapslog, logr.FromSlogHandler and their kin) if your program does not use slog.
+
+Attribute names are the contract (lower snake case, one meaning each). New ones can be added in any release, for example for hardware with PoE; none is renamed or removed before a major version. Message texts may change.
+
+No message carries the password, user name or session key. The Terraform provider routes the logger to tflog. A forbidigo lint rule keeps fmt.Print* and log.* out of the package.
+
+Compatibility
+
+Switch
+Hardware
+Firmware
+Status
+
+TL-SG108E
+v6
+1.0.0 Build 20230218
+Verified: reads and writes checked on a real device, and the settings read back. The VLAN mode, 802.1Q VLAN and PVID writes were not tried on this build (they are verified on 20250710; same protocol generation).
+
+TL-SG108E
+v6
+1.0.0 Build 20250710
+Verified: reads; the writes on unused ports (including mirror egress, unknown-unicast storm control and the VLAN mode, 802.1Q VLAN and PVID), the management address and the DHCP lease (the switch found again by its MAC address). LAG creation works as on 20230218 (group 1 takes ports 1-4, group 2 ports 5-8).
+
+TL-SG108E
+v6
+builds newer than 20250710
+Untried; reads work; safety.FirmwareGate refuses writes unless the caller opts in. Start with the reads
+
+TL-SG108E
+other hardware versions
+any
+Untested
+
+Other Easy Smart models (TL-SG105E, TL-SG1016DE, ...)
+any
+any
+Untested; reports wanted
+
+Any
+any
+firmware before the 2023 RSA key exchange
+Not supported: the client always performs the key exchange and has never been tried against the older login
+
+Security
+
+ESCP has no real secrecy: the password travels in every write, protected only by RC4 with a key exchanged under a 64-bit RSA key that anyone who can capture the traffic can break. Use it on a network you trust, never log a Config, and do not reuse the switch password elsewhere.
+
+Disclaimer
+
+This is an independent project. It is not affiliated with, endorsed by or supported by TP-Link; the protocol was worked out from the vendor's configuration utility, earlier open-source clients and observation of the switches. TP-Link, Easy Smart and the model names are trademarks of their owners. Use it at your own risk (see the license, and "Writing safely").
+
+See also
+
+PROTOCOL.md (wire format and measured behaviour) · CONTRIBUTING.md (how to add or change a setting) · go doc -all . and pkgsite for the full reference.
+
+      Expand ▾
+      Collapse ▴
+
+##
+
+      Documentation
+      ¶
+
+### Overview ¶
+
+Stability
+
+Naming
+
+Layout of the package
+
+Identity: finding a switch by MAC address
+
+Using a client
+
+Writing safely
+
+Errors
+
+Logging
+
+Security
+
+Package escp is a client for the TP-Link Easy Smart UDP management protocol (ESCP), as
+spoken by TL-SG108E v6 switches. It reads and writes the switch's settings, finds
+switches on the network and validates every value before anything is sent. The wire
+format is described in PROTOCOL.md at the root of the repository.
+
+Stability ¶
+
+The module is version 0: until a 1.0 release, exported names, types and error values may
+change in any minor version, and every change is listed in CHANGELOG.md. Where something
+outside the code depends on a spelling (the names of Speed and QoSMode values are kept in
+saved state by the Terraform provider), the doc comment of that name says so.
+
+Naming ¶
+
+A field that holds a port number is named for what the record is. A record that is a
+port (Port, PortConfig, PortStats) calls it ID; a record that refers to a port (PortBandwidth,
+PortStorm, StormConfig, PortPVID, PortPriority) calls it Port; a port with a role in
+the record is named for the role (MTUVLAN.UplinkPort, Mirror.MirrorPort). Readers are
+named for what they return (Ports, QoS, LED, Dot1Q), writers Set... and Delete....
+
+Layout of the package ¶
+
+A setting is one file: its types, its reader, its writer, its parser and its validation live
+together, and its tests sit in the file of the same name with the suffix _test (ports.go,
+ports_test.go). The settings are leaves: they depend on the client and on the shared
+helpers, never on each other (except Port, the type most of them refer to).
+
+Settings: ports, lag, qos, bandwidth, storm, igmp, mirror, loopprevention, led, system,
+stats, backup, vlan_mtu, vlan_port, vlan_mode, vlan_8021q (the reads) and
+vlan_8021q_write. system.go is the device description, ip.go the static management address
+(SetIPConfig and its lost-reply handling) and dhcp.go the lease (EnableDHCP).
+
+The client: client.go (Client, Dial, Close, the socket), config.go (Config, WriteGate,
+InfoReader, Info), info.go (reading Info), session.go (the key exchange and its retry),
+transport.go (packets, encryption, sending, receiving, fragments, deadlines), request.go
+(the one place that sends a gated SET and a GET, and the port count) and errors.go.
+
+Shared: mac.go (MAC, the one place a switch's hardware address is parsed, compared and printed), operation.go (the Operation a gate sees and the Impact classes), limits.go (the
+public limits and Validate functions), portset.go (PortID and PortSet: the port numbers and the sets of them, which are the wire bitmap) and discover.go (finding
+switches without credentials).
+
+Sub-packages hold what has a boundary of its own: internal/wire (the packet codec, the
+session crypto and every TLV type number, which no caller needs), internal/udp (sharing the
+reply port between sockets), safety (the policy gates and the compatibility table) and
+escptest (a fake switch for tests). Tests are named for the source they exercise; the ones
+that cut across sources have a name of their own: cancel_test (cancellation), parsers_test,
+readers_test, identity_test (identity and lookup by MAC address), write_gate_test, dryrun_test, fake_switch_test (the fake itself) and
+helpers_test. CONTRIBUTING.md at the root of the repository is the checklist for adding or
+changing a setting.
+
+Identity: finding a switch by MAC address ¶
+
+A switch's address can change (a lease, a move), its MAC address does not. Config.MAC names the
+switch: it pins the identity, so a request to an address that now belongs to another device
+fails with ErrWrongSwitch before a session is handed to it or a write is sent (the MAC is
+checked on every reply, the key exchange's included), and it lets the client find the
+switch when Config.Host is empty or stops answering (Locate does the lookup: a discovery probe
+that stops at the first reply from that switch, normally under a second; a lookup that finds
+nobody is tried once more before ErrNotFound is returned). Nothing is sent by
+Dial. A device that takes over the address meanwhile ignores requests encrypted with a session
+key it never accepted; the client then starts a new session, and the reply to the key exchange
+names the stranger, so nothing is written to it.
+
+Using a client ¶
+
+Dial prepares a Client for one switch; nothing is sent to it until the first call.
+Reads (Ports, Dot1Q, QoS and the rest; named for what they return) cannot change the
+switch. Writes are the methods named Set... and Delete...:
+
+c, err := escp.Dial(escp.Config{Host: "192.0.2.11", Username: "admin", Password: escp.Password(pw)})
+if err != nil { ... }
+defer c.Close()
+ports, err := c.Ports(ctx)
+
+A Client is safe for concurrent use, but it sends one request at a time because the
+switch answers one request at a time. Use one Client per switch and share it between
+goroutines. Clients for different switches work side by side, in one process or on one
+host: switches always reply to UDP port 29809, the clients share that port, and each
+keeps only the replies from its own switch. Two Clients for the same switch do not work
+at all (measured: 30 reads out of 30 failed, and the switch dropped pings meanwhile).
+The switch appears to keep a single session, so that each key exchange invalidates the
+other client's. Discover can run next to a Client. Port sharing was observed on macOS with
+real switches, and a test shows that on Linux a broadcast reaches every sharing socket; where
+the system offers no sharing option the second bind fails with an error.
+
+Discover finds the switches on the network without credentials and without knowing
+their addresses.
+
+Writing safely ¶
+
+The switch is real network equipment with no console: a wrong write can cut the
+management path or the uplink, and recovery is a physical factory reset. Every write
+therefore follows the same steps:
+
+The arguments are validated (see the Validate functions) and a bad value is refused
+before any write is sent. A writer that names a port also reads the switch's port count
+once (the first time), to refuse ports the switch does not have: that is a read, and it
+happens before the gate.
+
+The Config.WriteGate, if there is one, is consulted with the write's Operation (the
+method, the ports it names and its Impact class). When it refuses, the method returns
+the gate's error unchanged and sends no write. The safety package provides gates
+for firmware builds this client was not verified against, for a ceiling on the impact,
+for the ports a write touches, and for a dry run, and Chain combines them.
+
+The write is sent with the credentials, which ride on every SET. If the switch
+answers with a non-zero code the error is a *RejectedError (it matches ErrRejected).
+
+The client does not know which ports carry traffic, and apart from SetIPConfig (which
+waits for the switch to answer at its new address) no write reads back to check that it
+took effect. Deciding whether a write is prudent (is the port in use? is it in a link
+aggregation group?) and verifying the result are the caller's job. The doc comment of
+each write says what it can disturb, and the safety package answers the common question
+of what a port is used for. A few writes read the current settings first so they can
+send the rest unchanged (SetHostname, SetPortPriorities); their comments say so. Every write
+that names a port also refuses ports the switch does not have (ErrInvalid): the client reads
+the switch's port count once, on the first such write, and keeps it.
+
+Errors ¶
+
+Test errors with errors.Is and errors.As, never by message: ErrNoReply (the switch did
+not answer in time), ErrRejected and *RejectedError (the switch refused a write),
+ErrNoInterface (Discover has nowhere to send), ErrMoveUnconfirmed (SetIPConfig lost
+track of the switch), ErrInvalidConfig (a configuration backup that is not complete, after the download was repeated) and
+ErrInvalid (an argument refused before any write was sent; the message names the value and
+what is allowed), ErrReplyTooLarge (a fragmented reply bigger than any switch sends).
+
+Logging ¶
+
+The library writes nowhere on its own. Pass a *slog.Logger in Config.Logger (a Client) or
+DiscoverOptions.Logger (Discover, Locate) and it reports through that; nil discards everything.
+The caller owns format, destination and level, so the lines look like the rest of the caller's
+logs: a JSON handler gives JSON, a handler bridging to zap, zerolog or logr gives theirs.
+
+Every line carries component=escp, which identifies the library the way a logger name does;
+filter on it to keep or drop the library's lines. The switch a client talks to is attached to
+its lines as host and mac, so several clients in one log can be told apart. Fields the caller
+attached with Logger.With (a request id, a tenant) come along on every line, and every message
+is logged with the context of the call (slog's ...Context methods), so a handler can add what
+lives in the context, such as a trace id: that is the mapped diagnostic context of other
+frameworks.
+
+The levels are slog's four. Debug lines are the protocol (each request and reply with the
+operation, sequence number, TLV types and sizes, and each fragment), Info lines the lifecycle (a
+session, the switch located by MAC, a write with its operation and impact, a lease), Warn lines
+a recoverable anomaly (no reply and a retry, a session reopened, a download repeated). Error is
+not used: failures are returned, not logged. TLV values are never logged, so no message carries
+the password, the user name or the session key.
+
+Attribute names are the contract: lower case, snake_case, one meaning each. New names may be
+added in any release (a setting the hardware of a later model has, such as PoE, brings its own);
+an existing name is not renamed or removed before a major version. Message texts may change.
+
+Security ¶
+
+ESCP has no real secrecy. The password travels in every write, protected only by RC4
+with a key exchanged under a 64-bit RSA key, which anyone who can capture the traffic
+can break. Use it on a network you trust, and never log a Config.
+
+### Index ¶
+
+Constants
+
+Variables
+
+        func ParseIPv4(s string) (netip.Addr, error)
+
+        func ValidateIPConfig(cfg IPConfig) error
+
+        func ValidateLAG(group LAGID, ports PortSet) error
+
+        func ValidateVLANMode(s VLANModeSetting) error
+
+          type BuildDate
+
+            func ParseBuildDate(s string) (BuildDate, error)
+
+            func (b BuildDate) String() string
+
+            func (b *BuildDate) UnmarshalText(text []byte) error
+
+          type Client
+
+            func Dial(cfg Config) (*Client, error)
+
+            func (c *Client) Bandwidth(ctx context.Context) ([]PortBandwidth, error)
+
+            func (c *Client) Close() error
+
+            func (c *Client) ConfigBackup(ctx context.Context) (ConfigFile, error)
+
+            func (c *Client) DeleteVLAN8021Q(ctx context.Context, id VLANID) error
+
+            func (c *Client) Dot1Q(ctx context.Context) (Dot1Q, error)
+
+            func (c *Client) EnableDHCP(ctx context.Context) error
+
+            func (c *Client) IGMP(ctx context.Context) (IGMP, error)
+
+            func (c *Client) Info(ctx context.Context) (Info, error)
+
+            func (c *Client) LAGs(ctx context.Context) ([]LAG, error)
+
+            func (c *Client) LED(ctx context.Context) (bool, error)
+
+            func (c *Client) LoopPrevention(ctx context.Context) (bool, error)
+
+            func (c *Client) MTUVLAN(ctx context.Context) (MTUVLAN, error)
+
+            func (c *Client) PortBasedVLAN(ctx context.Context) (PortBasedVLAN, error)
+
+            func (c *Client) PortMirror(ctx context.Context) (Mirror, error)
+
+            func (c *Client) PortStatistics(ctx context.Context) ([]PortStats, error)
+
+            func (c *Client) Ports(ctx context.Context) ([]Port, error)
+
+            func (c *Client) QoS(ctx context.Context) (QoS, error)
+
+            func (c *Client) SetBandwidth(ctx context.Context, limit PortBandwidth) error
+
+            func (c *Client) SetHostname(ctx context.Context, name Hostname) error
+
+            func (c *Client) SetIGMP(ctx context.Context, cfg IGMPConfig) error
+
+            func (c *Client) SetIPConfig(ctx context.Context, cfg IPConfig) error
+
+            func (c *Client) SetLAG(ctx context.Context, group LAGID, ports PortSet) error
+
+            func (c *Client) SetLED(ctx context.Context, on bool) error
+
+            func (c *Client) SetLoopPrevention(ctx context.Context, on bool) error
+
+            func (c *Client) SetPVIDs(ctx context.Context, pvids map[PortID]VLANID) error
+
+            func (c *Client) SetPort(ctx context.Context, cfg PortConfig) error
+
+            func (c *Client) SetPortBasedVLAN(ctx context.Context, id PortVLANID, ports PortSet) error
+
+            func (c *Client) SetPortMirror(ctx context.Context, m Mirror) error
+
+            func (c *Client) SetPortPriorities(ctx context.Context, changes map[PortID]Priority) error
+
+            func (c *Client) SetQoSMode(ctx context.Context, mode QoSMode) error
+
+            func (c *Client) SetStormControl(ctx context.Context, cfg StormConfig) error
+
+            func (c *Client) SetVLAN8021Q(ctx context.Context, v VLAN8021Q) error
+
+            func (c *Client) SetVLANMode(ctx context.Context, s VLANModeSetting) error
+
+            func (c *Client) StormControl(ctx context.Context) ([]PortStorm, error)
+
+            func (c *Client) System(ctx context.Context) (System, error)
+
+            func (c *Client) VLANMode(ctx context.Context) (VLANModeSetting, error)
+
+          type Config
+
+          type ConfigFile
+
+            func (f ConfigFile) Base64() string
+
+            func (f ConfigFile) GoString() string
+
+            func (f ConfigFile) LogValue() slog.Value
+
+            func (f ConfigFile) SHA256() string
+
+            func (f ConfigFile) Size() int
+
+            func (f ConfigFile) String() string
+
+          type DiscoverOptions
+
+          type Dot1Q
+
+            func (q Dot1Q) CheckRoom(id VLANID) error
+
+          type Firmware
+
+            func ParseFirmware(s string) Firmware
+
+            func (f Firmware) HasBuild() bool
+
+            func (f Firmware) IsZero() bool
+
+            func (f Firmware) String() string
+
+          type GroupKind
+
+          type Hostname
+
+            func (h Hostname) String() string
+
+            func (h Hostname) Validate() error
+
+          type IGMP
+
+          type IGMPConfig
+
+          type IGMPGroup
+
+          type IPConfig
+
+            func (cfg IPConfig) String() string
+
+          type Impact
+
+            func (i Impact) String() string
+
+            func (i Impact) Valid() bool
+
+          type Info
+
+            func Discover(ctx context.Context, opts DiscoverOptions) ([]Info, error)
+
+            func Locate(ctx context.Context, mac MAC, opts DiscoverOptions) (Info, error)
+
+          type InfoReader
+
+          type Kbps
+
+            func (k Kbps) String() string
+
+            func (k Kbps) Validate() error
+
+          type LAG
+
+          type LAGID
+
+            func (g LAGID) Range() (first, last PortID)
+
+            func (g LAGID) String() string
+
+            func (g LAGID) Validate() error
+
+          type MAC
+
+            func MACFromBytes(b []byte) (m MAC, ok bool)
+
+            func ParseMAC(s string) (MAC, error)
+
+            func (m MAC) IsZero() bool
+
+            func (m MAC) String() string
+
+          type MTUVLAN
+
+          type Mirror
+
+          type Operation
+
+          type Password
+
+            func (Password) GoString() string
+
+            func (Password) LogValue() slog.Value
+
+            func (p Password) Reveal() string
+
+            func (Password) String() string
+
+          type Port
+
+          type PortBandwidth
+
+          type PortBasedVLAN
+
+            func (v PortBasedVLAN) Group(id PortVLANID) (PortSet, bool)
+
+            func (v PortBasedVLAN) GroupLimit(portCount int) PortVLANLimit
+
+          type PortConfig
+
+          type PortID
+
+            func ParsePortID(s string) (PortID, error)
+
+            func (p PortID) String() string
+
+            func (p PortID) Validate() error
+
+          type PortPVID
+
+          type PortPriority
+
+          type PortSet
+
+            func MustPortSet(ports ...PortID) PortSet
+
+            func NewPortSet(ports ...PortID) (PortSet, error)
+
+            func PortSetFromMask(v []byte) PortSet
+
+            func (s PortSet) Has(p PortID) bool
+
+            func (s PortSet) Intersect(o PortSet) PortSet
+
+            func (s PortSet) Ints() []int
+
+            func (s PortSet) IsEmpty() bool
+
+            func (s PortSet) Len() int
+
+            func (s PortSet) Mask() []byte
+
+            func (s PortSet) Minus(o PortSet) PortSet
+
+            func (s PortSet) Ports() []PortID
+
+            func (s PortSet) String() string
+
+            func (s PortSet) Union(o PortSet) PortSet
+
+          type PortStats
+
+          type PortStorm
+
+          type PortVLAN
+
+          type PortVLANID
+
+            func (g PortVLANID) String() string
+
+            func (g PortVLANID) Validate() error
+
+          type PortVLANLimit
+
+            func NewPortVLANLimit(groups, ports int) PortVLANLimit
+
+            func (l PortVLANLimit) Check(id PortVLANID) error
+
+            func (l PortVLANLimit) Known() bool
+
+            func (l PortVLANLimit) String() string
+
+          type Priority
+
+            func (p Priority) Valid() bool
+
+          type QoS
+
+          type QoSMode
+
+            func ParseQoSMode(name string) (QoSMode, error)
+
+            func QoSModes() []QoSMode
+
+            func (m QoSMode) String() string
+
+            func (m QoSMode) Valid() bool
+
+          type RejectedError
+
+            func (e *RejectedError) Error() string
+
+            func (e *RejectedError) Is(target error) bool
+
+          type ReplyCode
+
+          type Speed
+
+            func ConfigurableSpeeds() []Speed
+
+            func ParseSpeed(name string) (Speed, error)
+
+            func (s Speed) AllowsFlowControl() bool
+
+            func (s Speed) String() string
+
+          type StormConfig
+
+          type System
+
+          type VLAN8021Q
+
+          type VLANID
+
+            func (v VLANID) String() string
+
+            func (v VLANID) Validate() error
+
+          type VLANMode
+
+            func VLANModes() []VLANMode
+
+          type VLANModeSetting
+
+            func VLANModeFrom(mtu MTUVLAN, portBased, dot1q bool) VLANModeSetting
+
+          type VLANName
+
+            func (n VLANName) String() string
+
+            func (n VLANName) Validate() error
+
+          type WriteGate
+
+          type WrongSwitchError
+
+            func (e *WrongSwitchError) Error() string
+
+            func (e *WrongSwitchError) Is(target error) bool
+
+### Examples ¶
+
+Client.EnableDHCP
+
+Client.SetLED
+
+Dial
+
+Discover
+
+Locate
+
+ParseMAC
+
+ParseSpeed
+
+QoSModes
+
+RejectedError
+
+ValidateIPConfig
+
+### Constants ¶
+
+      View Source
+
+const (
+	// LAGGroupCount is the number of LAG groups.
+	LAGGroupCount = 2
+	// LAGPortsPerGroup is how many ports each group owns (group 1: ports 1-4, group 2: 5-8) and the most it can hold.
+	LAGPortsPerGroup = 4
+	// LAGMinPorts is the fewest members a group can have (a single port is refused with code 7415).
+	LAGMinPorts = 2
+)
+
+LAG limits of the TL-SG108E. They come from the switch's own web UI
+(PortTrunkRpm.htm: "available ports of LAG 1: port 1 -- port 4", "LAG 2:
+port 5 -- port 8", at most 4 ports, at least 2) and were confirmed on the
+wire on firmware 20230218 and 20250710: a mask outside the group's range is
+refused with code 4.
+
+      View Source
+
+const (
+	// MaxPort is the highest port number a 32-bit port mask can express.
+	MaxPort = 32
+	// RateStepKbps is the granularity of rate limits: the switch rounds to multiples of 64 kbps.
+	RateStepKbps = 64
+	// MaxHostnameLen is the longest device description the switch accepts.
+	MaxHostnameLen = 32
+)
+
+      View Source
+
+const MaxBandwidthKbps = 1000000
+
+MaxBandwidthKbps is the largest limit the web UI offers.
+
+      View Source
+
+const MaxPortVLANID = 255
+
+MaxPortVLANID is the largest port-based VLAN id: the id is one byte on the wire.
+
+      View Source
+
+const NoRetries = -1
+
+NoRetries is the Config.Retries value that asks for a single attempt per request. (Zero
+cannot mean that: it selects the default.)
+
+### Variables ¶
+
+      View Source
+
+var (
+	// ErrNoReply means the switch did not answer within the timeout.
+	ErrNoReply = errors.New("escp: no reply from switch")
+	// ErrReplyTooLarge means a fragmented reply grew past the sane limit.
+	ErrReplyTooLarge = errors.New("escp: fragmented reply is larger than any switch sends")
+	// ErrRejected means the switch rejected a write. Wrong credentials are one reason, but
+	// any non-zero reply code lands here (a LAG with ports outside its group's range, for
+	// example, is refused with code 4 although the credentials are fine); the
+	// *RejectedError that wraps it carries the code.
+	ErrRejected = errors.New("escp: switch rejected the request")
+	// ErrInvalid means the caller's argument was refused before any write was sent: a port or
+	// id out of range, a rate that is not a multiple of the step, a combination the switch
+	// cannot keep. The message names the value and what is allowed; test for the class with
+	// errors.Is(err, ErrInvalid). It is never returned for a reply the client cannot parse,
+	// nor for a failure of the switch.
+	ErrInvalid = errors.New("escp: invalid argument")
+	// ErrWrongSwitch means the device that answered is not the one the configuration names:
+	// Config.MAC is set and the reply carries another MAC address. Nothing was written to it.
+	// The *WrongSwitchError that wraps it names both addresses.
+	ErrWrongSwitch = errors.New("escp: the device that answered is not the configured switch")
+	// ErrNotFound means no switch with the wanted MAC address answered a discovery probe on
+	// this network (Locate, or a client configured with a MAC and no working address).
+	ErrNotFound = errors.New("escp: no switch with that MAC address answered")
+)
+
+      View Source
+
+var ErrInvalidConfig = errors.New("escp: reply is not a switch configuration file")
+
+ErrInvalidConfig means the reply was not a complete switch configuration file: it did not
+start with the configuration magic, a packet was missing, or two downloads of it differed. The
+message says which. ConfigBackup repeats the download before it returns this.
+
+      View Source
+
+var ErrMoveUnconfirmed = errors.New("escp: the switch did not answer at its new address")
+
+ErrMoveUnconfirmed means the switch was told to move but it is not known whether it did:
+it did not answer at the new address in time, or it did not answer the write and a probe
+found nothing, or something else answered. Its address is then unknown: look at both.
+
+      View Source
+
+var ErrNoInterface = errors.New("escp: no network interface to discover on")
+
+ErrNoInterface means there is no network interface to send a discovery probe on: none
+is up with an IPv4 broadcast address, or the one asked for is not among them.
+
+### Functions ¶
+
+      func ParseIPv4 ¶
+
+func ParseIPv4(s string) (netip.Addr, error)
+
+ParseIPv4 reads a dotted-quad IPv4 address: no IPv6, no zone, no port. The error matches
+ErrInvalid. It is the one parser of an address a person types; replies are read from the wire.
+
+      func ValidateIPConfig ¶
+
+func ValidateIPConfig(cfg IPConfig) error
+
+ValidateIPConfig checks a static management address before anything is sent:
+all three are IPv4, the mask is a contiguous prefix between /8 and /30, the
+address is a usable host address of its subnet and the gateway is another
+host of the same subnet (0.0.0.0 means no gateway).
+
+Example ¶
+
+package main
+
+import (
+	"fmt"
+	"net/netip"
+
+	"github.com/davidlukac/escp-go"
+)
+
+func main() {
+	ok := escp.IPConfig{IP: netip.MustParseAddr("192.0.2.11"), Netmask: netip.MustParseAddr("255.255.255.0"), Gateway: netip.MustParseAddr("192.0.2.1")}
+	fmt.Println(escp.ValidateIPConfig(ok))
+
+	bad := ok
+	bad.Gateway = netip.MustParseAddr("192.168.78.1") // another subnet: the switch would be unreachable
+	fmt.Println(escp.ValidateIPConfig(bad) != nil)
+}
+
+Output:
+<nil>
+true
+
+        Share
+        Format
+        Run
+
+      func ValidateLAG ¶
+
+func ValidateLAG(group LAGID, ports PortSet) error
+
+ValidateLAG checks a group number and member ports against the limits
+above. An empty port set (removing the group) only needs a valid group.
+
+      func ValidateVLANMode ¶
+
+func ValidateVLANMode(s VLANModeSetting) error
+
+ValidateVLANMode checks a setting for SetVLANMode: one of VLANModes; for the MTU VLAN a
+valid uplink port, for the others none.
+
+### Types ¶
+
+      type BuildDate ¶
+
+type BuildDate string
+
+BuildDate is the eight-digit build date a firmware version names ("20230218"). It is what the
+compatibility table and the firmware gate match on. The empty value means "no build date".
+
+      func ParseBuildDate ¶
+
+func ParseBuildDate(s string) (BuildDate, error)
+
+ParseBuildDate reads a build date: exactly eight digits; the error matches ErrInvalid.
+
+      func (BuildDate) String ¶
+
+func (b BuildDate) String() string
+
+String is the date as written.
+
+      func (*BuildDate) UnmarshalText ¶
+
+func (b *BuildDate) UnmarshalText(text []byte) error
+
+UnmarshalText reads a build date from JSON (and any text decoder), with the rule of ParseBuildDate.
+
+      type Client ¶
+
+type Client struct {
+	// contains filtered or unexported fields
+}
+
+Client talks ESCP to one switch. It is safe for concurrent use; requests
+are serialized because the switch answers one request at a time. Use one Client per
+switch: two Clients for the same switch were measured to fail completely, apparently
+because the switch keeps a single session (see the package documentation).
+
+      func Dial ¶
+
+func Dial(cfg Config) (*Client, error)
+
+Dial prepares a client for the switch at cfg.Host, which must be an IPv4 address or a
+name that resolves to one (a name is looked up now), or, when cfg.MAC is set, may be left
+empty to find the switch by its MAC address on the first request. It sends nothing to the switch and
+binds no socket: the local UDP port is bound on first use, so merely configuring a client
+(a program that builds one and validates its input) has no side effects on the switch. Close the client
+when done.
+
+Example ¶
+
+Read a switch. Dial sends nothing; the first call opens the socket and does the key exchange.
+
+package main
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/davidlukac/escp-go"
+)
+
+func main() {
+	c, err := escp.Dial(escp.Config{Host: "192.0.2.11", Username: "admin", Password: "secret"})
+	if err != nil {
+		panic(err)
+	}
+	defer func() { _ = c.Close() }()
+
+	ports, err := c.Ports(context.Background())
+	if err != nil {
+		panic(err)
+	}
+	for _, p := range ports {
+		fmt.Printf("port %d: %s (configured %s)\n", p.ID, p.ActualSpeed, p.ConfiguredSpeed)
+	}
+}
+
+Output:
+
+        Share
+        Format
+        Run
+
+      func (*Client) Bandwidth ¶
+
+func (c *Client) Bandwidth(ctx context.Context) ([]PortBandwidth, error)
+
+Bandwidth reads the per-port ingress and egress rate limits.
+
+      func (*Client) Close ¶
+
+func (c *Client) Close() error
+
+Close releases the UDP socket, if it was opened, so that another client or Discover can
+use the reply port. A closed client opens the socket again if it is used afterwards.
+
+      func (*Client) ConfigBackup ¶
+
+func (c *Client) ConfigBackup(ctx context.Context) (ConfigFile, error)
+
+ConfigBackup downloads the switch's binary configuration file (the same
+bytes as System Tools > Backup Config in the web UI). The vendor utility
+requests it with an authenticated SET carrying an empty TLV 768; the file
+arrives in fragments, which are reassembled. Nothing on the switch changes. Although it is
+a SET on the wire, it is a read: it never passes the write gate, so it works on any firmware
+(as the provider promises for reads) even where writes are refused.
+
+The result is complete or there is none. The replies are UDP: one can be lost, and the
+fragments carry no index, total or checksum (the web UI is different: TCP, with a declared
+Content-Length). A download is therefore accepted only when it is structurally complete (it
+starts with the magic, the last fragment arrived, the packets before it are equally long, see
+assembleConfig) and a second download, requested separately, is byte for byte the same. Anything
+else is repeated, up to Config.Retries+1 rounds, and then reported as ErrInvalidConfig. A
+configuration that changes while it is read fails the same way. A rejection, a missing reply
+and a cancelled context end the call at once.
+
+      func (*Client) DeleteVLAN8021Q ¶
+
+func (c *Client) DeleteVLAN8021Q(ctx context.Context, id VLANID) error
+
+DeleteVLAN8021Q removes an 802.1Q VLAN: TLV 8705 with both masks empty and an
+empty name, as the vendor utility sends it.
+
+      func (*Client) Dot1Q ¶
+
+func (c *Client) Dot1Q(ctx context.Context) (Dot1Q, error)
+
+Dot1Q reads the 802.1Q mode, VLAN table and per-port PVIDs.
+
+      func (*Client) EnableDHCP ¶
+
+func (c *Client) EnableDHCP(ctx context.Context) error
+
+EnableDHCP makes the switch lease its management address from a DHCP server. It does nothing when
+the switch already leases one.
+
+DANGER: this moves the switch to an address the server chooses, which this client cannot know in
+advance, so the call needs Config.MAC (otherwise ErrInvalid): the client looks the switch up by it
+until discovery reports the DHCP flag on with a usable address, then follows it, so later calls on
+this client go to the leased address. The switch is silent for a moment while it asks for the
+lease (measured: about two seconds), and it ignores a static address written while it leases
+one, so SetIPConfig is the way back.
+
+The write may be applied without a reply. When it got none and the lookup finds the switch static
+at its old address, the error says the write was not applied (it matches ErrNoReply); when nothing
+can be established the error matches ErrMoveUnconfirmed and the caller must look for the switch by its
+MAC before it believes anything. Callers must guard: a network without a DHCP server leaves the
+switch without an address, and the way back then needs this host to be on the address the switch
+falls back to.
+
+Example ¶
+
+Let the switch lease its address. The leased address is not known in advance, so the client must
+have the switch's MAC: it looks the switch up by it and follows it to the lease.
+
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+
+	"github.com/davidlukac/escp-go"
+)
+
+func main() {
+	mac, _ := escp.ParseMAC("00:00:5e:00:53:01")
+	c, err := escp.Dial(escp.Config{MAC: mac, Username: "admin", Password: escp.Password(os.Getenv("SWITCH_PASSWORD"))})
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer c.Close()
+	if err := c.EnableDHCP(context.Background()); err != nil {
+		fmt.Println("DHCP not confirmed:", err) // ErrMoveUnconfirmed: look for the switch by its MAC before anything else
+		return
+	}
+	// The way back is SetIPConfig with the static address: it writes the DHCP flag off.
+}
+
+Output:
+
+        Share
+        Format
+        Run
+
+      func (*Client) IGMP ¶
+
+func (c *Client) IGMP(ctx context.Context) (IGMP, error)
+
+IGMP reads IGMP snooping state, report suppression and learned groups.
+
+      func (*Client) Info ¶
+
+func (c *Client) Info(ctx context.Context) (Info, error)
+
+Info asks the switch to describe itself with a discovery probe: model, firmware, hardware,
+hostname, MAC and its network settings. It needs no credentials and works on any firmware,
+which is why a WriteGate reads the firmware through it. Each attempt is sent to the
+switch's address and to Config.BroadcastAddr, and repeated up to Config.Retries times; if
+nothing answers the error is ErrNoReply.
+
+      func (*Client) LAGs ¶
+
+func (c *Client) LAGs(ctx context.Context) ([]LAG, error)
+
+LAGs reads the link aggregation groups (Switching > Port Trunk), unused ones included with no ports.
+
+      func (*Client) LED ¶
+
+func (c *Client) LED(ctx context.Context) (bool, error)
+
+LED reports whether the switch LEDs are on.
+
+      func (*Client) LoopPrevention ¶
+
+func (c *Client) LoopPrevention(ctx context.Context) (bool, error)
+
+LoopPrevention reports whether loop prevention (Monitoring > Loop Prevention) is on.
+
+      func (*Client) MTUVLAN ¶
+
+func (c *Client) MTUVLAN(ctx context.Context) (MTUVLAN, error)
+
+MTUVLAN reads whether the MTU VLAN mode is on and which port is its uplink.
+
+      func (*Client) PortBasedVLAN ¶
+
+func (c *Client) PortBasedVLAN(ctx context.Context) (PortBasedVLAN, error)
+
+PortBasedVLAN reads the port-based VLAN mode and groups.
+
+      func (*Client) PortMirror ¶
+
+func (c *Client) PortMirror(ctx context.Context) (Mirror, error)
+
+PortMirror reads the port mirroring configuration: whether it is on, the monitoring port and the
+source ports per direction.
+
+      func (*Client) PortStatistics ¶
+
+func (c *Client) PortStatistics(ctx context.Context) ([]PortStats, error)
+
+PortStatistics reads the traffic counters of every port. The counters change on every read, so
+they do not belong in anything compared between two reads.
+
+      func (*Client) Ports ¶
+
+func (c *Client) Ports(ctx context.Context) ([]Port, error)
+
+Ports reads the Port Setting page: state, LAG membership, speed and flow control per port.
+
+      func (*Client) QoS ¶
+
+func (c *Client) QoS(ctx context.Context) (QoS, error)
+
+QoS reads the QoS mode and per-port priorities. Priorities are only
+effective in port-based mode but are always reported.
+
+      func (*Client) SetBandwidth ¶
+
+func (c *Client) SetBandwidth(ctx context.Context, limit PortBandwidth) error
+
+SetBandwidth sets a port's ingress and egress limits in kbps (0 = unlimited,
+otherwise a multiple of 64; the same type Bandwidth reads). An ingress limit is refused (ErrInvalid) on a port
+whose storm control is on: the switch would turn storm control off without saying so. Like the vendor utility it sends two requests,
+ingress first, then egress. A limit on a port that carries traffic throttles
+it; callers must guard against that. The two requests are not atomic: if the second
+fails (or its gate refuses, or the call is cancelled) the ingress limit stays applied.
+
+      func (*Client) SetHostname ¶
+
+func (c *Client) SetHostname(ctx context.Context, name Hostname) error
+
+SetHostname changes the device description. Like the vendor utility, the
+request carries the current IP settings (read via discovery) unchanged, so
+the management address is re-asserted as it is. Verified live on firmware
+20230218 and 20250710.
+
+      func (*Client) SetIGMP ¶
+
+func (c *Client) SetIGMP(ctx context.Context, cfg IGMPConfig) error
+
+SetIGMP writes IGMP snooping state and report suppression together, as the vendor
+utility does, so a caller that changes one passes the other as read. With snooping off
+the switch floods multicast traffic to every port. Toggling it was verified on a live
+switch without interrupting traffic.
+
+      func (*Client) SetIPConfig ¶
+
+func (c *Client) SetIPConfig(ctx context.Context, cfg IPConfig) error
+
+SetIPConfig gives the switch a static management address, keeping the device description as
+the switch reports it. It turns DHCP off: a switch that leases its address ignores a static
+one written next to the flag (measured on switch 03, firmware 20250710), so the flag is
+written off with the address, and the switch is at that address a fraction of a second later.
+
+DANGER: this moves the switch. The request is answered from the old or the
+new address, so the client accepts replies from both and, once the switch
+confirms, follows it: later calls on this client go to the new address.
+
+A switch that applies the write may never answer it from the old address, so
+when the write gets no reply the client probes both addresses and compares
+what answers with what was asked and with what was there before (by MAC
+address, so a different device does not count). The outcomes: the switch
+has the new settings, and the call succeeds as if the reply had arrived; the
+switch is unchanged after all the attempts went unanswered, and the error says the
+write was not applied (it matches ErrNoReply); or nothing can be established, and the
+error matches ErrMoveUnconfirmed. In that last case the state is unknown and the caller
+must look at both addresses before it believes either. The same holds when ctx is
+cancelled or expires after the write was sent: the probe still runs (for a bounded
+time), because "cancelled" would not say whether the switch moved; a probe that still
+shows the old settings then proves little (the write may be taking effect), so it is
+reported as ErrMoveUnconfirmed, not as "not applied". A write the switch refuses, or the gate refuses, is not probed:
+nothing was applied.
+
+Callers must guard: a wrong address, mask or gateway can cut the management path for good.
+EnableDHCP is the way back to a lease.
+
+      func (*Client) SetLAG ¶
+
+func (c *Client) SetLAG(ctx context.Context, group LAGID, ports PortSet) error
+
+SetLAG creates or replaces a link aggregation group: TLV 4608 with the group
+id and the member port mask. An empty port set removes the group. Group
+and ports are checked against ValidateLAG first. The switch itself refuses
+ports that conflict with mirroring, a port-based VLAN, a bandwidth limit or
+storm control, and member ports that differ in speed, negotiation, flow control,
+enabled state or (in port-based QoS mode) QoS priority, or that are half duplex;
+such a refusal comes back as a *RejectedError that names the conflict. The switch
+checks these only when the group is written: it does not keep members alike
+afterwards (see SetPort). Changing a group whose ports carry traffic can cut the
+uplink; callers must guard against that.
+
+      func (*Client) SetLED ¶
+
+func (c *Client) SetLED(ctx context.Context, on bool) error
+
+SetLED switches the LEDs on or off. It is cosmetic: it does not touch traffic or
+configuration, and it is the one write that is safe to try on any switch.
+
+Example ¶
+
+Write behind the firmware gate. A switch on a firmware the client was not verified
+against is read but never written: the write returns a *safety.FirmwareError and
+sends nothing.
+
+package main
+
+import (
+	"context"
+	"errors"
+	"fmt"
+
+	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/safety"
+)
+
+func main() {
+	c, err := escp.Dial(escp.Config{
+		Host: "192.0.2.11", Username: "admin", Password: "secret",
+		WriteGate: safety.FirmwareGate(),
+	})
+	if err != nil {
+		panic(err)
+	}
+	defer func() { _ = c.Close() }()
+
+	err = c.SetLED(context.Background(), false)
+	var refused *safety.FirmwareError
+	switch {
+	case errors.As(err, &refused):
+		fmt.Println("refused, firmware build", refused.Firmware.Build)
+	case errors.Is(err, escp.ErrRejected):
+		fmt.Println("the switch refused the write:", err)
+	case err != nil:
+		fmt.Println("write failed:", err)
+	}
+}
+
+Output:
+
+        Share
+        Format
+        Run
+
+      func (*Client) SetLoopPrevention ¶
+
+func (c *Client) SetLoopPrevention(ctx context.Context, on bool) error
+
+SetLoopPrevention enables or disables loop prevention. With it off the switch no longer
+detects a cabling loop, which can flood the network; turning it on is the safe direction.
+Toggling it was verified on a live switch without interrupting traffic.
+
+      func (*Client) SetPVIDs ¶
+
+func (c *Client) SetPVIDs(ctx context.Context, pvids map[PortID]VLANID) error
+
+SetPVIDs sets the default VLAN of the given ports (port -> pvid): one TLV
+8706 per port with the port (1 byte) and the pvid (2 bytes). The VLAN must
+exist and the 802.1Q mode must be on; callers must guard linked ports.
+
+      func (*Client) SetPort ¶
+
+func (c *Client) SetPort(ctx context.Context, cfg PortConfig) error
+
+SetPort writes the configuration of one port: admin state, speed and flow
+control (7-byte TLV 4096 as sent by the vendor utility). Flow control can only be
+on with speed auto or 1000Mbps-full (see Speed.AllowsFlowControl): any other
+combination is refused before anything is sent, because the switch would accept
+it and silently keep flow control off. Changing a port that carries traffic can
+cut connectivity; callers must guard against that.
+
+For a port that is a member of a LAG the switch refuses half duplex (the error names
+that), but it accepts a different speed, flow control or admin state and so lets
+the members drift apart: keep them alike, or change the whole group.
+
+      func (*Client) SetPortBasedVLAN ¶
+
+func (c *Client) SetPortBasedVLAN(ctx context.Context, id PortVLANID, ports PortSet) error
+
+SetPortBasedVLAN creates or replaces a port-based VLAN group: TLV 8449 with
+the VLAN id (1 byte) and the member port mask. An empty port set removes
+the group. The mode itself (enabled/disabled) is not touched. Changing a
+group whose ports carry traffic can cut connectivity; callers must guard.
+
+      func (*Client) SetPortMirror ¶
+
+func (c *Client) SetPortMirror(ctx context.Context, m Mirror) error
+
+SetPortMirror writes the mirroring configuration (10-byte TLV 16640). To
+disable, pass the zero Mirror. The destination port stops carrying normal
+traffic; callers must guard against choosing a port that is in use.
+
+      func (*Client) SetPortPriorities ¶
+
+func (c *Client) SetPortPriorities(ctx context.Context, changes map[PortID]Priority) error
+
+SetPortPriorities changes the priority of the given ports (port -> priority). Every port
+must exist and every priority be within PriorityLowest..PriorityHighest, or nothing is
+sent. As in the vendor utility the request carries the priority of every port, so the
+current values are read first (a QoS read, which the write gate does not see) and the
+ports not mentioned are re-sent unchanged. The priorities only take effect in
+QoSPortBased mode.
+
+      func (*Client) SetQoSMode ¶
+
+func (c *Client) SetQoSMode(ctx context.Context, mode QoSMode) error
+
+SetQoSMode selects the QoS mode, which changes how traffic is queued on every port. The
+mode must be one of QoSModes. Per-port priorities (SetPortPriorities) only take effect in
+QoSPortBased; the switch accepts them in the other modes and ignores them.
+
+      func (*Client) SetStormControl ¶
+
+func (c *Client) SetStormControl(ctx context.Context, cfg StormConfig) error
+
+SetStormControl configures storm control on one port. Following the vendor
+utility: selecting any traffic type requires a rate (a multiple of 64 kbps,
+at least 64, at most MaxBandwidthKbps); selecting none disables it and the
+rate must be 0. A rate on a port that carries traffic drops its excess
+broadcast/multicast; callers must guard against that. Storm control is refused (ErrInvalid) on a port that has an
+ingress limit: the switch would remove the limit without saying so.
+
+      func (*Client) SetVLAN8021Q ¶
+
+func (c *Client) SetVLAN8021Q(ctx context.Context, v VLAN8021Q) error
+
+SetVLAN8021Q creates or replaces an 802.1Q VLAN: TLV 8705 with the id, the
+member and tagged port masks and the name. Changing a VLAN whose ports carry
+traffic can cut connectivity; callers must guard. The 802.1Q mode must be on.
+
+      func (*Client) SetVLANMode ¶
+
+func (c *Client) SetVLANMode(ctx context.Context, s VLANModeSetting) error
+
+SetVLANMode makes the given VLAN mode the active one; the switch turns the other two off and
+discards their settings, which can cut every connection, including the management path.
+Callers must guard. With the MTU VLAN every port can only talk to the uplink port. Writing
+the mode the switch already has is harmless but not skipped: compare with VLANMode first.
+
+      func (*Client) StormControl ¶
+
+func (c *Client) StormControl(ctx context.Context) ([]PortStorm, error)
+
+StormControl reads the storm control setting of every port.
+
+      func (*Client) System ¶
+
+func (c *Client) System(ctx context.Context) (System, error)
+
+System reads the port count and the auto-save flag.
+
+      func (*Client) VLANMode ¶
+
+func (c *Client) VLANMode(ctx context.Context) (VLANModeSetting, error)
+
+VLANMode reads the three mode flags (three reads) and names the active mode.
+
+      type Config ¶
+
+type Config struct {
+	// Host is the switch's IPv4 address or hostname. It is required unless MAC is set, in which
+	// case the address is found by discovery on the first request.
+	Host string
+	// MAC, when set, pins the identity of the switch: a device that answers with another MAC
+	// address is never written to (the request fails with ErrWrongSwitch). With no Host, or when
+	// Host does not answer, the switch is looked up by MAC with a discovery probe on the first
+	// request and again when it stops answering (its address may have changed); nothing is sent
+	// by Dial.
+	MAC MAC
+	// Username and Password are sent with every write and every authenticated read.
+	Username string
+	Password Password
+	Timeout  time.Duration // how long to wait for a reply per attempt, default 3s
+	// Retries is the number of additional attempts after the first when the switch stays
+	// silent: zero selects the default (2), NoRetries (any negative value) selects none.
+	// One request is therefore sent up to Retries+1 times, each waiting up to Timeout. A call
+	// that needs a session makes up to four such requests (the key exchange and the request,
+	// then both again if the switch stops answering mid-call), plus the discovery that learns
+	// the switch's MAC on a client's first call: with the defaults 36 seconds, 45 on the first.
+	Retries int
+
+	// SwitchPort and HostPort are the UDP ports of the switch (29808) and of this host
+	// (29809). A real switch always replies to 29809 whatever port the request came from,
+	// so change them only to talk to a fake switch.
+	SwitchPort int
+	HostPort   int
+	// BroadcastAddr is where discovery probes go besides the switch's own address;
+	// default 255.255.255.255.
+	BroadcastAddr netip.Addr
+
+	// WriteGate, when set, is consulted before every write; see WriteGate.
+	WriteGate WriteGate
+
+	// Logger receives the client's messages: requests and replies (types and sizes, never
+	// values) at Debug, sessions, lookups and writes at Info, retries and repeated downloads
+	// at Warn. Nil discards them. The library writes nowhere else, and no message carries the
+	// password, the username or the session key.
+	Logger *slog.Logger
+}
+
+Config configures a Client. Zero values select sensible defaults, except Host, which is
+required. A Config holds the switch's password as a Password, which prints as [redacted], so a
+Config can be logged or put in an error message; keep the text itself (Reveal) out of both.
+
+      type ConfigFile ¶
+
+type ConfigFile []byte
+
+ConfigFile is the switch's binary configuration file, as ConfigBackup returns it. It holds
+the account block of the switch (obfuscated, not safe), so it prints as its size and hash and
+never as its bytes, under every fmt verb and in slog; convert it to []byte for the bytes.
+
+      func (ConfigFile) Base64 ¶
+
+func (f ConfigFile) Base64() string
+
+Base64 is the file in standard base64, for a place that can only hold text.
+
+      func (ConfigFile) GoString ¶
+
+func (f ConfigFile) GoString() string
+
+GoString is String, so %#v does not print the bytes either.
+
+      func (ConfigFile) LogValue ¶
+
+func (f ConfigFile) LogValue() slog.Value
+
+LogValue makes slog log the size and hash instead of the bytes.
+
+      func (ConfigFile) SHA256 ¶
+
+func (f ConfigFile) SHA256() string
+
+SHA256 is the hex SHA-256 of the file: the hash that tells whether the configuration changed.
+
+      func (ConfigFile) Size ¶
+
+func (f ConfigFile) Size() int
+
+Size is the length of the file in bytes.
+
+      func (ConfigFile) String ¶
+
+func (f ConfigFile) String() string
+
+String describes the file by its size and hash, not by its content.
+
+      type DiscoverOptions ¶
+
+type DiscoverOptions struct {
+	// Interface restricts discovery to the interface of that name (for example "en0").
+	// Empty means every interface that is up, can broadcast, has a MAC address and an IPv4
+	// address with a subnet broadcast address.
+	Interface string
+	// Window is how long to listen for replies; zero means two seconds.
+	Window time.Duration
+	// Logger receives the probes sent and the replies found (Debug); nil discards them.
+	Logger *slog.Logger
+}
+
+DiscoverOptions tunes Discover. The zero value probes every usable interface and listens
+for two seconds.
+
+      type Dot1Q ¶
+
+type Dot1Q struct {
+	Enabled bool
+	MaxVLAN int
+	VLANs   []VLAN8021Q
+	PVIDs   []PortPVID
+}
+
+Dot1Q is VLAN > 802.1Q VLAN plus PVID settings.
+
+      func (Dot1Q) CheckRoom ¶
+
+func (q Dot1Q) CheckRoom(id VLANID) error
+
+CheckRoom reports whether the table can take VLAN id: it holds it already (changing a VLAN needs no
+room), or it has fewer entries than the most the switch supports. MaxVLAN counts VLAN 1: probed on
+switch 03, which reports 32, it took 31 more VLANs beside VLAN 1 and refused the next with code 7505.
+A switch that did not report its maximum is not bounded here. The error matches ErrInvalid.
+
+      type Firmware ¶
+
+type Firmware struct {
+	// Build is the eight-digit build date ("20230218"); empty when the string has no build that
+	// stands alone ("Build 2025071012" is not a build date).
+	Build BuildDate
+	// contains filtered or unexported fields
+}
+
+Firmware is the version string a switch reports ("1.0.0 Build 20230218 Rel.50633"), with the one
+part anything matches on, the build date, read out of it once. It is a comparable value: two are
+equal when the switch reported the same string. The zero value is "no firmware reported".
+
+      func ParseFirmware ¶
+
+func ParseFirmware(s string) Firmware
+
+ParseFirmware reads a version string. It never fails: a string that does not look like a vendor
+version has an empty Build (and so matches nothing that needs one), and String still returns it
+as it came.
+
+      func (Firmware) HasBuild ¶
+
+func (f Firmware) HasBuild() bool
+
+HasBuild reports whether the string names a build date.
+
+      func (Firmware) IsZero ¶
+
+func (f Firmware) IsZero() bool
+
+IsZero reports whether the switch reported no firmware version.
+
+      func (Firmware) String ¶
+
+func (f Firmware) String() string
+
+String is the version string as the switch reported it.
+
+      type GroupKind ¶
+
+type GroupKind int
+
+GroupKind says which kind of group of ports a write replaces.
+
+const (
+	// GroupLAG: a link aggregation group; Operation.ID is its number.
+	GroupLAG GroupKind = iota + 1
+	// GroupPortVLAN: a port-based VLAN group; Operation.ID is its id.
+	GroupPortVLAN
+	// GroupDot1QVLAN: an 802.1Q VLAN; Operation.ID is its VLAN id.
+	GroupDot1QVLAN
+)
+
+The groups a write can replace. The zero value is no group.
+
+      type Hostname ¶
+
+type Hostname string
+
+Hostname is the device description of a switch (System > System Info), what the web UI calls the
+device description and the protocol the hostname: 1 to MaxHostnameLen letters, digits and
+hyphens, not starting or ending with a hyphen. The rules are the web UI's.
+
+      func (Hostname) String ¶
+
+func (h Hostname) String() string
+
+String is the device description.
+
+      func (Hostname) Validate ¶
+
+func (h Hostname) Validate() error
+
+Validate applies the rules; the error matches ErrInvalid.
+
+      type IGMP ¶
+
+type IGMP struct {
+	Enabled           bool
+	ReportSuppression bool
+	Groups            []IGMPGroup
+}
+
+IGMP is the Switching > IGMP Snooping page.
+
+      type IGMPConfig ¶
+
+type IGMPConfig struct {
+	Enabled           bool
+	ReportSuppression bool
+}
+
+IGMPConfig is what SetIGMP writes. It is separate from IGMP (a reading) because the
+learned groups cannot be set.
+
+      type IGMPGroup ¶
+
+type IGMPGroup struct {
+	IP    netip.Addr // the group address (IPv4 multicast)
+	VLAN  VLANID     // the VLAN the group was learned in
+	Ports PortSet    // the ports that asked to receive it
+}
+
+IGMPGroup is one multicast group the switch has learned through IGMP snooping.
+
+      type IPConfig ¶
+
+type IPConfig struct {
+	IP, Netmask, Gateway netip.Addr
+}
+
+IPConfig is the static management address of the switch (System > IP Setting): three IPv4
+addresses. It is a comparable value; two configurations are the same when they are ==.
+
+      func (IPConfig) String ¶
+
+func (cfg IPConfig) String() string
+
+String formats the triple for messages.
+
+      type Impact ¶
+
+type Impact int
+
+Impact classes what a write can do to the switch's users, as the worst the method can do
+with any arguments. It is an upper bound for a gate or a front end deciding how much
+confirmation a write needs; it cannot say whether a particular write is harmless (a speed
+change on a free port is not, to the library, different from one on the uplink). That
+needs the ports: see Operation.Ports and the safety package.
+
+const (
+	// ImpactCosmetic cannot affect traffic or the way the switch is reached (LED, device
+	// description).
+	ImpactCosmetic Impact = iota + 1
+	// ImpactTraffic can affect the traffic of the ports it names or of the whole switch:
+	// port settings, rate limits, storm control, QoS, IGMP, port mirroring and the VLAN
+	// groups.
+	ImpactTraffic
+	// ImpactManagement can cut the management path or the uplink, or leave the switch
+	// unreachable: its IP settings, the VLAN mode, PVIDs, link aggregation, loop prevention.
+	ImpactManagement
+)
+
+The impact classes, from harmless to able to cut the management path. The zero value is
+not a class: a writer that forgot to declare one would be refused by every gate that
+compares.
+
+      func (Impact) String ¶
+
+func (i Impact) String() string
+
+String returns the lower-case name of the class, or unknown(n) for a value that is none.
+
+      func (Impact) Valid ¶
+
+func (i Impact) Valid() bool
+
+Valid reports whether i is one of the three classes.
+
+      type Info ¶
+
+type Info struct {
+	Model, Hardware string
+	// Hostname is the device description.
+	Hostname Hostname
+	// Firmware is the version the switch reports, read into its parts.
+	Firmware Firmware
+	// MAC is the switch's hardware address; the zero value when the reply carried none.
+	MAC MAC
+	// IP, Netmask and Gateway are the management address the switch reports. An address the reply
+	// did not carry is the invalid netip.Addr (Addr.IsValid is false), which is not the same as
+	// 0.0.0.0: a gateway of 0.0.0.0 means "no gateway".
+	IP, Netmask, Gateway netip.Addr
+	DHCP                 bool
+	// FactoryDefault is discovery TLV 14: the switch has never been configured
+	// (still on factory credentials).
+	FactoryDefault bool
+}
+
+Info is what a discovery reply reports about the switch.
+
+      func Discover ¶
+
+func Discover(ctx context.Context, opts DiscoverOptions) ([]Info, error)
+
+Discover broadcasts an unauthenticated discovery probe and returns every switch that
+answers within the window: one Info per MAC address, sorted by IP address, empty (not an
+error) when nobody answers. It is read-only, needs no credentials and is not subject to a
+WriteGate.
+
+The probe goes to the subnet broadcast address of each interface, with that interface's
+MAC as the sender, so switches behind a second network card are found too. It is sent
+again halfway through the window, because UDP is lossy; duplicate replies are dropped.
+If the context ends early, Discover returns the replies collected so far together with the
+context's error. A failure to bind the socket, or to send on every interface, is an error.
+
+Switches always reply to UDP port 29809 whatever the sender's port. The port is shared
+(see Client), so Discover can run while a Client of the same host is working: on macOS it
+found both switches three times out of three while a Client was reading at the same
+time. Where the system offers no port sharing, or another program holds the port
+exclusively (an old Easy Smart utility), binding fails and Discover returns that error.
+
+Example ¶
+
+Find the switches on the network. Run it on its own: switches reply to UDP port 29809,
+which a Client or the vendor's utility on the same host would share out unpredictably.
+
+package main
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/davidlukac/escp-go"
+)
+
+func main() {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	switches, err := escp.Discover(ctx, escp.DiscoverOptions{Window: 2 * time.Second})
+	if err != nil {
+		fmt.Println("discovery stopped early:", err)
+	}
+	for _, s := range switches {
+		fmt.Println(s.IP, s.MAC, s.Model, s.Firmware)
+	}
+}
+
+Output:
+
+        Share
+        Format
+        Run
+
+      func Locate ¶
+
+func Locate(ctx context.Context, mac MAC, opts DiscoverOptions) (Info, error)
+
+Locate finds the switch with the given MAC address: a discovery probe like Discover's that
+stops at the first reply from that switch, so it normally returns in well under a second (a
+switch needs 250 to 500 milliseconds to answer). It returns ErrNotFound when nobody with that
+MAC answers within the window (two seconds unless opts.Window says otherwise). Read-only and
+not subject to a WriteGate.
+
+Example ¶
+
+Find one switch by its MAC address, wherever it is on the segment. Like Discover, run it on its own.
+
+package main
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"time"
+
+	"github.com/davidlukac/escp-go"
+)
+
+func main() {
+	mac, _ := escp.ParseMAC("00:00:5e:00:53:01")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	info, err := escp.Locate(ctx, mac, escp.DiscoverOptions{})
+	if errors.Is(err, escp.ErrNotFound) {
+		fmt.Println("no switch with that MAC answered")
+		return
+	}
+	fmt.Println(info.IP, info.DHCP)
+}
+
+Output:
+
+        Share
+        Format
+        Run
+
+      type InfoReader ¶
+
+type InfoReader interface {
+	Info(ctx context.Context) (Info, error)
+}
+
+InfoReader is the part of a Client that a WriteGate may use. It only reads.
+
+      type Kbps ¶
+
+type Kbps int
+
+Kbps is a rate limit in kilobits per second, as the bandwidth and storm control pages take it:
+0 is unlimited (or, for storm control, no limit set), otherwise a multiple of RateStepKbps up to
+MaxBandwidthKbps. It is the unit of the switch's own rate fields.
+
+      func (Kbps) String ¶
+
+func (k Kbps) String() string
+
+String is the rate with its unit, "128 kbps".
+
+      func (Kbps) Validate ¶
+
+func (k Kbps) Validate() error
+
+Validate reports whether k is a rate the switch can hold; the error matches ErrInvalid and says
+what is allowed.
+
+      type LAG ¶
+
+type LAG struct {
+	ID    LAGID
+	Ports PortSet // empty when the group is unused
+}
+
+LAG is one link aggregation group (Switching > Port Trunk).
+
+      type LAGID ¶
+
+type LAGID int
+
+LAGID is the number of a link aggregation group, 1 to LAGGroupCount. The zero value means "no
+group" where a record allows it (a port that is in none).
+
+      func (LAGID) Range ¶
+
+func (g LAGID) Range() (first, last PortID)
+
+Range is the first and the last port the group owns (group 1: ports 1-4, group 2: ports 5-8);
+g must be valid.
+
+      func (LAGID) String ¶
+
+func (g LAGID) String() string
+
+String is the group number.
+
+      func (LAGID) Validate ¶
+
+func (g LAGID) Validate() error
+
+Validate reports whether g names a group of this switch family; the error matches ErrInvalid.
+
+      type MAC ¶
+
+type MAC [macLen]byte
+
+MAC is the hardware address of a switch: the one thing about it that does not change when its
+IP address does. It is a comparable value, so two of them are equal with ==, and the zero value
+means "no MAC" (no device has the all-zero address). Every place that reads, writes, compares or
+prints a switch's MAC goes through this type.
+
+      func MACFromBytes ¶
+
+func MACFromBytes(b []byte) (m MAC, ok bool)
+
+MACFromBytes converts a six-byte hardware address; ok is false for any other length.
+
+      func ParseMAC ¶
+
+func ParseMAC(s string) (MAC, error)
+
+ParseMAC reads the text form "aa:bb:cc:dd:ee:ff": six hex bytes, any case, separated by colons
+or by hyphens (one kind of separator). Anything else, including the dotted and unseparated forms
+net.ParseMAC accepts, is an error that matches ErrInvalid and shows the form that is accepted.
+
+Example ¶
+
+Name a switch by its MAC address: the client pins the identity (a device with another MAC is never
+written to) and finds the switch by itself when its address is not known or has changed.
+
+package main
+
+import (
+	"fmt"
+
+	"github.com/davidlukac/escp-go"
+)
+
+func main() {
+	mac, err := escp.ParseMAC("00-00-5E-00-53-01")
+	fmt.Println(mac, err)
+	_, err = escp.ParseMAC("00005e005301")
+	fmt.Println(err)
+}
+
+Output:
+00:00:5e:00:53:01 <nil>
+escp: "00005e005301" is not a MAC address; write it as aa:bb:cc:dd:ee:ff (colons or hyphens)
+
+        Share
+        Format
+        Run
+
+      func (MAC) IsZero ¶
+
+func (m MAC) IsZero() bool
+
+IsZero reports whether m is the zero value, "no MAC".
+
+      func (MAC) String ¶
+
+func (m MAC) String() string
+
+String formats the address in lower case with colons, "aa:bb:cc:dd:ee:ff"; the zero value is "".
+
+      type MTUVLAN ¶
+
+type MTUVLAN struct {
+	Enabled    bool
+	UplinkPort PortID
+}
+
+MTUVLAN is VLAN > MTU VLAN: when enabled, every port is isolated from the
+others and only talks to the uplink port.
+
+      type Mirror ¶
+
+type Mirror struct {
+	Enabled      bool
+	MirrorPort   PortID  // monitoring (destination) port, 0 when disabled
+	IngressPorts PortSet // source ports whose incoming traffic is copied
+	EgressPorts  PortSet // source ports whose outgoing traffic is copied
+}
+
+Mirror is the port mirroring configuration (Monitoring > Port Mirror): the traffic of the
+source ports is copied to MirrorPort. When Enabled is false the switch reports no ports.
+
+      type Operation ¶
+
+type Operation struct {
+	// Name is the name of the client method that is writing ("SetPort", "SetLAG").
+	Name string
+	// Ports are the ports the write names: the mirror's destination and sources, the members
+	// of a LAG or a VLAN, the port of a port setting. Empty for a write that names none.
+	//
+	// These are the ports named, not every port affected: a write that replaces a group
+	// (Replaces below) also takes the ports away that were members before and are not
+	// named now, and removing a group names none. A gate that has to protect those ports
+	// reads the group's members itself (safety.PortGate does).
+	Ports PortSet
+	// Impact is the class of the method; see Impact. It is an upper bound for the method,
+	// not a verdict on these arguments: it does not know which port is the uplink.
+	Impact Impact
+	// Replaces and ID say which group the write replaces or removes, when it does: its
+	// current members lose their membership unless the write names them again.
+	Replaces GroupKind
+	ID       int
+}
+
+Operation describes a write to a WriteGate before it is sent.
+
+      type Password ¶
+
+type Password string
+
+Password is the password of the switch's admin account. It prints as "[redacted]" whatever
+the verb (%v, %+v, %#v, %q, %s), in a structured log (slog) and in an error that formats a
+Config, so a Config can be logged or wrapped in an error without leaking it. The only way to
+the text is Reveal, which makes every place that needs it easy to find and review.
+
+      func (Password) GoString ¶
+
+func (Password) GoString() string
+
+GoString returns "[redacted]", so %#v does not print the password either.
+
+      func (Password) LogValue ¶
+
+func (Password) LogValue() slog.Value
+
+LogValue makes slog log "[redacted]" instead of the password.
+
+      func (Password) Reveal ¶
+
+func (p Password) Reveal() string
+
+Reveal returns the password itself, to be sent to the switch (or to be handed to a
+configuration the caller writes for the switch). Do not log the result.
+
+      func (Password) String ¶
+
+func (Password) String() string
+
+String returns "[redacted]".
+
+      type Port ¶
+
+type Port struct {
+	ID                    PortID
+	Enabled               bool
+	LAG                   LAGID // 0 = not in a LAG
+	ConfiguredSpeed       Speed // auto, 10Mbps-half, ... 1000Mbps-full
+	ActualSpeed           Speed // SpeedLinkDown or a negotiated speed
+	ConfiguredFlowControl bool
+	ActualFlowControl     bool
+}
+
+Port is one row of the Port Setting page.
+
+      type PortBandwidth ¶
+
+type PortBandwidth struct {
+	Port        PortID
+	IngressKbps Kbps
+	EgressKbps  Kbps
+}
+
+PortBandwidth holds a port's rate limits in kbps; 0 means unlimited.
+
+      type PortBasedVLAN ¶
+
+type PortBasedVLAN struct {
+	Enabled bool       // the port-based mode is the active VLAN mode
+	MaxVLAN int        // the most groups the switch supports (0 when it did not say)
+	VLANs   []PortVLAN // never nil
+}
+
+PortBasedVLAN is the port-based VLAN state (VLAN > Port Based VLAN): whether this is the active
+VLAN mode, how many groups the switch supports, and the groups that exist.
+
+      func (PortBasedVLAN) Group ¶
+
+func (v PortBasedVLAN) Group(id PortVLANID) (PortSet, bool)
+
+Group returns the member ports of group id and whether the group exists.
+
+      func (PortBasedVLAN) GroupLimit ¶
+
+func (v PortBasedVLAN) GroupLimit(portCount int) PortVLANLimit
+
+GroupLimit is the highest group id of the switch whose state v is and which has portCount ports
+(0 when unknown).
+
+      type PortConfig ¶
+
+type PortConfig struct {
+	ID          PortID
+	Enabled     bool
+	Speed       Speed // a configurable speed; SpeedLinkDown is refused
+	FlowControl bool
+}
+
+PortConfig is what SetPort writes to one port. All fields are required: the switch
+takes the whole entry, so a caller changing one field passes the others as read.
+FlowControl can only be true with a speed for which Speed.AllowsFlowControl is true.
+
+      type PortID ¶
+
+type PortID int
+
+PortID is the number of a port, counted from 1. The largest a port mask can express is MaxPort;
+how many ports a switch really has is known only to the switch, so writers also refuse ports
+beyond its own count. The zero value means "no port" where a record allows it (a disabled
+mirror has no monitoring port).
+
+      func ParsePortID ¶
+
+func ParsePortID(s string) (PortID, error)
+
+ParsePortID reads a port number written in decimal; the port must be valid (Validate), and the
+error then matches ErrInvalid.
+
+      func (PortID) String ¶
+
+func (p PortID) String() string
+
+String is the port number.
+
+      func (PortID) Validate ¶
+
+func (p PortID) Validate() error
+
+Validate reports whether p can be addressed in a port mask (1 to MaxPort); the error matches
+ErrInvalid.
+
+      type PortPVID ¶
+
+type PortPVID struct {
+	Port PortID
+	PVID VLANID
+}
+
+PortPVID is the default VLAN of a port.
+
+      type PortPriority ¶
+
+type PortPriority struct {
+	Port     PortID
+	Priority Priority
+}
+
+PortPriority is a port's priority queue (PriorityLowest to PriorityHighest).
+
+      type PortSet ¶
+
+type PortSet uint32
+
+PortSet is a set of ports: unordered, without duplicates, with ports 1 to MaxPort only. It is a
+comparable value (two sets are the same when they are ==) held as the very bitmap that goes on
+the wire (bit n-1 is port n), so building, comparing, sorting and removing duplicates are the
+operations of the type and nowhere else. The zero value is the empty set.
+
+      func MustPortSet ¶
+
+func MustPortSet(ports ...PortID) PortSet
+
+MustPortSet is NewPortSet for ports known to be valid (constants and tests); it panics otherwise.
+
+      func NewPortSet ¶
+
+func NewPortSet(ports ...PortID) (PortSet, error)
+
+NewPortSet builds a set from ports; a port outside 1 to MaxPort is an error that matches
+ErrInvalid. Repeating a port is not an error.
+
+      func PortSetFromMask ¶
+
+func PortSetFromMask(v []byte) PortSet
+
+PortSetFromMask reads a big-endian port bitmap (bit n-1 = port n) from the first four bytes of
+v; shorter input is the empty set.
+
+      func (PortSet) Has ¶
+
+func (s PortSet) Has(p PortID) bool
+
+Has reports whether p is in the set.
+
+      func (PortSet) Intersect ¶
+
+func (s PortSet) Intersect(o PortSet) PortSet
+
+Intersect is the ports in both sets.
+
+      func (PortSet) Ints ¶
+
+func (s PortSet) Ints() []int
+
+Ints lists the ports in ascending order as plain integers, for callers that hold them that way.
+
+      func (PortSet) IsEmpty ¶
+
+func (s PortSet) IsEmpty() bool
+
+IsEmpty reports whether the set has no port.
+
+      func (PortSet) Len ¶
+
+func (s PortSet) Len() int
+
+Len is the number of ports in the set.
+
+      func (PortSet) Mask ¶
+
+func (s PortSet) Mask() []byte
+
+Mask is the big-endian port bitmap that goes on the wire.
+
+      func (PortSet) Minus ¶
+
+func (s PortSet) Minus(o PortSet) PortSet
+
+Minus is the ports of s that are not in o.
+
+      func (PortSet) Ports ¶
+
+func (s PortSet) Ports() []PortID
+
+Ports lists the ports in ascending order; the empty set gives a non-nil empty slice.
+
+      func (PortSet) String ¶
+
+func (s PortSet) String() string
+
+String lists the ports in ascending order, "2,3,5"; the empty set is "none".
+
+      func (PortSet) Union ¶
+
+func (s PortSet) Union(o PortSet) PortSet
+
+Union is the ports in either set.
+
+      type PortStats ¶
+
+type PortStats struct {
+	ID      PortID
+	Enabled bool
+	Link    Speed // SpeedLinkDown or the negotiated speed
+	TxGood  uint32
+	TxBad   uint32
+	RxGood  uint32
+	RxBad   uint32
+}
+
+PortStats is one row of Monitoring > Port Statistics. Counters are the
+switch's 32-bit packet counters and wrap.
+
+      type PortStorm ¶
+
+type PortStorm struct {
+	Port           PortID
+	UnknownUnicast bool // limit unknown-unicast traffic
+	Multicast      bool // limit multicast traffic
+	Broadcast      bool // limit broadcast traffic
+	RateKbps       Kbps // the limit, a multiple of RateStepKbps; 0 when none is set
+	// Enabled mirrors the web UI: a rate is set and at least one traffic type is selected.
+	Enabled bool
+}
+
+PortStorm is a port's storm control setting: which kinds of traffic are limited and at what rate.
+
+      type PortVLAN ¶
+
+type PortVLAN struct {
+	ID    PortVLANID
+	Ports PortSet
+}
+
+PortVLAN is one port-based VLAN group: the VLAN id (1 to MaxPortVLANID) and its member ports.
+Membership is exclusive: a port is in one group at a time.
+
+      type PortVLANID ¶
+
+type PortVLANID int
+
+PortVLANID is the id of a port-based VLAN group, 1 to MaxPortVLANID. It is not an 802.1Q VLAN
+id (VLANID): the two modes have their own groups and their own ranges.
+
+      func (PortVLANID) String ¶
+
+func (g PortVLANID) String() string
+
+String is the id as a number.
+
+      func (PortVLANID) Validate ¶
+
+func (g PortVLANID) Validate() error
+
+Validate reports whether g is an id the switch can hold; the error matches ErrInvalid.
+
+      type PortVLANLimit ¶
+
+type PortVLANLimit int
+
+PortVLANLimit is the highest port-based VLAN group id a switch holds: the larger of the number of
+groups it says it supports and its number of ports. Both are 8 on a TL-SG108E; the web UI takes
+new ids from 2 to the port count, and group 1 is the default group that always exists. Taking the
+larger of the two means a model whose group limit and port count differ (a 24-port TL-SG1024DE,
+say) is never refused an id one of them allows. The zero value is an unknown limit: only the
+wire's range (PortVLANID.Validate) applies.
+
+      func NewPortVLANLimit ¶
+
+func NewPortVLANLimit(groups, ports int) PortVLANLimit
+
+NewPortVLANLimit is the limit of a switch that supports groups groups and has ports ports; either
+may be 0 when the switch did not say.
+
+      func (PortVLANLimit) Check ¶
+
+func (l PortVLANLimit) Check(id PortVLANID) error
+
+Check reports whether id is an id the switch can hold: within the wire's range and, when the limit
+is known, not above it. The error matches ErrInvalid.
+
+      func (PortVLANLimit) Known ¶
+
+func (l PortVLANLimit) Known() bool
+
+Known reports whether the switch said anything that bounds the ids.
+
+      func (PortVLANLimit) String ¶
+
+func (l PortVLANLimit) String() string
+
+String is the limit as a number.
+
+      type Priority ¶
+
+type Priority int
+
+Priority is a port's priority queue as the web UI shows it: PriorityLowest (1) to PriorityHighest (4).
+On the wire it is one less.
+
+const (
+	PriorityLowest  Priority = 1
+	PriorityHighest Priority = 4
+)
+
+The bounds of Priority.
+
+      func (Priority) Valid ¶
+
+func (p Priority) Valid() bool
+
+Valid reports whether the priority is within PriorityLowest..PriorityHighest.
+
+      type QoS ¶
+
+type QoS struct {
+	Mode       QoSMode
+	Priorities []PortPriority // one entry per port
+}
+
+QoS is the QoS Basic page: the mode and, for every port, a priority. The priorities are only
+effective in QoSPortBased mode, but the switch reports them in every mode.
+
+      type QoSMode ¶
+
+type QoSMode int
+
+QoSMode is the switch's QoS mode. The number is the wire byte; the name is the web UI's
+and the Terraform provider's spelling, which consumers keep in saved state: do not change it.
+
+const (
+	QoSPortBased QoSMode = 0
+	QoS8021p     QoSMode = 1
+	QoSDSCP8021p QoSMode = 2
+)
+
+The QoS modes the switch knows. Per-port priorities only take effect in QoSPortBased.
+
+      func ParseQoSMode ¶
+
+func ParseQoSMode(name string) (QoSMode, error)
+
+ParseQoSMode converts a mode name as String spells it.
+
+      func QoSModes ¶
+
+func QoSModes() []QoSMode
+
+QoSModes lists the modes SetQoSMode accepts, in the order of their codes.
+
+Example ¶
+
+package main
+
+import (
+	"fmt"
+
+	"github.com/davidlukac/escp-go"
+)
+
+func main() {
+	for _, m := range escp.QoSModes() {
+		fmt.Printf("%d %s\n", int(m), m)
+	}
+}
+
+Output:
+0 port-based
+1 802.1p
+2 dscp-802.1p
+
+        Share
+        Format
+        Run
+
+      func (QoSMode) String ¶
+
+func (m QoSMode) String() string
+
+String returns the web UI's name of the mode, or unknown(n) for a code this client does not know.
+
+      func (QoSMode) Valid ¶
+
+func (m QoSMode) Valid() bool
+
+Valid reports whether the switch knows the mode.
+
+      type RejectedError ¶
+
+type RejectedError struct {
+	Code   ReplyCode
+	Reason string
+}
+
+RejectedError is a write the switch answered with a non-zero code. It matches
+ErrRejected (errors.Is) for callers that treat every refusal alike, and names the
+code for those that want to know which one it was. Reason, when set, says why
+the switch refused (only for codes whose cause has been established).
+
+Example ¶
+
+A write the switch refuses matches ErrRejected, and carries the reply code.
+
+package main
+
+import (
+	"errors"
+	"fmt"
+
+	"github.com/davidlukac/escp-go"
+)
+
+func main() {
+	err := fmt.Errorf("creating the group: %w", &escp.RejectedError{Code: 4})
+
+	fmt.Println(errors.Is(err, escp.ErrRejected))
+	var rejected *escp.RejectedError
+	if errors.As(err, &rejected) {
+		fmt.Println("code", rejected.Code)
+	}
+}
+
+Output:
+true
+code 4
+
+        Share
+        Format
+        Run
+
+      func (*RejectedError) Error ¶
+
+func (e *RejectedError) Error() string
+
+Error names the code and, when the client knows it, the reason; for an unknown code it says only that
+the credentials, the setting or the value may be at fault, because the switch does not say which.
+
+      func (*RejectedError) Is ¶
+
+func (e *RejectedError) Is(target error) bool
+
+Is makes errors.Is(err, ErrRejected) true for every rejected write.
+
+      type ReplyCode ¶
+
+type ReplyCode int32
+
+ReplyCode is the result code of a switch reply: zero when the request was accepted,
+otherwise the code the switch gives for refusing it. Only some codes have a known cause
+(see RejectedError.Reason); the rest are reported as they came.
+
+      type Speed ¶
+
+type Speed string
+
+Speed is a port's speed and duplex, spelled as the web UI spells it. Consumers keep the
+values in saved state (the Terraform provider does): do not change them.
+
+const (
+	SpeedAuto     Speed = "auto"
+	Speed10Half   Speed = "10Mbps-half"
+	Speed10Full   Speed = "10Mbps-full"
+	Speed100Half  Speed = "100Mbps-half"
+	Speed100Full  Speed = "100Mbps-full"
+	Speed1000Full Speed = "1000Mbps-full"
+	// SpeedLinkDown is the ActualSpeed of a port with no link; it cannot be configured.
+	SpeedLinkDown Speed = "link-down"
+)
+
+The speeds a port can be configured to (codes 1..6 on the wire), and the one state
+that is only ever reported.
+
+      func ConfigurableSpeeds ¶
+
+func ConfigurableSpeeds() []Speed
+
+ConfigurableSpeeds lists the speeds SetPort accepts, in the order of the switch's codes 1..6.
+
+      func ParseSpeed ¶
+
+func ParseSpeed(name string) (Speed, error)
+
+ParseSpeed converts a configurable speed name; SpeedLinkDown and unknown names are errors.
+
+Example ¶
+
+package main
+
+import (
+	"fmt"
+
+	"github.com/davidlukac/escp-go"
+)
+
+func main() {
+	s, err := escp.ParseSpeed("100Mbps-full")
+	fmt.Println(s, err)
+
+	_, err = escp.ParseSpeed("link-down") // only ever reported, never configured
+	fmt.Println(err != nil)
+}
+
+Output:
+100Mbps-full <nil>
+true
+
+        Share
+        Format
+        Run
+
+      func (Speed) AllowsFlowControl ¶
+
+func (s Speed) AllowsFlowControl() bool
+
+AllowsFlowControl reports whether flow control can be switched on at this speed. The switch
+keeps it only with auto-negotiation or at 1000Mbps-full; at a fixed 10 or 100 Mbps speed it
+accepts the write but stores flow control as off (measured on firmware 20250710, every
+fixed speed below 1000 Mbps). The vendor utility enforces the same rule: its flow control
+choice is forced to off and disabled unless the speed is auto or 1000 Mbps full, with the
+message "Failed to enable flow control when speed in Force mode".
+
+      func (Speed) String ¶
+
+func (s Speed) String() string
+
+String returns the speed as spelled in the web UI.
+
+      type StormConfig ¶
+
+type StormConfig struct {
+	Port           PortID
+	UnknownUnicast bool
+	Multicast      bool
+	Broadcast      bool
+	RateKbps       Kbps
+}
+
+StormConfig is what SetStormControl writes to one port. Unlike PortStorm (a reading)
+it has no Enabled flag: storm control is on exactly when a traffic type is selected.
+
+      type System ¶
+
+type System struct {
+	PortCount int
+	AutoSave  bool
+}
+
+System holds device facts that are not part of discovery.
+
+      type VLAN8021Q ¶
+
+type VLAN8021Q struct {
+	ID       VLANID
+	Name     VLANName
+	Tagged   PortSet
+	Untagged PortSet
+}
+
+VLAN8021Q is one 802.1Q VLAN with its tagged and untagged members.
+
+      type VLANID ¶
+
+type VLANID int
+
+VLANID is the id of an 802.1Q VLAN, and the PVID of a port, which is the id of the VLAN its
+untagged traffic enters. The IEEE range is MinVLANID to MaxVLANID; two bytes carry it on the wire.
+(Port-based VLAN groups and LAG groups have ids of their own, one byte each, and are plain ints.)
+
+const (
+	MinVLANID      VLANID = 1
+	MaxVLANID      VLANID = 4094
+	MaxVLANNameLen        = 10
+)
+
+Limits of 802.1Q VLANs (VLAN > 802.1Q VLAN, VLAN > 802.1Q PVID Setting). The
+id range is the IEEE one; the name rules are those of the vendor utility
+(at most ten characters from letters, digits, hyphen and underscore).
+
+      func (VLANID) String ¶
+
+func (v VLANID) String() string
+
+String is the id as a number.
+
+      func (VLANID) Validate ¶
+
+func (v VLANID) Validate() error
+
+Validate reports whether v is within MinVLANID to MaxVLANID; the error matches ErrInvalid.
+
+      type VLANMode ¶
+
+type VLANMode string
+
+VLANMode is which of the switch's three VLAN modes is active. They exclude each other: the
+vendor utility warns that switching discards the settings of the other modes. The values
+are the spellings consumers keep in saved state (the Terraform provider does), so they do not change.
+
+const (
+	VLANModeNone      VLANMode = "none"
+	VLANModeMTU       VLANMode = "mtu"
+	VLANModePortBased VLANMode = "port-based"
+	VLANModeDot1Q     VLANMode = "802.1q"
+)
+
+The VLAN modes. VLANModeNone is what VLANMode reports for a switch with no mode on, or with
+several on (which the firmware should not allow); it cannot be written.
+
+      func VLANModes ¶
+
+func VLANModes() []VLANMode
+
+VLANModes lists the modes SetVLANMode accepts.
+
+      type VLANModeSetting ¶
+
+type VLANModeSetting struct {
+	Mode       VLANMode
+	UplinkPort PortID
+}
+
+VLANModeSetting is the active VLAN mode and, for the MTU VLAN, its uplink port (zero for
+every other mode).
+
+      func VLANModeFrom ¶
+
+func VLANModeFrom(mtu MTUVLAN, portBased, dot1q bool) VLANModeSetting
+
+VLANModeFrom names the active mode from the three mode flags the switch reports. No flag, or
+more than one, is VLANModeNone: a state the client cannot write, shown as it is instead of
+being hidden.
+
+      type VLANName ¶
+
+type VLANName string
+
+VLANName is the name of an 802.1Q VLAN: empty, or up to MaxVLANNameLen letters, digits, hyphens and
+underscores (the vendor utility's rules).
+
+      func (VLANName) String ¶
+
+func (n VLANName) String() string
+
+String is the name.
+
+      func (VLANName) Validate ¶
+
+func (n VLANName) Validate() error
+
+Validate applies the rules; the error matches ErrInvalid.
+
+      type WriteGate ¶
+
+type WriteGate func(ctx context.Context, sw InfoReader, op Operation) error
+
+WriteGate decides whether the client may send a write to the switch. Every
+method that changes the switch (each Set* and Delete*) calls it first, with
+the client itself and a description of the write (its method, the ports it
+names and its Impact), and sends nothing when it returns an error: the
+method returns that error unchanged. A gate may read from the switch through
+sw but must never write, and must be safe for concurrent use. Reads are
+never gated.
+
+A method that sends several writes consults the gate before each of them
+with the same operation, so a gate that is expensive should remember its
+verdict.
+
+      type WrongSwitchError ¶
+
+type WrongSwitchError struct {
+	Want, Got MAC
+	IP        netip.Addr // where the other device answered from; invalid when unknown
+}
+
+WrongSwitchError is the refusal to talk to a device whose MAC address is not Config.MAC. It
+matches ErrWrongSwitch.
+
+      func (*WrongSwitchError) Error ¶
+
+func (e *WrongSwitchError) Error() string
+
+Error names both addresses and where the other device was.
+
+      func (*WrongSwitchError) Is ¶
+
+func (e *WrongSwitchError) Is(target error) bool
+
+Is makes errors.Is(err, ErrWrongSwitch) true.
+
+##
+
+      Source Files
+      ¶
+
+      View all Source files
+
+backup.go
+
+bandwidth.go
+
+client.go
+
+config.go
+
+dhcp.go
+
+discover.go
+
+doc.go
+
+errors.go
+
+firmware.go
+
+igmp.go
+
+info.go
+
+ip.go
+
+lag.go
+
+led.go
+
+limiter.go
+
+limits.go
+
+logging.go
+
+loopprevention.go
+
+mac.go
+
+mirror.go
+
+operation.go
+
+password.go
+
+ports.go
+
+portset.go
+
+qos.go
+
+request.go
+
+seq.go
+
+session.go
+
+stats.go
+
+storm.go
+
+system.go
+
+transport.go
+
+vlan_8021q.go
+
+vlan_8021q_write.go
+
+vlan_mode.go
+
+vlan_mtu.go
+
+vlan_port.go
+
+##
+
+      Directories
+      ¶
+
+          Show internal
+
+          Expand all
+
+        Path
+        Synopsis
+
+escptest
+
+Package escptest is an in-process TL-SG108E that speaks ESCP over loopback UDP, for tests of code that uses the escp client.
+
+      Package escptest is an in-process TL-SG108E that speaks ESCP over loopback UDP, for tests of code that uses the escp client.
+
+            examples
+
+            discover
+
+            command
+
+Command discover is a read-only example of the library: it lists the switches that answer a discovery probe on the local network and, when ESCP_HOST, ESCP_USERNAME and ESCP_PASSWORD are set, the ports of that switch.
+
+      Command discover is a read-only example of the library: it lists the switches that answer a discovery probe on the local network and, when ESCP_HOST, ESCP_USERNAME and ESCP_PASSWORD are set, the ports of that switch.
+
+            internal
+
+            udp
+
+Package udp holds the one piece of socket handling the ESCP client needs that has nothing to do with the protocol: letting several sockets (several clients, Discover, other processes) bind the same reply port.
+
+      Package udp holds the one piece of socket handling the ESCP client needs that has nothing to do with the protocol: letting several sockets (several clients, Discover, other processes) bind the same reply port.
+
+            wire
+
+Package wire is the byte level of the ESCP protocol: the 32-byte packet header, the type-length-value elements, the catalogue of TLV types, and the RC4 and RSA primitives that protect them.
+
+      Package wire is the byte level of the ESCP protocol: the 32-byte packet header, the type-length-value elements, the catalogue of TLV types, and the RC4 and RSA primitives that protect them.
+
+safety
+
+Package safety holds the rules that decide whether a write to a switch is prudent: which firmware builds the client was verified against, and what a port is used for (link, link aggregation).
+
+      Package safety holds the rules that decide whether a write to a switch is prudent: which firmware builds the client was verified against, and what a port is used for (link, link aggregation).
+
+            tools
+
+            coverpolicy
+
+            command
+
+Command coverpolicy enforces the module's coverage policy on a Go cover profile, and turns the same profile into the shields.io endpoint file behind the README badge.
+
+      Command coverpolicy enforces the module's coverage policy on a Go cover profile, and turns the same profile into the shields.io endpoint file behind the README badge.
+
+ Click to show internal directories.
+
+ Click to hide internal directories.
+
+## Jump to
+
+        Close
+
+## Keyboard shortcuts
+
+              ? : This menu
+
+              / : Search site
+
+              f or F : Jump to
+
+              y or Y
+               : Canonical URL
+
+        Close
+
