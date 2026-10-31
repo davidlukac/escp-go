@@ -47,8 +47,10 @@ import sys
 ver, msg = sys.argv[1:3]
 p = 'CHANGELOG.md'
 s = open(p).read()
-head, rest = s.split('\n\n', 1)
-open(p, 'w').write(head + f'\n\n## {ver}\n\n- {msg}\n\n' + rest)
+# the new entry goes above the newest one, below the title and the introduction
+i = s.find('\n## ')
+entry = f'\n## {ver}\n\n- {msg}\n'
+open(p, 'w').write(s.rstrip('\n') + '\n' + entry if i < 0 else s[:i] + entry + s[i:])
 PY
 
 # The checks of RELEASING.md step 1. The pre-commit hook then runs them again on the commit.
