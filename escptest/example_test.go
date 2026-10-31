@@ -61,7 +61,7 @@ func ExampleSwitch_EnableModel() {
 
 	ctx := context.Background()
 	fmt.Println("mirror:", c.SetPortMirror(ctx, escp.Mirror{Enabled: true, MirrorPort: 4, IngressPorts: escp.MustPortSet(2)}))
-	err = c.SetLAG(ctx, 1, escp.MustPortSet(2, 3))
+	err = c.SetLAG(ctx, escp.LAG{ID: 1, Ports: escp.MustPortSet(2, 3)})
 	var refused *escp.RejectedError
 	if errors.As(err, &refused) {
 		fmt.Println("LAG refused with code", refused.Code)

@@ -117,7 +117,7 @@ func TestLiveInactiveSettings(t *testing.T) {
 		if err := c.SetVLANMode(ctx, VLANModeSetting{Mode: VLANModePortBased}); err != nil {
 			t.Errorf("RESTORE FAILED: port-based mode: %v", err)
 		}
-		if err := c.SetPortBasedVLAN(ctx, 2, 0); err != nil {
+		if err := c.SetPortBasedVLAN(ctx, PortVLAN{ID: 2, Ports: 0}); err != nil {
 			t.Logf("RESTORE: removing group 2: %v", err)
 		}
 		if err := c.SetQoSMode(ctx, QoSPortBased); err != nil {
@@ -183,16 +183,16 @@ func TestLiveInactiveSettings(t *testing.T) {
 	}
 
 	// B. A port-based group staged while the switch is in 802.1Q mode.
-	err = c.SetPortBasedVLAN(ctx, 2, MustPortSet(a, b))
+	err = c.SetPortBasedVLAN(ctx, PortVLAN{ID: 2, Ports: MustPortSet(a, b)})
 	obs("B1 SetPortBasedVLAN(2,[a b]) while port-based is off: %s", result(err))
 	obs("B1 read right after: %s | raw %s", portBased(), raw(wire.TLVVLANPortBased, wire.TLVVLANPortBasedVID))
 	setMode(VLANModePortBased)
 	obs("B2 after switching port-based on: %s", portBased())
-	_ = c.SetPortBasedVLAN(ctx, 2, 0)
+	_ = c.SetPortBasedVLAN(ctx, PortVLAN{ID: 2, Ports: 0})
 	obs("B2 after removing group 2: %s", portBased())
 
 	// C. Does a table survive a trip through the other mode?
-	if err := c.SetPortBasedVLAN(ctx, 2, MustPortSet(a, b)); err != nil {
+	if err := c.SetPortBasedVLAN(ctx, PortVLAN{ID: 2, Ports: MustPortSet(a, b)}); err != nil {
 		t.Fatalf("creating the test group in port-based mode: %v", err)
 	}
 	obs("C1 group 2 created in port-based mode: %s", portBased())
@@ -200,7 +200,7 @@ func TestLiveInactiveSettings(t *testing.T) {
 	obs("C1 in 802.1Q mode: %s", dot1q())
 	setMode(VLANModePortBased)
 	obs("C1 back in port-based mode (trip through 802.1Q): %s", portBased())
-	_ = c.SetPortBasedVLAN(ctx, 2, 0)
+	_ = c.SetPortBasedVLAN(ctx, PortVLAN{ID: 2, Ports: 0})
 	setMode(VLANModeDot1Q)
 	if err := c.SetDot1QVLAN(ctx, Dot1QVLAN{ID: 20, Name: "trip", Untagged: MustPortSet(PortID(a)), Tagged: MustPortSet(PortID(b))}); err != nil {
 		t.Fatalf("creating the test VLAN in 802.1Q mode: %v", err)

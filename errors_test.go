@@ -97,7 +97,7 @@ func TestEveryRefusedArgumentIsErrInvalid(t *testing.T) {
 		{"SetPortMirror disabled with ports", func(c *Client) error {
 			return c.SetPortMirror(ctx, Mirror{MirrorPort: 5})
 		}, "a disabled mirror must have no"},
-		{"SetLAG", func(c *Client) error { return c.SetLAG(ctx, 1, MustPortSet(1)) }, "a LAG takes"},
+		{"SetLAG", func(c *Client) error { return c.SetLAG(ctx, LAG{ID: 1, Ports: MustPortSet(1)}) }, "a LAG takes"},
 		{"SetQoSMode", func(c *Client) error { return c.SetQoSMode(ctx, QoSMode(9)) }, "invalid QoS mode 9"},
 		{"SetPortPriorities port", func(c *Client) error { return c.SetPortPriorities(ctx, map[PortID]Priority{9: PriorityLowest}) }, "port 9 does not exist"},
 		{"SetPortPriorities priority", func(c *Client) error { return c.SetPortPriorities(ctx, map[PortID]Priority{2: Priority(9)}) }, "invalid priority 9 for port 2"},
@@ -105,7 +105,7 @@ func TestEveryRefusedArgumentIsErrInvalid(t *testing.T) {
 			return c.SetDot1QVLAN(ctx, Dot1QVLAN{ID: 20, Tagged: MustPortSet(2), Untagged: MustPortSet(2)})
 		}, "both tagged and untagged"},
 		{"SetDot1QVLAN empty", func(c *Client) error { return c.SetDot1QVLAN(ctx, Dot1QVLAN{ID: 20}) }, "has no member ports"},
-		{"SetPortBasedVLAN id", func(c *Client) error { return c.SetPortBasedVLAN(ctx, 0, MustPortSet(2, 3)) }, "invalid port-based VLAN id 0"},
+		{"SetPortBasedVLAN id", func(c *Client) error { return c.SetPortBasedVLAN(ctx, PortVLAN{ID: 0, Ports: MustPortSet(2, 3)}) }, "invalid port-based VLAN id 0"},
 		{"SetPVIDs empty", func(c *Client) error { return c.SetPVIDs(ctx, nil) }, "no PVIDs to set"},
 	}
 	for _, tc := range cases {

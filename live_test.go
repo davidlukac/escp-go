@@ -432,7 +432,7 @@ func TestLiveLAG2(t *testing.T) {
 		t.Fatalf("LAG%d is already in use: %+v; refusing", group, orig)
 	}
 	defer func() {
-		if err := c.SetLAG(ctx, group, 0); err != nil {
+		if err := c.SetLAG(ctx, LAG{ID: group, Ports: 0}); err != nil {
 			t.Errorf("RESTORE FAILED: %v", err)
 		}
 		if now := lagByID(t, c, group); !now.Ports.IsEmpty() {
@@ -442,7 +442,7 @@ func TestLiveLAG2(t *testing.T) {
 			t.Errorf("LAG%d changed: %+v vs %+v", untouched, now, before)
 		}
 	}()
-	if err := c.SetLAG(ctx, group, MustPortSet(a, b)); err != nil {
+	if err := c.SetLAG(ctx, LAG{ID: group, Ports: MustPortSet(a, b)}); err != nil {
 		t.Fatal(err)
 	}
 	if got := lagByID(t, c, group); got.Ports != MustPortSet(a, b) {
@@ -481,13 +481,13 @@ func TestLivePortBasedVLAN2(t *testing.T) {
 		t.Fatal("VLAN 2 already exists; refusing")
 	}
 	defer func() {
-		if err := c.SetPortBasedVLAN(ctx, 2, 0); err != nil {
+		if err := c.SetPortBasedVLAN(ctx, PortVLAN{ID: 2, Ports: 0}); err != nil {
 			t.Errorf("RESTORE FAILED (remove VLAN 2): %v", err)
 		}
 		now, _ := c.PortBasedVLAN(ctx)
 		if g, _ := portVLANByID(now, 1); !reflect.DeepEqual(g, vlan1) {
 			t.Errorf("VLAN 1 changed (%+v); repairing", g)
-			if err := c.SetPortBasedVLAN(ctx, 1, vlan1.Ports); err != nil {
+			if err := c.SetPortBasedVLAN(ctx, PortVLAN{ID: 1, Ports: vlan1.Ports}); err != nil {
 				t.Errorf("REPAIR FAILED: %v", err)
 			}
 		}
@@ -495,7 +495,7 @@ func TestLivePortBasedVLAN2(t *testing.T) {
 			t.Errorf("not restored: %+v", now)
 		}
 	}()
-	if err := c.SetPortBasedVLAN(ctx, 2, MustPortSet(a, b)); err != nil {
+	if err := c.SetPortBasedVLAN(ctx, PortVLAN{ID: 2, Ports: MustPortSet(a, b)}); err != nil {
 		t.Fatal(err)
 	}
 	now, _ := c.PortBasedVLAN(ctx)

@@ -53,7 +53,7 @@ func TestWritersRefusePortsTheSwitchDoesNotHave(t *testing.T) {
 		{"SetPortMirror egress", func(c *Client) error {
 			return c.SetPortMirror(ctx, Mirror{Enabled: true, MirrorPort: 5, EgressPorts: MustPortSet(9)})
 		}},
-		{"SetPortBasedVLAN", func(c *Client) error { return c.SetPortBasedVLAN(ctx, 2, MustPortSet(2, 9)) }},
+		{"SetPortBasedVLAN", func(c *Client) error { return c.SetPortBasedVLAN(ctx, PortVLAN{ID: 2, Ports: MustPortSet(2, 9)}) }},
 		{"SetDot1QVLAN tagged", func(c *Client) error {
 			return c.SetDot1QVLAN(ctx, Dot1QVLAN{ID: 20, Tagged: MustPortSet(9), Untagged: MustPortSet(2)})
 		}},
@@ -90,7 +90,7 @@ func TestSetLAGRefusesPortsBeyondASmallerSwitch(t *testing.T) {
 	var reads atomic.Int32
 	countingPorts(f, 4, &reads)
 	c := dialFake(t, f, "secret")
-	err := c.SetLAG(context.Background(), 2, MustPortSet(5, 6))
+	err := c.SetLAG(context.Background(), LAG{ID: 2, Ports: MustPortSet(5, 6)})
 	if !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "port 5 does not exist: this switch has 4 ports") {
 		t.Fatalf("got %v", err)
 	}
@@ -138,7 +138,7 @@ func TestPortCountIsReadOnce(t *testing.T) {
 	if err := c.SetLED(ctx, false); err != nil {
 		t.Fatal(err)
 	}
-	if err := c.SetLAG(ctx, 1, 0); err != nil { // removing a group names no ports
+	if err := c.SetLAG(ctx, LAG{ID: 1, Ports: 0}); err != nil { // removing a group names no ports
 		t.Fatal(err)
 	}
 	if n := reads.Load(); n != 0 {

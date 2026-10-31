@@ -36,20 +36,20 @@ func TestSetPortBasedVLANWire(t *testing.T) {
 	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
 	ctx := context.Background()
-	if err := c.SetPortBasedVLAN(ctx, 2, MustPortSet(6, 7)); err != nil {
+	if err := c.SetPortBasedVLAN(ctx, PortVLAN{ID: 2, Ports: MustPortSet(6, 7)}); err != nil {
 		t.Fatal(err)
 	}
 	if got := f.LastSet(); got[0].Type != wire.TLVVLANPortBasedVID || !reflect.DeepEqual(got[0].Value, []byte{2, 0, 0, 0, 0x60}) {
 		t.Fatalf("wire %+v", got)
 	}
-	if err := c.SetPortBasedVLAN(ctx, 2, 0); err != nil {
+	if err := c.SetPortBasedVLAN(ctx, PortVLAN{ID: 2, Ports: 0}); err != nil {
 		t.Fatal(err)
 	}
 	if got := f.LastSet(); !reflect.DeepEqual(got[0].Value, []byte{2, 0, 0, 0, 0}) {
 		t.Fatalf("delete wire %v", got[0].Value)
 	}
 	n := f.WriteCount()
-	if c.SetPortBasedVLAN(ctx, 0, MustPortSet(1)) == nil || c.SetPortBasedVLAN(ctx, 256, MustPortSet(1)) == nil {
+	if c.SetPortBasedVLAN(ctx, PortVLAN{ID: 0, Ports: MustPortSet(1)}) == nil || c.SetPortBasedVLAN(ctx, PortVLAN{ID: 256, Ports: MustPortSet(1)}) == nil {
 		t.Fatal("an invalid id must be rejected")
 	}
 	if f.WriteCount() != n {
@@ -179,17 +179,17 @@ func TestSetPortBasedVLANRefusesAGroupTheSwitchDoesNotHave(t *testing.T) {
 			var reads atomic.Int32
 			f.Configure(func(f *escptest.Faults) { f.GetFn = scriptedPortBased(c.max, c.ports, &reads) })
 			cl := dialFake(t, f, "secret")
-			err := cl.SetPortBasedVLAN(ctx, c.bad, MustPortSet(2))
+			err := cl.SetPortBasedVLAN(ctx, PortVLAN{ID: c.bad, Ports: MustPortSet(2)})
 			if !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), c.want) {
 				t.Fatalf("group %d: got %v, want ErrInvalid containing %q", c.bad, err, c.want)
 			}
 			if f.WriteCount() != 0 {
 				t.Fatalf("the refused write reached the switch (%d writes)", f.WriteCount())
 			}
-			if err := cl.SetPortBasedVLAN(ctx, c.ok, MustPortSet(2)); err != nil {
+			if err := cl.SetPortBasedVLAN(ctx, PortVLAN{ID: c.ok, Ports: MustPortSet(2)}); err != nil {
 				t.Fatalf("group %d: %v", c.ok, err)
 			}
-			if err := cl.SetPortBasedVLAN(ctx, 2, MustPortSet(3)); err != nil {
+			if err := cl.SetPortBasedVLAN(ctx, PortVLAN{ID: 2, Ports: MustPortSet(3)}); err != nil {
 				t.Fatal(err)
 			}
 			if n := reads.Load(); n != 1 {
@@ -205,7 +205,7 @@ func TestSetPortBasedVLANFailsWhenTheGroupLimitCannotBeRead(t *testing.T) {
 		f.GetFn = func(types []wire.TLVType) ([]escptest.Setting, int32, bool) { return nil, 1, false } // the switch refuses every read
 	})
 	c := dialFake(t, f, "secret")
-	err := c.SetPortBasedVLAN(context.Background(), 2, MustPortSet(2))
+	err := c.SetPortBasedVLAN(context.Background(), PortVLAN{ID: 2, Ports: MustPortSet(2)})
 	if err == nil || errors.Is(err, ErrInvalid) {
 		t.Fatalf("got %v, want the read error, which is not a refusal of the group", err)
 	}
@@ -227,7 +227,7 @@ func TestSetPortBasedVLANFailsWhenThePortCountCannotBeRead(t *testing.T) {
 		}
 	})
 	c := dialFake(t, f, "secret")
-	if err := c.SetPortBasedVLAN(context.Background(), 2, MustPortSet(2)); err == nil || errors.Is(err, ErrInvalid) {
+	if err := c.SetPortBasedVLAN(context.Background(), PortVLAN{ID: 2, Ports: MustPortSet(2)}); err == nil || errors.Is(err, ErrInvalid) {
 		t.Fatalf("got %v, want the read error", err)
 	}
 	if f.WriteCount() != 0 {
