@@ -21,14 +21,14 @@ import (
 // answers: every observation is logged as a line starting with "OBS|" for the run record. What is
 // asserted is the restore: the switch must end exactly as it began.
 //
-// Only unused test ports are written (TPLINK_EASYSMART_LIVE_PORTS="a,b", proven link-down and in
+// Only unused test ports are written (ESCP_LIVE_PORTS="a,b", proven link-down and in
 // no LAG), the uplink and VLAN 1 are never changed, and the MTU VLAN is deliberately not probed
 // (a misread write could enable it without its uplink and cut the management path). It switches
-// the VLAN mode several times, so it needs TPLINK_EASYSMART_LIVE_INACTIVE=1 and a switch that
+// the VLAN mode several times, so it needs ESCP_LIVE_INACTIVE=1 and a switch that
 // starts in port-based mode. Take a configuration backup first and watch the pings.
 func TestLiveInactiveSettings(t *testing.T) {
-	if os.Getenv("TPLINK_EASYSMART_LIVE_INACTIVE") != "1" {
-		t.Skip("set TPLINK_EASYSMART_LIVE_INACTIVE=1 to probe inactive settings (switches the VLAN mode several times)")
+	if os.Getenv("ESCP_LIVE_INACTIVE") != "1" {
+		t.Skip("set ESCP_LIVE_INACTIVE=1 to probe inactive settings (switches the VLAN mode several times)")
 	}
 	a, b, _ := liveTestPorts(t)
 	c, ctx := liveClient(t), context.Background()

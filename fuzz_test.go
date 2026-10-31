@@ -13,7 +13,7 @@ import (
 // Everything below parses or transforms bytes that arrive over the network.
 // The fuzz targets assert that no input makes them panic and that the
 // properties each function promises hold. `go test` runs the seed corpus; run
-// `go test -fuzz=<Name> -fuzztime=30s ./internal/escp` to explore further.
+// `go test -fuzz=<Name> -fuzztime=30s .` to explore further.
 
 func mustHex(t testing.TB, s string) []byte {
 	t.Helper()
