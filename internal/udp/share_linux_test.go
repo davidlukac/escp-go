@@ -14,7 +14,7 @@ import (
 // Linux only: macOS has no loopback broadcast address, so the same fact was measured there with the
 // switch itself (two sharing sockets both received every reply).
 // The switch answers to the broadcast address (two sharing sockets on macOS both received every
-// reply, which a unicast reply would not do there). The same must hold wherever the provider
+// reply, which a unicast reply would not do there). The same must hold wherever the library
 // runs: a datagram sent to the broadcast address reaches every socket that shares the reply port,
 // so several clients and Discover can listen side by side.
 func TestSharingSocketsAllReceiveABroadcast(t *testing.T) {

@@ -553,7 +553,7 @@ func TestLiveHostnameRename(t *testing.T) {
 	}
 }
 
-// Two clients (one per switch, as two provider aliases would be) must work at
+// Two clients (one per switch, as two aliases of a multi-switch consumer would be) must work at
 // the same time on the shared reply port. Needs ESCP_SECOND_HOST; it only sends
 // the unauthenticated discovery request to the second switch, no credentials.
 func TestLiveTwoClientsShareThePort(t *testing.T) {

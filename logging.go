@@ -9,8 +9,8 @@ import (
 // The library logs through the *slog.Logger the caller passes in Config.Logger (clients) or
 // DiscoverOptions.Logger (Discover and Locate), and nowhere else: no fmt.Print*, no log.* (a
 // lint rule enforces it). The zero value discards. The messages use the ...Context methods so a
-// handler can reach what the caller put in the context (the provider's handler finds the
-// Terraform logger there).
+// handler can reach what the caller put in the context (the Terraform provider's handler
+// finds the Terraform logger there).
 //
 // Levels: Debug is protocol detail (each request and reply, each fragment), Info is lifecycle
 // (a session, the switch located, a write sent), Warn is a recoverable anomaly (no reply, a
