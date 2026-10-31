@@ -43,7 +43,7 @@ func TestDryRunThroughTheRealClient(t *testing.T) {
 	}
 	// a write above the ceiling is refused before the dry run sees it
 	var tooMuch *safety.ImpactError
-	if err := c.SetLAG(ctx, 1, escp.MustPortSet(2, 3)); !errors.As(err, &tooMuch) || tooMuch.Op.Name != "SetLAG" {
+	if err := c.SetLAG(ctx, escp.LAG{ID: 1, Ports: escp.MustPortSet(2, 3)}); !errors.As(err, &tooMuch) || tooMuch.Op.Name != "SetLAG" {
 		t.Fatalf("SetLAG: got %v, want an *ImpactError for SetLAG", err)
 	}
 
@@ -122,7 +122,7 @@ func TestPortGateThroughTheRealClient(t *testing.T) {
 		t.Fatalf("disabling the uplink: got %v, want a link-up refusal for port 1", err)
 	}
 	// removing LAG 1 names no port, yet its member carries the link
-	if err := c.SetLAG(ctx, 1, 0); !errors.As(err, &used) || used.Port != 1 {
+	if err := c.SetLAG(ctx, escp.LAG{ID: 1, Ports: 0}); !errors.As(err, &used) || used.Port != 1 {
 		t.Fatalf("removing LAG 1: got %v, want a refusal for port 1", err)
 	}
 	if n := f.WriteCount(); n != 0 {

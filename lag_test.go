@@ -31,13 +31,13 @@ func TestSetLAGWire(t *testing.T) {
 	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
 	ctx := context.Background()
-	if err := c.SetLAG(ctx, 2, MustPortSet(6, 7)); err != nil {
+	if err := c.SetLAG(ctx, LAG{ID: 2, Ports: MustPortSet(6, 7)}); err != nil {
 		t.Fatal(err)
 	}
 	if got := f.LastSet(); got[0].Type != wire.TLVLAG || !reflect.DeepEqual(got[0].Value, []byte{2, 0, 0, 0, 0x60}) {
 		t.Fatalf("wire %+v", got)
 	}
-	if err := c.SetLAG(ctx, 2, 0); err != nil {
+	if err := c.SetLAG(ctx, LAG{ID: 2, Ports: 0}); err != nil {
 		t.Fatal(err)
 	}
 	if got := f.LastSet(); !reflect.DeepEqual(got[0].Value, []byte{2, 0, 0, 0, 0}) {
@@ -48,7 +48,7 @@ func TestSetLAGWire(t *testing.T) {
 		group LAGID
 		ports PortSet
 	}{{0, MustPortSet(1, 2)}, {3, MustPortSet(5, 6)}, {1, MustPortSet(4, 5)}, {2, MustPortSet(2, 3)}, {2, MustPortSet(6)}, {1, MustPortSet(1, 2, 3, 4, 5)}} {
-		if c.SetLAG(ctx, bad.group, bad.ports) == nil {
+		if c.SetLAG(ctx, LAG{ID: bad.group, Ports: bad.ports}) == nil {
 			t.Errorf("LAG %d with ports %v must be rejected", bad.group, bad.ports)
 		}
 	}
@@ -119,7 +119,7 @@ func TestSetLAGRefusalNamesTheConflict(t *testing.T) {
 			f := escptest.Start(t)
 			f.Configure(func(f *escptest.Faults) { f.RejectSetsFrom, f.RejectCode = 1, int32(tc.code) })
 			c := dialFake(t, f, "secret")
-			err := c.SetLAG(context.Background(), 1, MustPortSet(2, 3))
+			err := c.SetLAG(context.Background(), LAG{ID: 1, Ports: MustPortSet(2, 3)})
 			var rejected *RejectedError
 			if !errors.Is(err, ErrRejected) || !errors.As(err, &rejected) || rejected.Code != tc.code {
 				t.Fatalf("got %v, want a RejectedError with code %d that matches ErrRejected", err, tc.code)
@@ -133,7 +133,7 @@ func TestSetLAGRefusalNamesTheConflict(t *testing.T) {
 		f := escptest.Start(t)
 		f.Configure(func(f *escptest.Faults) { f.RejectSetsFrom = 1 })
 		c := dialFake(t, f, "secret")
-		err := c.SetLAG(context.Background(), 1, MustPortSet(2, 3))
+		err := c.SetLAG(context.Background(), LAG{ID: 1, Ports: MustPortSet(2, 3)})
 		if !errors.Is(err, ErrRejected) || !strings.Contains(err.Error(), "error code 9") || !strings.Contains(err.Error(), "wrong credentials") {
 			t.Fatalf("got %v", err)
 		}

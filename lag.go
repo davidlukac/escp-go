@@ -148,14 +148,14 @@ func (c *Client) LAGs(ctx context.Context) ([]LAG, error) {
 // checks these only when the group is written: it does not keep members alike
 // afterwards (see SetPort). Changing a group whose ports carry traffic can cut the
 // uplink; callers must guard against that.
-func (c *Client) SetLAG(ctx context.Context, group LAGID, ports PortSet) error {
-	if err := (LAG{ID: group, Ports: ports}).Validate(); err != nil {
+func (c *Client) SetLAG(ctx context.Context, lag LAG) error {
+	if err := lag.Validate(); err != nil {
 		return err
 	}
-	if err := c.requirePorts(ctx, ports); err != nil {
+	if err := c.requirePorts(ctx, lag.Ports); err != nil {
 		return err
 	}
-	return nameRefusal(c.setTLVs(ctx, Operation{Name: "SetLAG", Ports: ports, Impact: ImpactManagement, Replaces: GroupLAG, ID: int(group)}, wire.TLV{Type: wire.TLVLAG, Value: append([]byte{byte(group)}, ports.Mask()...)}), lagRefusals)
+	return nameRefusal(c.setTLVs(ctx, Operation{Name: "SetLAG", Ports: lag.Ports, Impact: ImpactManagement, Replaces: GroupLAG, ID: int(lag.ID)}, wire.TLV{Type: wire.TLVLAG, Value: append([]byte{byte(lag.ID)}, lag.Ports.Mask()...)}), lagRefusals)
 }
 
 // nameRefusal adds the reason to a *RejectedError whose code is in reasons; any other

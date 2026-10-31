@@ -29,7 +29,7 @@ var writeCalls = map[string]func(context.Context, *Client) error{
 	"SetIGMP": func(ctx context.Context, c *Client) error {
 		return c.SetIGMP(ctx, IGMPConfig{Enabled: true, ReportSuppression: false})
 	},
-	"SetLAG":            func(ctx context.Context, c *Client) error { return c.SetLAG(ctx, 1, MustPortSet(2, 3)) },
+	"SetLAG":            func(ctx context.Context, c *Client) error { return c.SetLAG(ctx, LAG{ID: 1, Ports: MustPortSet(2, 3)}) },
 	"SetLoopPrevention": func(ctx context.Context, c *Client) error { return c.SetLoopPrevention(ctx, true) },
 	"SetPort": func(ctx context.Context, c *Client) error {
 		return c.SetPort(ctx, PortConfig{ID: 2, Enabled: true, Speed: "auto", FlowControl: false})
@@ -51,7 +51,9 @@ var writeCalls = map[string]func(context.Context, *Client) error{
 	"SetVLANMode": func(ctx context.Context, c *Client) error {
 		return c.SetVLANMode(ctx, VLANModeSetting{Mode: VLANModeMTU, UplinkPort: 8})
 	},
-	"SetPortBasedVLAN": func(ctx context.Context, c *Client) error { return c.SetPortBasedVLAN(ctx, 2, MustPortSet(3, 4)) },
+	"SetPortBasedVLAN": func(ctx context.Context, c *Client) error {
+		return c.SetPortBasedVLAN(ctx, PortVLAN{ID: 2, Ports: MustPortSet(3, 4)})
+	},
 	"EnableDHCP": func(ctx context.Context, c *Client) error {
 		// the client needs the switch's MAC, and a lookup that asks the fake itself
 		c.cfg.MAC = MAC(escptest.DefaultMAC())
@@ -308,7 +310,7 @@ func TestOperationPortsFollowTheArguments(t *testing.T) {
 		{"the other VLAN modes name no port", func(c *Client) error {
 			return c.SetVLANMode(ctx, VLANModeSetting{Mode: VLANModeDot1Q})
 		}, 0},
-		{"a LAG that is removed names none", func(c *Client) error { return c.SetLAG(ctx, 2, 0) }, 0},
+		{"a LAG that is removed names none", func(c *Client) error { return c.SetLAG(ctx, LAG{ID: 2, Ports: 0}) }, 0},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -333,7 +335,7 @@ func TestGateChangingItsOperationChangesNothingThatIsSent(t *testing.T) {
 			return nil
 		}})
 	t.Cleanup(func() { c.Close() })
-	if err := c.SetPortBasedVLAN(context.Background(), 2, MustPortSet(3, 4)); err != nil {
+	if err := c.SetPortBasedVLAN(context.Background(), PortVLAN{ID: 2, Ports: MustPortSet(3, 4)}); err != nil {
 		t.Fatal(err)
 	}
 	if got := f.LastSet(); len(got) != 1 || !reflect.DeepEqual(got[0].Value, []byte{2, 0, 0, 0, 0x0c}) {
@@ -361,8 +363,8 @@ func TestARemovedGroupIsStillReportedAsReplaced(t *testing.T) {
 		call func(c *Client) error
 		want Operation
 	}{
-		{"LAG", func(c *Client) error { return c.SetLAG(ctx, 2, 0) }, Operation{Name: "SetLAG", Impact: ImpactManagement, Replaces: GroupLAG, ID: 2}},
-		{"port-based VLAN", func(c *Client) error { return c.SetPortBasedVLAN(ctx, 3, 0) }, Operation{Name: "SetPortBasedVLAN", Impact: ImpactTraffic, Replaces: GroupPortVLAN, ID: 3}},
+		{"LAG", func(c *Client) error { return c.SetLAG(ctx, LAG{ID: 2, Ports: 0}) }, Operation{Name: "SetLAG", Impact: ImpactManagement, Replaces: GroupLAG, ID: 2}},
+		{"port-based VLAN", func(c *Client) error { return c.SetPortBasedVLAN(ctx, PortVLAN{ID: 3, Ports: 0}) }, Operation{Name: "SetPortBasedVLAN", Impact: ImpactTraffic, Replaces: GroupPortVLAN, ID: 3}},
 		{"802.1Q VLAN", func(c *Client) error { return c.DeleteDot1QVLAN(ctx, 20) }, Operation{Name: "DeleteDot1QVLAN", Impact: ImpactTraffic, Replaces: GroupDot1QVLAN, ID: 20}},
 	}
 	for _, tc := range cases {

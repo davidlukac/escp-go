@@ -39,6 +39,10 @@ type PortVLAN struct {
 	Ports PortSet
 }
 
+// Validate checks the group id (the ports are valid by construction); the error matches ErrInvalid.
+// Whether the switch has a group with that id is checked against the switch when it is written.
+func (g PortVLAN) Validate() error { return g.ID.Validate() }
+
 // PortBasedVLAN is the port-based VLAN state (VLAN > Port Based VLAN): whether this is the active
 // VLAN mode, how many groups the switch supports, and the groups that exist.
 type PortBasedVLAN struct {
@@ -133,24 +137,24 @@ func (c *Client) PortBasedVLAN(ctx context.Context) (PortBasedVLAN, error) {
 // the VLAN id (1 byte) and the member port mask. An empty port set removes
 // the group. The mode itself (enabled/disabled) is not touched. Changing a
 // group whose ports carry traffic can cut connectivity; callers must guard.
-func (c *Client) SetPortBasedVLAN(ctx context.Context, id PortVLANID, ports PortSet) error {
-	if err := c.requirePortVLANGroup(ctx, id); err != nil {
+func (c *Client) SetPortBasedVLAN(ctx context.Context, group PortVLAN) error {
+	if err := group.Validate(); err != nil {
 		return err
 	}
-	if err := c.requirePorts(ctx, ports); err != nil {
+	if err := c.requirePortVLANGroup(ctx, group.ID); err != nil {
 		return err
 	}
-	return c.setTLVs(ctx, Operation{Name: "SetPortBasedVLAN", Ports: ports, Impact: ImpactTraffic, Replaces: GroupPortVLAN, ID: int(id)}, wire.TLV{Type: wire.TLVVLANPortBasedVID, Value: append([]byte{byte(id)}, ports.Mask()...)})
+	if err := c.requirePorts(ctx, group.Ports); err != nil {
+		return err
+	}
+	return c.setTLVs(ctx, Operation{Name: "SetPortBasedVLAN", Ports: group.Ports, Impact: ImpactTraffic, Replaces: GroupPortVLAN, ID: int(group.ID)}, wire.TLV{Type: wire.TLVVLANPortBasedVID, Value: append([]byte{byte(group.ID)}, group.Ports.Mask()...)})
 }
 
 // requirePortVLANGroup refuses a group id the switch does not have. The limit is read once and kept,
 // in the same way as the port count, so the first group write costs the reads of the group state
-// and of the port count; if one fails, so does the write, with that error. The id's own range is
-// checked first, before anything is read.
+// and of the port count; if one fails, so does the write, with that error. The caller has checked
+// the id's own range (PortVLAN.Validate) before anything is read.
 func (c *Client) requirePortVLANGroup(ctx context.Context, id PortVLANID) error {
-	if err := id.Validate(); err != nil {
-		return err
-	}
 	c.mu.Lock()
 	limit := c.groupLimit
 	c.mu.Unlock()
