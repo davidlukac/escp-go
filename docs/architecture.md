@@ -7,12 +7,14 @@ For people who work on the library. Users want the [guides](README.md); the chec
 | Package | What it is |
 |---|---|
 | `escp` (the repository root) | the client, the domain types, validators and `Discover`/`Locate` |
-| `escp-go/safety` | the policy: write gates (firmware, ports, impact, dry run) and the compatibility table. No logging; it reads a switch only through the small interfaces it is given and reports what it finds as typed errors and values, so each front end words the refusal in its own vocabulary |
-| `escp-go/escptest` | a fake switch on a loopback UDP port, for tests ([guide](testing.md)); imports only the wire codec, never the client, so the client's own tests can use it without an import cycle |
+| `safety` | the policy: write gates (firmware, ports, impact, dry run) and the compatibility table. No logging; it reads a switch only through the small interfaces it is given and reports what it finds as typed errors and values, so each front end words the refusal in its own vocabulary |
+| `escptest` | a fake switch on a loopback UDP port, for tests ([guide](testing.md)); imports only the wire codec, never the client, so the client's own tests can use it without an import cycle |
 | `internal/wire` | the packet codec, the session crypto and every TLV type number, which no caller needs |
 | `internal/udp` | sharing the reply port between sockets, per operating system |
 | `internal/coverpolicy` | the coverage policy checker and the badge (a build tool, not part of the API) |
 | `examples/discover` | a read-only example program |
+
+The module path is the repository's, `github.com/davidlukac/escp-go`, so the import paths are that, `.../escp-go/safety` and `.../escp-go/escptest`; the packages themselves are named `escp`, `safety` and `escptest`, and the documentation calls them that.
 
 Dependencies point one way: `safety` and `escptest` depend on the client or the codec, never the other way round.
 
