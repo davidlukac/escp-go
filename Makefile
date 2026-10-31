@@ -5,7 +5,7 @@
 # Dependabot bumps them there. `go tool` builds the pinned version on first use (cached afterwards).
 DEVTOOL := go tool -modfile=devtools/go.mod
 
-.PHONY: test lint vuln cover cover-html apidiff fuzz compat-table hooks pre-commit
+.PHONY: test lint vuln cover cover-html apidiff fuzz pkgdoc pkgdoc-serve compat-table hooks pre-commit
 
 # Unit tests against the fake switch. No hardware is touched.
 test:
@@ -21,10 +21,10 @@ vuln:
 
 # `make cover` runs the whole suite with the race detector, writes cover.out and enforces the policy:
 # every statement covered except functions whose doc comment says `// coverage: ignore - <reason>`
-# (see CONTRIBUTING.md). The checker is Go (tools/coverpolicy) and is tested, and measured, by the same run.
+# (see CONTRIBUTING.md). The checker is Go (internal/coverpolicy) and is tested, and measured, by the same run.
 cover:
 	go test ./... -race -count=1 -coverpkg=./... -coverprofile=cover.out
-	go run ./tools/coverpolicy check cover.out .
+	go run ./internal/coverpolicy check cover.out .
 
 cover-html: cover
 	go tool cover -html=cover.out -o coverage.html
@@ -37,6 +37,14 @@ apidiff:
 # Every fuzz target for SECONDS (default 30) each; the seed corpora run in `make test` anyway.
 fuzz:
 	scripts/fuzz.sh $(or $(SECONDS),30)
+
+# The package documentation as pkg.go.dev renders it, from the working tree: HTML and plain text
+# per package under build/pkgdoc (gitignored). `make pkgdoc-serve` browses it on localhost:8089.
+pkgdoc:
+	scripts/pkgdoc.sh
+
+pkgdoc-serve:
+	scripts/pkgdoc.sh --serve
 
 # Rewrites the compatibility table in README.md from safety/compatibility.json (the firmware
 # allow-list reads the same file); a test fails when the README is stale.
