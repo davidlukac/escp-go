@@ -1,0 +1,181 @@
+# CI for github.com/davidlukac/escp-go. Everything runs against the in-process fake switch
+# (escptest): no hardware, and the `live` tests are only compiled, never run.
+#
+# Conventions:
+#   * Third-party actions are pinned to commit SHAs (the comment names the release);
+#     Dependabot keeps the SHAs current.
+#   * Steps call the Makefile, so a local `make <target>` reproduces CI.
+#   * Shared setup lives in .github/actions/setup.
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A newer push to the same PR supersedes the running one; runs on main always finish.
+concurrency:
+  group: tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build, lint and vulnerabilities
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # The pinned tools (devtools/go.mod) need a newer Go than the module's floor.
+      - uses: ./.github/actions/setup
+        with:
+          go-version: stable
+      - name: Build, including the live tests
+        run: |
+          go build ./...
+          go vet ./...
+          go vet -tags live ./...
+      # The linter and govulncheck are the versions pinned in devtools/go.mod, the same ones
+      # `make pre-commit` runs locally.
+      - name: Lint
+        run: make lint
+      - name: Known vulnerabilities
+        run: make vuln
+      - name: Go files are formatted
+        run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+      - name: The README compatibility table is generated from safety/compatibility.json
+        run: make compat-table && git diff --exit-code README.md
+
+  # Go matrix: "go.mod" is the minimum the module declares (the supported floor),
+  # "stable" is the newest release and catches toolchain regressions early.
+  unit:
+    name: Unit tests (Go ${{ matrix.go }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        go: ["go.mod", "stable"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+        with:
+          go-version: ${{ matrix.go }}
+      # Race detector, whole module, and the coverage policy: every statement
+      # covered unless its function says `// coverage: ignore - <reason>`.
+      - name: Tests with coverage policy
+        run: make cover
+      - name: Coverage report
+        if: always()
+        run: |
+          [ -f cover.out ] || exit 0
+          go tool cover -html=cover.out -o coverage.html
+          {
+            echo "### Coverage"
+            echo '```'
+            go tool cover -func=cover.out | tail -1
+            echo '```'
+            echo "Per-function detail: download the \`coverage\` artifact (coverage.html)."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: coverage-go-${{ matrix.go }}
+          path: |
+            cover.out
+            coverage.html
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # The client shares its UDP reply port (SO_REUSEPORT) differently per system, so the
+  # tests also run on macOS. Windows has its own socket option and is only built and
+  # vetted until the tests are known to pass there.
+  other-systems:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+      - name: Build and vet
+        run: |
+          go build ./...
+          go vet ./...
+      - name: Tests
+        if: runner.os == 'macOS'
+        run: go test -race -count=1 ./...
+      # Informational until it is known to pass; promote to required (drop continue-on-error).
+      - name: Tests (informational)
+        if: runner.os == 'Windows'
+        continue-on-error: true
+        run: go test -count=1 ./...
+
+  # What a pull request changes in the exported API, as the release tool sees it. Informational
+  # while the module is 0.x (breaking changes are allowed, the CHANGELOG must name them).
+  api:
+    name: Exported API changes
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+        with:
+          go-version: stable
+      - name: Compare with the latest release
+        run: |
+          if git describe --tags --abbrev=0 >/dev/null 2>&1; then
+            make apidiff | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No release yet: nothing to compare with."
+          fi
+
+  # Publishes the measured coverage as a shields.io endpoint file (coverage.json) on
+  # the `badges` branch, written by CI only, never by hand. The README badge reads
+  # it from there. Runs on pushes to main, from the go.mod-version unit run.
+  coverage-badge:
+    name: Publish coverage badge
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: unit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: coverage-go-go.mod
+          path: ${{ runner.temp }}/coverage
+      - name: Compute coverage
+        run: |
+          go run ./tools/coverpolicy badge "$RUNNER_TEMP/coverage/cover.out" . > "$RUNNER_TEMP/coverage.json"
+          cat "$RUNNER_TEMP/coverage.json"
+      - name: Publish to the badges branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # A second worktree: the main checkout stays on the commit the job was built from,
+          # because the job's post step for ./.github/actions/setup reads that action from it.
+          if git ls-remote --exit-code --heads origin badges >/dev/null 2>&1; then
+            git fetch --depth=1 origin badges:refs/remotes/origin/badges
+            git worktree add --force -B badges "$RUNNER_TEMP/badges" origin/badges
+          else
+            git worktree add --orphan -b badges "$RUNNER_TEMP/badges"
+          fi
+          cd "$RUNNER_TEMP/badges"
+          cp "$RUNNER_TEMP/coverage.json" coverage.json
+          git add coverage.json
+          git diff --cached --quiet && { echo "coverage unchanged"; exit 0; }
+          git commit -m "chore: coverage $(jq -r .message coverage.json)"
+          git push origin badges

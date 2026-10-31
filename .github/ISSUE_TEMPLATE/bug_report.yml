@@ -1,0 +1,44 @@
+name: Bug report
+description: Something does not work as documented
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Switch model and hardware version
+      placeholder: TL-SG108E v6
+    validations:
+      required: true
+  - type: input
+    id: firmware
+    attributes:
+      label: Firmware
+      placeholder: 1.0.0 Build 20230218 Rel.50633
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Library version and Go version
+      placeholder: escp-go v0.1.0, go1.27
+    validations:
+      required: true
+  - type: textarea
+    id: code
+    attributes:
+      label: Minimal code and the log output
+      description: A Debug-level slog output (see "Logging" in the README) shows what the client sent. Redact hosts, credentials and MAC addresses.
+      render: go
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Before you submit
+      options:
+        - label: I removed passwords and MAC addresses from this report
+          required: true
