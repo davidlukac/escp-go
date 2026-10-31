@@ -35,7 +35,7 @@ func TestParseDot1QVLANs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []VLAN8021Q{
+	want := []Dot1QVLAN{
 		{ID: 10, Name: "iot", Tagged: MustPortSet(8), Untagged: MustPortSet(1, 2)},
 		{ID: 1, Name: "Default", Tagged: 0, Untagged: MustPortSet(1, 2, 3, 4, 5, 6, 7, 8)},
 	}
@@ -51,17 +51,17 @@ func TestParseDot1QVLANs(t *testing.T) {
 }
 
 func TestDot1QCheckRoom(t *testing.T) {
-	table := func(n int) []VLAN8021Q {
-		out := make([]VLAN8021Q, 0, n)
+	table := func(n int) []Dot1QVLAN {
+		out := make([]Dot1QVLAN, 0, n)
 		for i := 0; i < n; i++ {
-			out = append(out, VLAN8021Q{ID: VLANID(i + 1), Untagged: MustPortSet(1)})
+			out = append(out, Dot1QVLAN{ID: VLANID(i + 1), Untagged: MustPortSet(1)})
 		}
 		return out
 	}
 	for _, c := range []struct {
 		name    string
 		max     int
-		vlans   []VLAN8021Q
+		vlans   []Dot1QVLAN
 		id      VLANID
 		wantErr string // empty: accepted
 	}{

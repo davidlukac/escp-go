@@ -11,18 +11,18 @@ import (
 	"github.com/davidlukac/escp-go/internal/wire"
 )
 
-func TestVLAN8021QEncodeMatchesVendorLayout(t *testing.T) {
+func TestDot1QVLANEncodeMatchesVendorLayout(t *testing.T) {
 	tests := []struct {
 		name string
-		v    VLAN8021Q
+		v    Dot1QVLAN
 		want []byte
 	}{
 		// id 2, ports 4 and 5 untagged: member mask 0x18, tagged mask 0, name "iot".
-		{"untagged", VLAN8021Q{ID: 2, Name: "iot", Untagged: MustPortSet(4, 5)}, []byte{0, 2, 0, 0, 0, 0x18, 0, 0, 0, 0, 'i', 'o', 't', 0}},
+		{"untagged", Dot1QVLAN{ID: 2, Name: "iot", Untagged: MustPortSet(4, 5)}, []byte{0, 2, 0, 0, 0, 0x18, 0, 0, 0, 0, 'i', 'o', 't', 0}},
 		// id 100, port 1 tagged and port 8 untagged: member 0x81, tagged 0x01, empty name.
-		{"mixed", VLAN8021Q{ID: 100, Tagged: MustPortSet(1), Untagged: MustPortSet(8)}, []byte{0, 100, 0, 0, 0, 0x81, 0, 0, 0, 0x01, 0}},
+		{"mixed", Dot1QVLAN{ID: 100, Tagged: MustPortSet(1), Untagged: MustPortSet(8)}, []byte{0, 100, 0, 0, 0, 0x81, 0, 0, 0, 0x01, 0}},
 		// highest id, the highest port of the mask.
-		{"edges", VLAN8021Q{ID: 4094, Name: "a-b_C9", Tagged: MustPortSet(32)}, []byte{0x0f, 0xfe, 0x80, 0, 0, 0, 0x80, 0, 0, 0, 'a', '-', 'b', '_', 'C', '9', 0}},
+		{"edges", Dot1QVLAN{ID: 4094, Name: "a-b_C9", Tagged: MustPortSet(32)}, []byte{0x0f, 0xfe, 0x80, 0, 0, 0, 0x80, 0, 0, 0, 'a', '-', 'b', '_', 'C', '9', 0}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -35,8 +35,8 @@ func TestVLAN8021QEncodeMatchesVendorLayout(t *testing.T) {
 }
 
 // What the client writes must read back as the same VLAN through the parser used for GETs.
-func TestVLAN8021QEncodeRoundTripsThroughParser(t *testing.T) {
-	want := VLAN8021Q{ID: 30, Name: "media", Tagged: MustPortSet(1, 6), Untagged: MustPortSet(2, 3)}
+func TestDot1QVLANEncodeRoundTripsThroughParser(t *testing.T) {
+	want := Dot1QVLAN{ID: 30, Name: "media", Tagged: MustPortSet(1, 6), Untagged: MustPortSet(2, 3)}
 	value := want.encode()
 	got, err := parseDot1Q([]wire.TLV{{Type: wire.TLVVLAN8021Q, Value: []byte{1}}, {Type: wire.TLVVLAN8021QVLAN, Value: value}})
 	if err != nil {
@@ -47,30 +47,30 @@ func TestVLAN8021QEncodeRoundTripsThroughParser(t *testing.T) {
 	}
 }
 
-func TestVLAN8021QValidation(t *testing.T) {
+func TestDot1QVLANValidation(t *testing.T) {
 	tests := []struct {
 		name string
-		v    VLAN8021Q
+		v    Dot1QVLAN
 		frag string
 	}{
-		{"id zero", VLAN8021Q{ID: 0, Untagged: MustPortSet(1)}, "invalid VLAN id 0"},
-		{"id too big", VLAN8021Q{ID: 4095, Untagged: MustPortSet(1)}, "invalid VLAN id 4095"},
-		{"name too long", VLAN8021Q{ID: 2, Name: "elevenchars", Untagged: MustPortSet(1)}, "invalid VLAN name"},
-		{"name with space", VLAN8021Q{ID: 2, Name: "a b", Untagged: MustPortSet(1)}, "invalid VLAN name"},
-		{"both tagged and untagged", VLAN8021Q{ID: 2, Tagged: MustPortSet(3), Untagged: MustPortSet(3)}, "port 3 is both tagged and untagged"},
-		{"no members", VLAN8021Q{ID: 2}, "no member ports"},
+		{"id zero", Dot1QVLAN{ID: 0, Untagged: MustPortSet(1)}, "invalid VLAN id 0"},
+		{"id too big", Dot1QVLAN{ID: 4095, Untagged: MustPortSet(1)}, "invalid VLAN id 4095"},
+		{"name too long", Dot1QVLAN{ID: 2, Name: "elevenchars", Untagged: MustPortSet(1)}, "invalid VLAN name"},
+		{"name with space", Dot1QVLAN{ID: 2, Name: "a b", Untagged: MustPortSet(1)}, "invalid VLAN name"},
+		{"both tagged and untagged", Dot1QVLAN{ID: 2, Tagged: MustPortSet(3), Untagged: MustPortSet(3)}, "port 3 is both tagged and untagged"},
+		{"no members", Dot1QVLAN{ID: 2}, "no member ports"},
 	}
 	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := c.SetVLAN8021Q(context.Background(), tt.v)
+			err := c.SetDot1QVLAN(context.Background(), tt.v)
 			if err == nil || !strings.Contains(err.Error(), tt.frag) {
 				t.Fatalf("got %v, want an error containing %q", err, tt.frag)
 			}
 		})
 	}
-	if err := c.SetVLAN8021Q(context.Background(), VLAN8021Q{ID: 2}); err == nil {
+	if err := c.SetDot1QVLAN(context.Background(), Dot1QVLAN{ID: 2}); err == nil {
 		t.Fatal("a VLAN without a member port must be rejected")
 	}
 	if n := f.WriteCount(); n != 0 {
@@ -78,18 +78,18 @@ func TestVLAN8021QValidation(t *testing.T) {
 	}
 }
 
-func TestSetVLAN8021QWire(t *testing.T) {
+func TestSetDot1QVLANWire(t *testing.T) {
 	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
 	ctx := context.Background()
-	if err := c.SetVLAN8021Q(ctx, VLAN8021Q{ID: 2, Name: "iot", Untagged: MustPortSet(4, 5)}); err != nil {
+	if err := c.SetDot1QVLAN(ctx, Dot1QVLAN{ID: 2, Name: "iot", Untagged: MustPortSet(4, 5)}); err != nil {
 		t.Fatal(err)
 	}
 	got := f.LastSet()
 	if len(got) != 1 || got[0].Type != wire.TLVVLAN8021QVLAN || !reflect.DeepEqual(got[0].Value, []byte{0, 2, 0, 0, 0, 0x18, 0, 0, 0, 0, 'i', 'o', 't', 0}) {
 		t.Fatalf("wire %+v", got)
 	}
-	if err := c.DeleteVLAN8021Q(ctx, 2); err != nil {
+	if err := c.DeleteDot1QVLAN(ctx, 2); err != nil {
 		t.Fatal(err)
 	}
 	got = f.LastSet()
@@ -97,7 +97,7 @@ func TestSetVLAN8021QWire(t *testing.T) {
 		t.Fatalf("delete wire %+v", got)
 	}
 	n := f.WriteCount()
-	if c.DeleteVLAN8021Q(ctx, 0) == nil || c.DeleteVLAN8021Q(ctx, 4095) == nil {
+	if c.DeleteDot1QVLAN(ctx, 0) == nil || c.DeleteDot1QVLAN(ctx, 4095) == nil {
 		t.Fatal("invalid ids must be rejected")
 	}
 	if f.WriteCount() != n {

@@ -53,18 +53,18 @@ func TestEveryRefusedArgumentIsErrInvalid(t *testing.T) {
 	}{
 		{"PortID.Validate", func(*Client) error { return PortID(0).Validate() }, "invalid port 0 (valid: 1-32)"},
 		{"Kbps.Validate", func(*Client) error { return Kbps(100).Validate() }, "100 kbps is not a valid rate"},
-		{"ValidateLAG group", func(*Client) error { return ValidateLAG(0, MustPortSet(1, 2)) }, "invalid LAG group 0"},
-		{"ValidateLAG port count", func(*Client) error { return ValidateLAG(1, MustPortSet(1)) }, "a LAG takes"},
-		{"ValidateLAG port outside its group", func(*Client) error { return ValidateLAG(1, MustPortSet(1, 9)) }, "cannot be in LAG 1"},
-		{"ValidateIPConfig not IPv4", func(*Client) error { return ValidateIPConfig(IPConfig{}) }, "must all be IPv4 addresses"},
-		{"ValidateIPConfig mask", func(*Client) error {
-			return ValidateIPConfig(cfgOf("192.0.2.13", "255.0.255.0", "192.0.2.1"))
+		{"LAG.Validate group", func(*Client) error { return LAG{ID: 0, Ports: MustPortSet(1, 2)}.Validate() }, "invalid LAG group 0"},
+		{"LAG.Validate port count", func(*Client) error { return LAG{ID: 1, Ports: MustPortSet(1)}.Validate() }, "a LAG takes"},
+		{"LAG.Validate port outside its group", func(*Client) error { return LAG{ID: 1, Ports: MustPortSet(1, 9)}.Validate() }, "cannot be in LAG 1"},
+		{"IPConfig.Validate not IPv4", func(*Client) error { return IPConfig{}.Validate() }, "must all be IPv4 addresses"},
+		{"IPConfig.Validate mask", func(*Client) error {
+			return cfgOf("192.0.2.13", "255.0.255.0", "192.0.2.1").Validate()
 		}, "is not a contiguous prefix"},
-		{"ValidateIPConfig host address", func(*Client) error {
-			return ValidateIPConfig(cfgOf("192.0.2.0", "255.255.255.0", "192.0.2.1"))
+		{"IPConfig.Validate host address", func(*Client) error {
+			return cfgOf("192.0.2.0", "255.255.255.0", "192.0.2.1").Validate()
 		}, "is not a usable host address"},
-		{"ValidateIPConfig gateway", func(*Client) error {
-			return ValidateIPConfig(cfgOf("192.0.2.13", "255.255.255.0", "192.0.2.13"))
+		{"IPConfig.Validate gateway", func(*Client) error {
+			return cfgOf("192.0.2.13", "255.255.255.0", "192.0.2.13").Validate()
 		}, "gateway 192.0.2.13 must be another host address"},
 		{"Hostname.Validate", func(*Client) error { return Hostname("-bad-").Validate() }, "invalid device description"},
 		{"VLANID.Validate", func(*Client) error { return VLANID(4095).Validate() }, "invalid VLAN id 4095"},
@@ -101,10 +101,10 @@ func TestEveryRefusedArgumentIsErrInvalid(t *testing.T) {
 		{"SetQoSMode", func(c *Client) error { return c.SetQoSMode(ctx, QoSMode(9)) }, "invalid QoS mode 9"},
 		{"SetPortPriorities port", func(c *Client) error { return c.SetPortPriorities(ctx, map[PortID]Priority{9: PriorityLowest}) }, "port 9 does not exist"},
 		{"SetPortPriorities priority", func(c *Client) error { return c.SetPortPriorities(ctx, map[PortID]Priority{2: Priority(9)}) }, "invalid priority 9 for port 2"},
-		{"SetVLAN8021Q both", func(c *Client) error {
-			return c.SetVLAN8021Q(ctx, VLAN8021Q{ID: 20, Tagged: MustPortSet(2), Untagged: MustPortSet(2)})
+		{"SetDot1QVLAN both", func(c *Client) error {
+			return c.SetDot1QVLAN(ctx, Dot1QVLAN{ID: 20, Tagged: MustPortSet(2), Untagged: MustPortSet(2)})
 		}, "both tagged and untagged"},
-		{"SetVLAN8021Q empty", func(c *Client) error { return c.SetVLAN8021Q(ctx, VLAN8021Q{ID: 20}) }, "has no member ports"},
+		{"SetDot1QVLAN empty", func(c *Client) error { return c.SetDot1QVLAN(ctx, Dot1QVLAN{ID: 20}) }, "has no member ports"},
 		{"SetPortBasedVLAN id", func(c *Client) error { return c.SetPortBasedVLAN(ctx, 0, MustPortSet(2, 3)) }, "invalid port-based VLAN id 0"},
 		{"SetPVIDs empty", func(c *Client) error { return c.SetPVIDs(ctx, nil) }, "no PVIDs to set"},
 	}

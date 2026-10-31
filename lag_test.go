@@ -57,7 +57,7 @@ func TestSetLAGWire(t *testing.T) {
 	}
 }
 
-func TestValidateLAG(t *testing.T) {
+func TestLAGValidate(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
 		group LAGID
@@ -79,7 +79,7 @@ func TestValidateLAG(t *testing.T) {
 		{"group 2 with low ports", 2, MustPortSet(2, 3), "port 2 cannot be in LAG 2 (LAG 2 takes ports 5-8)"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			err := ValidateLAG(tc.group, tc.ports)
+			err := LAG{ID: tc.group, Ports: tc.ports}.Validate()
 			if tc.want == "" {
 				if err != nil {
 					t.Fatalf("unexpected error: %v", err)

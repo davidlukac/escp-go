@@ -173,8 +173,8 @@ func TestSetVLANModeRefusesWhatCannotBeSet(t *testing.T) {
 			if !errors.Is(err, ErrInvalid) {
 				t.Fatalf("want ErrInvalid, got %v", err)
 			}
-			if err2 := ValidateVLANMode(tc.set); !errors.Is(err2, ErrInvalid) || err2.Error() != err.Error() {
-				t.Errorf("ValidateVLANMode must give the same answer: %v", err2)
+			if err2 := tc.set.Validate(); !errors.Is(err2, ErrInvalid) || err2.Error() != err.Error() {
+				t.Errorf("Validate must give the same answer: %v", err2)
 			}
 			if n := f.WriteCount(); n != 0 {
 				t.Fatalf("the switch received %d writes", n)

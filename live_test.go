@@ -615,7 +615,7 @@ func vlanModesE(c *Client) (mtu MTUVLAN, portBased PortBasedVLAN, dot1q Dot1Q, e
 // It can cut management access if the switch does not behave as the vendor
 // utility documents, so it only runs with ESCP_LIVE_VLAN_MODE=1 and
 // only on a switch that is in port-based mode with the default VLAN 1.
-func TestLiveVLAN8021QOnUnusedPorts(t *testing.T) {
+func TestLiveDot1QVLANOnUnusedPorts(t *testing.T) {
 	if os.Getenv("ESCP_LIVE_VLAN_MODE") != "1" {
 		t.Skip("set ESCP_LIVE_VLAN_MODE=1 to switch the VLAN mode of the switch")
 	}
@@ -642,7 +642,7 @@ func TestLiveVLAN8021QOnUnusedPorts(t *testing.T) {
 				if err := c.SetPVIDs(ctx, map[PortID]VLANID{a: 1, b: 1}); err != nil {
 					t.Errorf("RESTORE: PVIDs: %v", err)
 				}
-				if err := c.DeleteVLAN8021Q(ctx, testVLAN); err != nil {
+				if err := c.DeleteDot1QVLAN(ctx, testVLAN); err != nil {
 					t.Errorf("RESTORE: delete VLAN: %v", err)
 				}
 			}
@@ -671,8 +671,8 @@ func TestLiveVLAN8021QOnUnusedPorts(t *testing.T) {
 		t.Fatalf("the mode write had no effect: %+v", q)
 	}
 
-	want := VLAN8021Q{ID: testVLAN, Name: "livetest", Untagged: MustPortSet(PortID(a)), Tagged: MustPortSet(PortID(b))}
-	if err := c.SetVLAN8021Q(ctx, want); err != nil {
+	want := Dot1QVLAN{ID: testVLAN, Name: "livetest", Untagged: MustPortSet(PortID(a)), Tagged: MustPortSet(PortID(b))}
+	if err := c.SetDot1QVLAN(ctx, want); err != nil {
 		t.Fatal(err)
 	}
 	_, _, q = vlanModes(t, c)
@@ -698,7 +698,7 @@ func TestLiveVLAN8021QOnUnusedPorts(t *testing.T) {
 		t.Fatalf("PVID not restored: %+v", q.PVIDs)
 	}
 
-	if err := c.DeleteVLAN8021Q(ctx, testVLAN); err != nil {
+	if err := c.DeleteDot1QVLAN(ctx, testVLAN); err != nil {
 		t.Fatal(err)
 	}
 	_, _, q = vlanModes(t, c)
@@ -707,13 +707,13 @@ func TestLiveVLAN8021QOnUnusedPorts(t *testing.T) {
 	}
 }
 
-func vlanByID(q Dot1Q, id VLANID) (VLAN8021Q, bool) {
+func vlanByID(q Dot1Q, id VLANID) (Dot1QVLAN, bool) {
 	for _, v := range q.VLANs {
 		if v.ID == id {
 			return v, true
 		}
 	}
-	return VLAN8021Q{}, false
+	return Dot1QVLAN{}, false
 }
 
 func pvidByPort(q Dot1Q, port PortID) (VLANID, bool) {

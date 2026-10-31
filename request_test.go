@@ -54,11 +54,11 @@ func TestWritersRefusePortsTheSwitchDoesNotHave(t *testing.T) {
 			return c.SetPortMirror(ctx, Mirror{Enabled: true, MirrorPort: 5, EgressPorts: MustPortSet(9)})
 		}},
 		{"SetPortBasedVLAN", func(c *Client) error { return c.SetPortBasedVLAN(ctx, 2, MustPortSet(2, 9)) }},
-		{"SetVLAN8021Q tagged", func(c *Client) error {
-			return c.SetVLAN8021Q(ctx, VLAN8021Q{ID: 20, Tagged: MustPortSet(9), Untagged: MustPortSet(2)})
+		{"SetDot1QVLAN tagged", func(c *Client) error {
+			return c.SetDot1QVLAN(ctx, Dot1QVLAN{ID: 20, Tagged: MustPortSet(9), Untagged: MustPortSet(2)})
 		}},
-		{"SetVLAN8021Q untagged", func(c *Client) error {
-			return c.SetVLAN8021Q(ctx, VLAN8021Q{ID: 20, Untagged: MustPortSet(9)})
+		{"SetDot1QVLAN untagged", func(c *Client) error {
+			return c.SetDot1QVLAN(ctx, Dot1QVLAN{ID: 20, Untagged: MustPortSet(9)})
 		}},
 		{"SetPVIDs", func(c *Client) error { return c.SetPVIDs(ctx, map[PortID]VLANID{2: 1, 9: 1}) }},
 		{"SetVLANMode", func(c *Client) error {

@@ -26,10 +26,10 @@ const (
 	SupportUnsupported Support = "unsupported"
 )
 
-// Row is one line of the compatibility table: a switch model, a hardware revision and a firmware,
+// CompatibilityRow is one line of the compatibility table: a switch model, a hardware revision and a firmware,
 // and what is known about the combination. The table is compatibility.json, embedded in the
 // package; it is the one place the README table and the firmware allow-list come from.
-type Row struct {
+type CompatibilityRow struct {
 	Model    string           `json:"model"`
 	Hardware string           `json:"hardware"`
 	Firmware string           `json:"firmware"`
@@ -45,7 +45,7 @@ var compatibilityJSON []byte
 // valid stops the program at start, because the firmware gate depends on it.
 var compatibility = mustLoadCompatibility(compatibilityJSON)
 
-func mustLoadCompatibility(data []byte) []Row {
+func mustLoadCompatibility(data []byte) []CompatibilityRow {
 	rows, err := parseCompatibility(data)
 	if err != nil {
 		panic("safety: compatibility.json: " + err.Error())
@@ -55,9 +55,9 @@ func mustLoadCompatibility(data []byte) []Row {
 
 // parseCompatibility reads and validates the table: known support levels, well-formed and unique
 // build dates, and builds only on rows that name them (a verified row must).
-func parseCompatibility(data []byte) ([]Row, error) {
+func parseCompatibility(data []byte) ([]CompatibilityRow, error) {
 	var doc struct {
-		Rows []Row `json:"rows"`
+		Rows []CompatibilityRow `json:"rows"`
 	}
 	if err := json.Unmarshal(data, &doc); err != nil {
 		return nil, err
@@ -85,9 +85,9 @@ func parseCompatibility(data []byte) ([]Row, error) {
 	return doc.Rows, nil
 }
 
-// Compatibility returns the compatibility table. The result is a copy.
-func Compatibility() []Row {
-	out := make([]Row, len(compatibility))
+// CompatibilityRows returns the compatibility table. The result is a copy.
+func CompatibilityRows() []CompatibilityRow {
+	out := make([]CompatibilityRow, len(compatibility))
 	for i, r := range compatibility {
 		r.Builds = slices.Clone(r.Builds)
 		out[i] = r
@@ -96,7 +96,7 @@ func Compatibility() []Row {
 }
 
 // verifiedBuilds lists the builds of the verified rows, in order.
-func verifiedBuilds(rows []Row) []escp.BuildDate {
+func verifiedBuilds(rows []CompatibilityRow) []escp.BuildDate {
 	var out []escp.BuildDate
 	for _, r := range rows {
 		if r.Support == SupportVerified {
@@ -112,7 +112,7 @@ func CompatibilityTable() string {
 	return renderCompatibility(compatibility)
 }
 
-func renderCompatibility(rows []Row) string {
+func renderCompatibility(rows []CompatibilityRow) string {
 	var b strings.Builder
 	b.WriteString("| Switch | Hardware | Firmware | Status |\n|---|---|---|---|\n")
 	for _, r := range rows {

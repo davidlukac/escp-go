@@ -56,13 +56,13 @@ func ipConfigFromInfo(info Info) (IPConfig, error) {
 	return cfg, nil
 }
 
-// ValidateIPConfig checks a static management address before anything is sent:
+// Validate checks a static management address before anything is sent:
 // all three are IPv4, the mask is a contiguous prefix between /8 and /30, the
 // address is a usable host address of its subnet and the gateway is another
 // host of the same subnet (0.0.0.0 means no gateway).
-func ValidateIPConfig(cfg IPConfig) error { return validateIPConfig(cfg, false) }
+func (cfg IPConfig) Validate() error { return validateIPConfig(cfg, false) }
 
-// validateIPConfig is ValidateIPConfig; allowLoopback lets tests move a fake switch that lives on 127.0.0.0/8.
+// validateIPConfig is IPConfig.Validate; allowLoopback lets tests move a fake switch that lives on 127.0.0.0/8.
 func validateIPConfig(cfg IPConfig, allowLoopback bool) error {
 	if !cfg.IP.Is4() || !cfg.Netmask.Is4() || !cfg.Gateway.Is4() {
 		return invalidf("escp: IP address, subnet mask and gateway must all be IPv4 addresses (%s)", cfg)

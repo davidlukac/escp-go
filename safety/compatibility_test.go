@@ -23,7 +23,7 @@ func TestCompatibilityFeedsTheAllowList(t *testing.T) {
 		t.Fatalf("allow-list = %v, want %v", got, want)
 	}
 	// An untried or unsupported row never adds a build to the allow-list.
-	rows := []Row{
+	rows := []CompatibilityRow{
 		{Model: "m", Hardware: "h", Firmware: "f", Builds: []escp.BuildDate{"20250101"}, Support: SupportVerified},
 		{Model: "m", Hardware: "h", Firmware: "f", Builds: []escp.BuildDate{"20260101"}, Support: SupportUntried},
 		{Model: "m", Hardware: "h", Firmware: "f", Builds: []escp.BuildDate{"20240101"}, Support: SupportUnsupported},
@@ -35,10 +35,10 @@ func TestCompatibilityFeedsTheAllowList(t *testing.T) {
 }
 
 func TestCompatibilityIsACopy(t *testing.T) {
-	got := Compatibility()
+	got := CompatibilityRows()
 	got[0].Model = "tampered"
 	got[0].Builds[0] = "tampered"
-	again := Compatibility()
+	again := CompatibilityRows()
 	if again[0].Model == "tampered" || again[0].Builds[0] == "tampered" {
 		t.Fatal("changing the result changed the table")
 	}
@@ -77,7 +77,7 @@ func TestMustLoadCompatibilityStopsOnABadTable(t *testing.T) {
 }
 
 func TestRenderCompatibility(t *testing.T) {
-	got := renderCompatibility([]Row{
+	got := renderCompatibility([]CompatibilityRow{
 		{Model: "A", Hardware: "v1", Firmware: "f1", Support: SupportVerified, Summary: "reads"},
 		{Model: "B", Hardware: "v2", Firmware: "f2", Support: SupportUntried, Summary: "reads work"},
 		{Model: "C", Hardware: "v3", Firmware: "f3", Support: SupportUntested},

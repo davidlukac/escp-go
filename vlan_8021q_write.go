@@ -60,8 +60,8 @@ func (n VLANName) Validate() error {
 func (n VLANName) String() string { return string(n) }
 
 // validate checks a VLAN before it is encoded: id, name, ports, no port both
-// tagged and untagged, and at least one member (use DeleteVLAN8021Q to remove).
-func (v VLAN8021Q) validate() error {
+// tagged and untagged, and at least one member (use DeleteDot1QVLAN to remove).
+func (v Dot1QVLAN) validate() error {
 	if err := v.ID.Validate(); err != nil {
 		return err
 	}
@@ -79,7 +79,7 @@ func (v VLAN8021Q) validate() error {
 
 // encode builds the TLV 8705 value for the VLAN, as the vendor utility does:
 // the member mask holds every port, the tagged mask only the tagged ones.
-func (v VLAN8021Q) encode() []byte {
+func (v Dot1QVLAN) encode() []byte {
 	return vlanEntryBytes(v.ID, v.Tagged.Union(v.Untagged).Mask(), v.Tagged.Mask(), v.Name)
 }
 
@@ -92,10 +92,10 @@ func vlanEntryBytes(id VLANID, member, tagged []byte, name VLANName) []byte {
 	return append(out, 0)
 }
 
-// SetVLAN8021Q creates or replaces an 802.1Q VLAN: TLV 8705 with the id, the
+// SetDot1QVLAN creates or replaces an 802.1Q VLAN: TLV 8705 with the id, the
 // member and tagged port masks and the name. Changing a VLAN whose ports carry
 // traffic can cut connectivity; callers must guard. The 802.1Q mode must be on.
-func (c *Client) SetVLAN8021Q(ctx context.Context, v VLAN8021Q) error {
+func (c *Client) SetDot1QVLAN(ctx context.Context, v Dot1QVLAN) error {
 	if err := v.validate(); err != nil {
 		return err
 	}
@@ -103,17 +103,17 @@ func (c *Client) SetVLAN8021Q(ctx context.Context, v VLAN8021Q) error {
 	if err := c.requirePorts(ctx, members); err != nil {
 		return err
 	}
-	return c.setTLVs(ctx, Operation{Name: "SetVLAN8021Q", Ports: members, Impact: ImpactTraffic, Replaces: GroupDot1QVLAN, ID: int(v.ID)}, wire.TLV{Type: wire.TLVVLAN8021QVLAN, Value: v.encode()})
+	return c.setTLVs(ctx, Operation{Name: "SetDot1QVLAN", Ports: members, Impact: ImpactTraffic, Replaces: GroupDot1QVLAN, ID: int(v.ID)}, wire.TLV{Type: wire.TLVVLAN8021QVLAN, Value: v.encode()})
 }
 
-// DeleteVLAN8021Q removes an 802.1Q VLAN: TLV 8705 with both masks empty and an
+// DeleteDot1QVLAN removes an 802.1Q VLAN: TLV 8705 with both masks empty and an
 // empty name, as the vendor utility sends it.
-func (c *Client) DeleteVLAN8021Q(ctx context.Context, id VLANID) error {
+func (c *Client) DeleteDot1QVLAN(ctx context.Context, id VLANID) error {
 	if err := id.Validate(); err != nil {
 		return err
 	}
 	empty := make([]byte, maskLen)
-	return c.setTLVs(ctx, Operation{Name: "DeleteVLAN8021Q", Impact: ImpactTraffic, Replaces: GroupDot1QVLAN, ID: int(id)}, wire.TLV{Type: wire.TLVVLAN8021QVLAN, Value: vlanEntryBytes(id, empty, empty, "")})
+	return c.setTLVs(ctx, Operation{Name: "DeleteDot1QVLAN", Impact: ImpactTraffic, Replaces: GroupDot1QVLAN, ID: int(id)}, wire.TLV{Type: wire.TLVVLAN8021QVLAN, Value: vlanEntryBytes(id, empty, empty, "")})
 }
 
 // SetPVIDs sets the default VLAN of the given ports (port -> pvid): one TLV
