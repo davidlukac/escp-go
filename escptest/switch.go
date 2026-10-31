@@ -140,12 +140,22 @@ func Loopback() netip.Addr { return netip.MustParseAddr("127.0.0.1") }
 // this package can still collide; a client that binds late cannot rule that out.
 func FreeUDPPort(t testing.TB) int {
 	t.Helper()
-	c, err := listenUnreserved(listenLoopback)
+	port, err := FreePort()
 	if err != nil {
 		t.Fatal(err)
 	}
+	return port
+}
+
+// FreePort is FreeUDPPort for code that is not a test, such as an example: it returns the error
+// instead of failing a test.
+func FreePort() (int, error) {
+	c, err := listenUnreserved(listenLoopback)
+	if err != nil {
+		return 0, err
+	}
 	defer func() { _ = c.Close() }() // best effort: only the port number is kept
-	return c.LocalAddr().(*net.UDPAddr).Port
+	return c.LocalAddr().(*net.UDPAddr).Port, nil
 }
 
 // reserved holds every port this package has handed out, for the life of the process.
@@ -187,16 +197,29 @@ func listenUnreserved(listen func() (*net.UDPConn, error)) (*net.UDPConn, error)
 // Start runs a fake switch on a free loopback UDP port until the test ends. The LED starts on.
 func Start(t testing.TB) *Switch {
 	t.Helper()
-	conn, err := listenUnreserved(listenLoopback)
+	f, err := Listen()
 	if err != nil {
 		t.Fatal(err)
 	}
-	lease := DefaultLease()
-	f := &Switch{conn: conn, user: Username, password: Password, led: true, firmware: DefaultFirmware, lease: &lease}
-	t.Cleanup(func() { _ = conn.Close() }) // best effort at the end of the test
-	go f.serve()
+	t.Cleanup(func() { _ = f.Close() }) // best effort at the end of the test
 	return f
 }
+
+// Listen is Start for code that is not a test, such as an example: it runs a fake switch on a
+// free loopback UDP port and returns it; the caller closes it. The LED starts on.
+func Listen() (*Switch, error) {
+	conn, err := listenUnreserved(listenLoopback)
+	if err != nil {
+		return nil, err
+	}
+	lease := DefaultLease()
+	f := &Switch{conn: conn, user: Username, password: Password, led: true, firmware: DefaultFirmware, lease: &lease}
+	go f.serve()
+	return f, nil
+}
+
+// Close stops the switch. Requests that arrive afterwards get no answer.
+func (f *Switch) Close() error { return f.conn.Close() }
 
 // Port is the UDP port the switch listens on; give it to the client as its switch port.
 func (f *Switch) Port() int { return f.conn.LocalAddr().(*net.UDPAddr).Port }
