@@ -19,8 +19,8 @@ import (
 // of lookups.
 func dialLeasing(t *testing.T, f *escptest.Switch) (*Client, *int) {
 	t.Helper()
-	c := newBoundClient(t, Config{Host: "127.0.0.1", MAC: MAC(escptest.DefaultMAC), Username: "admin", Password: "secret",
-		Timeout: 150 * time.Millisecond, Retries: 1, SwitchPort: f.Port(), BroadcastAddr: escptest.Loopback})
+	c := newBoundClient(t, Config{Host: "127.0.0.1", MAC: MAC(escptest.DefaultMAC()), Username: "admin", Password: "secret",
+		Timeout: 150 * time.Millisecond, Retries: 1, SwitchPort: f.Port(), BroadcastAddr: escptest.Loopback()})
 	c.allowLoopback = true
 	lookups := new(int)
 	c.locator = func(ctx context.Context, _ MAC) (Info, error) { *lookups++; return c.discoverOnce(ctx) }
@@ -62,7 +62,7 @@ func TestEnableDHCPAsksForALeaseAndFollowsIt(t *testing.T) {
 
 func TestEnableDHCPWaitsOutTheSilenceWhileTheSwitchAsksForALease(t *testing.T) {
 	f := escptest.Start(t)
-	f.SetLease(escptest.Lease{IP: escptest.DefaultLease.IP, Mask: escptest.DefaultLease.Mask, Gateway: escptest.DefaultLease.Gateway, Silence: 6})
+	f.SetLease(escptest.Lease{IP: escptest.DefaultLease().IP, Mask: escptest.DefaultLease().Mask, Gateway: escptest.DefaultLease().Gateway, Silence: 6})
 	c, lookups := dialLeasing(t, f)
 	if err := c.EnableDHCP(context.Background()); err != nil {
 		t.Fatal(err)
@@ -99,7 +99,7 @@ func TestEnableDHCPOnASwitchThatLeasesWritesNothing(t *testing.T) {
 // The reply to the write was lost but the switch took it: the lookup shows the lease.
 func TestEnableDHCPSucceedsWhenTheReplyIsLostButTheSwitchLeases(t *testing.T) {
 	f := escptest.Start(t)
-	f.Configure(func(f *escptest.Switch) { f.OnSystemSet = escptest.SystemSetLeaves })
+	f.Configure(func(f *escptest.Faults) { f.OnSystemSet = escptest.SystemSetLeaves })
 	c, _ := dialLeasing(t, f)
 	if err := c.EnableDHCP(context.Background()); err != nil {
 		t.Fatalf("the switch leases, so the call must succeed: %v", err)
@@ -111,14 +111,14 @@ func TestEnableDHCPSucceedsWhenTheReplyIsLostButTheSwitchLeases(t *testing.T) {
 
 func TestEnableDHCPReportsAWriteThatWasNotApplied(t *testing.T) {
 	f := escptest.Start(t)
-	f.Configure(func(f *escptest.Switch) { f.DropSets = true })
+	f.Configure(func(f *escptest.Faults) { f.DropSets = true })
 	c, _ := dialLeasing(t, f)
 	c.moveWait = 400 * time.Millisecond
 	err := c.EnableDHCP(context.Background())
 	if !errors.Is(err, ErrNoReply) || errors.Is(err, ErrMoveUnconfirmed) || !strings.Contains(err.Error(), "not switched on") {
 		t.Fatalf("want ErrNoReply saying DHCP was not switched on, got %v", err)
 	}
-	if f.SetsDropped() == 0 {
+	if f.DroppedSets() == 0 {
 		t.Fatal("the write never left the client, so this proves nothing")
 	}
 }
@@ -138,7 +138,7 @@ func TestEnableDHCPReportsASwitchThatAnswersButDoesNotLease(t *testing.T) {
 
 func TestEnableDHCPReportsASwitchThatCannotBeFound(t *testing.T) {
 	f := escptest.Start(t)
-	f.Configure(func(f *escptest.Switch) { f.OnSystemSet = escptest.SystemSetVanishes })
+	f.Configure(func(f *escptest.Faults) { f.OnSystemSet = escptest.SystemSetVanishes })
 	c, _ := dialLeasing(t, f)
 	c.moveWait = 400 * time.Millisecond
 	err := c.EnableDHCP(context.Background())
@@ -149,7 +149,7 @@ func TestEnableDHCPReportsASwitchThatCannotBeFound(t *testing.T) {
 
 func TestEnableDHCPDoesNotWaitAfterARefusal(t *testing.T) {
 	f := escptest.Start(t)
-	f.Configure(func(f *escptest.Switch) { f.RejectSetsFrom = 1 })
+	f.Configure(func(f *escptest.Faults) { f.RejectSetsFrom = 1 })
 	c, lookups := dialLeasing(t, f)
 	var rejected *RejectedError
 	if err := c.EnableDHCP(context.Background()); !errors.As(err, &rejected) {
@@ -164,7 +164,7 @@ func TestEnableDHCPDoesNotWaitAfterARefusal(t *testing.T) {
 func TestEnableDHCPSettlesWhenTheCallIsCancelledAfterTheWrite(t *testing.T) {
 	f := escptest.Start(t)
 	ctx, cancel := context.WithCancel(context.Background())
-	f.Configure(func(f *escptest.Switch) {
+	f.Configure(func(f *escptest.Faults) {
 		f.OnSystemSet = escptest.SystemSetLeaves
 		f.AfterSystemSet = cancel
 	})
@@ -209,8 +209,9 @@ func TestEnableDHCPWritesNothingWhenTheSwitchCannotBeReadFirst(t *testing.T) {
 	}
 
 	f = escptest.Start(t)
-	f.Configure(func(f *escptest.Switch) {
-		f.DiscoverReply = []escptest.Setting{{Type: wire.TLVMAC, Value: escptest.DefaultMAC[:]}} // no addresses
+	defaultMAC := escptest.DefaultMAC()
+	f.Configure(func(f *escptest.Faults) {
+		f.DiscoverReply = []escptest.Setting{{Type: wire.TLVMAC, Value: defaultMAC[:]}} // no addresses
 	})
 	c, _ = dialLeasing(t, f)
 	if err := c.EnableDHCP(context.Background()); err == nil || !strings.Contains(err.Error(), "unusable IP configuration") {

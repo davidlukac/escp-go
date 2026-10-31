@@ -120,7 +120,7 @@ func (r *logRecorder) text() string {
 func dialLogged(t *testing.T, f *escptest.Switch, pass Password, log *slog.Logger, mutate ...func(*Config)) *Client {
 	t.Helper()
 	cfg := Config{Host: "127.0.0.1", Username: "admin", Password: pass, Timeout: 150 * time.Millisecond, Retries: 1,
-		SwitchPort: f.Port(), BroadcastAddr: escptest.Loopback, Logger: log}
+		SwitchPort: f.Port(), BroadcastAddr: escptest.Loopback(), Logger: log}
 	for _, m := range mutate {
 		m(&cfg)
 	}
@@ -330,7 +330,7 @@ func TestLoggerReportsASessionReopenedAfterSilence(t *testing.T) {
 func TestLoggerFollowsALeaseAndAMove(t *testing.T) {
 	t.Run("the wait for a lease", func(t *testing.T) {
 		f := escptest.Start(t)
-		f.SetLease(escptest.Lease{IP: escptest.DefaultLease.IP, Mask: escptest.DefaultLease.Mask, Gateway: escptest.DefaultLease.Gateway, Silence: 6})
+		f.SetLease(escptest.Lease{IP: escptest.DefaultLease().IP, Mask: escptest.DefaultLease().Mask, Gateway: escptest.DefaultLease().Gateway, Silence: 6})
 		c, _ := dialLeasing(t, f)
 		log, rec := newLogRecorder()
 		c.log = log
@@ -346,7 +346,7 @@ func TestLoggerFollowsALeaseAndAMove(t *testing.T) {
 	})
 	t.Run("a move whose reply is lost", func(t *testing.T) {
 		f := escptest.Start(t)
-		f.Configure(func(f *escptest.Switch) { f.OnSystemSet = escptest.SystemSetLeaves })
+		f.Configure(func(f *escptest.Faults) { f.OnSystemSet = escptest.SystemSetLeaves })
 		log, rec := newLogRecorder()
 		c := dialLogged(t, f, "secret", log)
 		if err := c.SetIPConfig(context.Background(), lostReplyWanted); err != nil {
@@ -358,7 +358,7 @@ func TestLoggerFollowsALeaseAndAMove(t *testing.T) {
 	})
 	t.Run("a switch that is not at the new address yet", func(t *testing.T) {
 		f := escptest.Start(t)
-		f.Configure(func(f *escptest.Switch) { f.StaleAfterSet = 2 })
+		f.Configure(func(f *escptest.Faults) { f.StaleAfterSet = 2 })
 		log, rec := newLogRecorder()
 		c := dialLogged(t, f, "secret", log)
 		if err := c.SetIPConfig(context.Background(), lostReplyWanted); err != nil {

@@ -44,7 +44,7 @@ func TestSetHostnameRefusesToWriteWithoutAUsableIPConfiguration(t *testing.T) {
 	for name, tlvs := range bad {
 		t.Run(name, func(t *testing.T) {
 			f := escptest.Start(t)
-			f.Configure(func(f *escptest.Switch) { f.DiscoverReply = tlvs })
+			f.Configure(func(f *escptest.Faults) { f.DiscoverReply = tlvs })
 			c := dialFast(t, f, "secret")
 			err := c.SetHostname(context.Background(), "new-name")
 			if err == nil || !strings.Contains(err.Error(), "unusable IP configuration") {
@@ -59,7 +59,7 @@ func TestSetHostnameRefusesToWriteWithoutAUsableIPConfiguration(t *testing.T) {
 
 func TestSetHostnameRefusesUnusableIPConfiguration(t *testing.T) {
 	f := escptest.Start(t)
-	f.Configure(func(f *escptest.Switch) {
+	f.Configure(func(f *escptest.Faults) {
 		f.DiscoverReply = []escptest.Setting{{Type: wire.TLVModel, Value: []byte("TL-SG108E\x00")}, {Type: wire.TLVHostname, Value: []byte("TL-SG108E-fake\x00")}, {Type: wire.TLVMAC, Value: []byte{0x00, 0x00, 0x5e, 0x00, 0x53, 0x02}}}
 	})
 	c := dialFake(t, f, "secret")

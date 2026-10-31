@@ -57,7 +57,7 @@ func scriptModes(f *escptest.Switch, mtu, portBased, dot1q bool, silentOn wire.T
 		}
 		return "00"
 	}
-	f.Configure(func(f *escptest.Switch) {
+	f.Configure(func(f *escptest.Faults) {
 		f.GetFn = func(types []wire.TLVType) ([]escptest.Setting, int32, bool) {
 			var out []escptest.Setting
 			for _, typ := range types {

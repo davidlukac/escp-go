@@ -22,7 +22,7 @@ func TestDryRunThroughTheRealClient(t *testing.T) {
 	dry := safety.NewDryRun()
 	c, err := escp.Dial(escp.Config{
 		Host: "127.0.0.1", Username: escptest.Username, Password: escptest.Password,
-		Timeout: 300 * time.Millisecond, SwitchPort: f.Port(), HostPort: escptest.FreeUDPPort(t), BroadcastAddr: escptest.Loopback,
+		Timeout: 300 * time.Millisecond, SwitchPort: f.Port(), HostPort: escptest.FreeUDPPort(t), BroadcastAddr: escptest.Loopback(),
 		WriteGate: safety.Chain(safety.FirmwareGate(), safety.MaxImpact(escp.ImpactTraffic), dry.Gate()),
 	})
 	if err != nil {
@@ -66,7 +66,7 @@ func TestDryRunOfAWriteThatReadsFirst(t *testing.T) {
 	dry := safety.NewDryRun()
 	c, err := escp.Dial(escp.Config{
 		Host: "127.0.0.1", Username: escptest.Username, Password: escptest.Password,
-		Timeout: 300 * time.Millisecond, SwitchPort: f.Port(), HostPort: escptest.FreeUDPPort(t), BroadcastAddr: escptest.Loopback,
+		Timeout: 300 * time.Millisecond, SwitchPort: f.Port(), HostPort: escptest.FreeUDPPort(t), BroadcastAddr: escptest.Loopback(),
 		WriteGate: dry.Gate(),
 	})
 	if err != nil {
@@ -88,7 +88,7 @@ func TestDryRunOfAWriteThatReadsFirst(t *testing.T) {
 // PortGate through the real client: the uplink cannot be touched, named or not, and a free port can.
 func TestPortGateThroughTheRealClient(t *testing.T) {
 	f := escptest.Start(t)
-	f.Configure(func(f *escptest.Switch) {
+	f.Configure(func(f *escptest.Faults) {
 		f.GetFn = func(types []wire.TLVType) ([]escptest.Setting, int32, bool) {
 			var out []escptest.Setting
 			for _, typ := range types {
@@ -108,7 +108,7 @@ func TestPortGateThroughTheRealClient(t *testing.T) {
 	})
 	c, err := escp.Dial(escp.Config{
 		Host: "127.0.0.1", Username: escptest.Username, Password: escptest.Password,
-		Timeout: 300 * time.Millisecond, SwitchPort: f.Port(), HostPort: escptest.FreeUDPPort(t), BroadcastAddr: escptest.Loopback,
+		Timeout: 300 * time.Millisecond, SwitchPort: f.Port(), HostPort: escptest.FreeUDPPort(t), BroadcastAddr: escptest.Loopback(),
 		WriteGate: safety.PortGate(),
 	})
 	if err != nil {

@@ -177,7 +177,7 @@ func TestSetPortBasedVLANRefusesAGroupTheSwitchDoesNotHave(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			f := escptest.Start(t)
 			var reads atomic.Int32
-			f.Configure(func(f *escptest.Switch) { f.GetFn = scriptedPortBased(c.max, c.ports, &reads) })
+			f.Configure(func(f *escptest.Faults) { f.GetFn = scriptedPortBased(c.max, c.ports, &reads) })
 			cl := dialFake(t, f, "secret")
 			err := cl.SetPortBasedVLAN(ctx, c.bad, MustPortSet(2))
 			if !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), c.want) {
@@ -201,7 +201,7 @@ func TestSetPortBasedVLANRefusesAGroupTheSwitchDoesNotHave(t *testing.T) {
 
 func TestSetPortBasedVLANFailsWhenTheGroupLimitCannotBeRead(t *testing.T) {
 	f := escptest.Start(t)
-	f.Configure(func(f *escptest.Switch) {
+	f.Configure(func(f *escptest.Faults) {
 		f.GetFn = func(types []wire.TLVType) ([]escptest.Setting, int32, bool) { return nil, 1, false } // the switch refuses every read
 	})
 	c := dialFake(t, f, "secret")
@@ -216,7 +216,7 @@ func TestSetPortBasedVLANFailsWhenTheGroupLimitCannotBeRead(t *testing.T) {
 
 func TestSetPortBasedVLANFailsWhenThePortCountCannotBeRead(t *testing.T) {
 	f := escptest.Start(t)
-	f.Configure(func(f *escptest.Switch) {
+	f.Configure(func(f *escptest.Faults) {
 		f.GetFn = func(types []wire.TLVType) ([]escptest.Setting, int32, bool) {
 			for _, ty := range types {
 				if ty == wire.TLVVLANPortBased { // the state reads fine
