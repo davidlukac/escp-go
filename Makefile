@@ -21,10 +21,10 @@ vuln:
 
 # `make cover` runs the whole suite with the race detector, writes cover.out and enforces the policy:
 # every statement covered except functions whose doc comment says `// coverage: ignore - <reason>`
-# (see CONTRIBUTING.md). The checker is Go (tools/coverpolicy) and is tested, and measured, by the same run.
+# (see CONTRIBUTING.md). The checker is Go (internal/coverpolicy) and is tested, and measured, by the same run.
 cover:
 	go test ./... -race -count=1 -coverpkg=./... -coverprofile=cover.out
-	go run ./tools/coverpolicy check cover.out .
+	go run ./internal/coverpolicy check cover.out .
 
 cover-html: cover
 	go tool cover -html=cover.out -o coverage.html

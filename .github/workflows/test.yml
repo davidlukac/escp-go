@@ -152,7 +152,7 @@ jobs:
           path: ${{ runner.temp }}/coverage
       - name: Compute coverage
         run: |
-          go run ./tools/coverpolicy badge "$RUNNER_TEMP/coverage/cover.out" . > "$RUNNER_TEMP/coverage.json"
+          go run ./internal/coverpolicy badge "$RUNNER_TEMP/coverage/cover.out" . > "$RUNNER_TEMP/coverage.json"
           cat "$RUNNER_TEMP/coverage.json"
       - name: Publish to the badges branch
         run: |
