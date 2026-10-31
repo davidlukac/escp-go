@@ -4,24 +4,28 @@
       "model": "TL-SG108E",
       "hardware": "v6",
       "firmware": "1.0.0 Build 20230218",
-      "builds": ["20230218"],
+      "builds": [
+        "20230218"
+      ],
       "support": "verified",
-      "summary": "reads, writes, import and drift checked on a real device. The VLAN mode, 802.1Q group and PVID resources were not tried on this build (they are verified on 20250710; same protocol generation)."
+      "summary": "reads and writes checked on a real device, and the settings read back. The VLAN mode, 802.1Q VLAN and PVID writes were not tried on this build (they are verified on 20250710; same protocol generation)."
     },
     {
       "model": "TL-SG108E",
       "hardware": "v6",
       "firmware": "1.0.0 Build 20250710",
-      "builds": ["20250710"],
+      "builds": [
+        "20250710"
+      ],
       "support": "verified",
-      "summary": "reads, imports and drift; the writes on unused ports (including mirror egress, unknown-unicast storm control and the VLAN mode, 802.1Q VLAN and PVID resources), the management address and the DHCP lease (the switch found again by its MAC address). LAG creation works as on 20230218 (group 1 takes ports 1-4, group 2 ports 5-8; see the `lag` page)."
+      "summary": "reads; the writes on unused ports (including mirror egress, unknown-unicast storm control and the VLAN mode, 802.1Q VLAN and PVID), the management address and the DHCP lease (the switch found again by its MAC address). LAG creation works as on 20230218 (group 1 takes ports 1-4, group 2 ports 5-8)."
     },
     {
       "model": "TL-SG108E",
       "hardware": "v6",
       "firmware": "builds newer than 20250710",
       "support": "untried",
-      "summary": "reads work, writes are refused unless `allow_unverified_firmware = true`; start with the read-only data sources"
+      "summary": "reads work; `safety.FirmwareGate` refuses writes unless the caller opts in. Start with the reads"
     },
     {
       "model": "TL-SG108E",

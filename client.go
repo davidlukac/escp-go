@@ -52,8 +52,8 @@ type Client struct {
 // Dial prepares a client for the switch at cfg.Host, which must be an IPv4 address or a
 // name that resolves to one (a name is looked up now), or, when cfg.MAC is set, may be left
 // empty to find the switch by its MAC address on the first request. It sends nothing to the switch and
-// binds no socket: the local UDP port is bound on first use, so merely configuring a
-// provider (e.g. `terraform validate`) has no side effects on the switch. Close the client
+// binds no socket: the local UDP port is bound on first use, so merely configuring a client
+// (a program that builds one and validates its input) has no side effects on the switch. Close the client
 // when done.
 func Dial(cfg Config) (*Client, error) {
 	if cfg.Timeout == 0 {

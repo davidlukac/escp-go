@@ -1,8 +1,8 @@
 # ESCP: the TP-Link Easy Smart UDP management protocol
 
-This is the wire protocol the provider speaks (`internal/escp`). It was worked out from the vendor's configuration utility, from earlier open-source clients ([smrt](https://github.com/rgl/smrt) and its forks) and by observing a TL-SG108E hardware v6 (firmware 1.0.0 Build 20230218). The firmware released in 2023 added the RSA key exchange described below.
+This is the wire protocol the `escp` package speaks. It was worked out from the vendor's configuration utility, from earlier open-source clients ([smrt](https://github.com/rgl/smrt) and its forks) and by observing a TL-SG108E hardware v6 (firmware 1.0.0 Build 20230218). The firmware released in 2023 added the RSA key exchange described below.
 
-The notes are descriptive, written for people who maintain this provider or want to build a compatible client. Layouts marked "verified" were exercised against a real switch; the others come from the vendor utility.
+The notes are descriptive, written for people who maintain this library or want to build a compatible client. Layouts marked "verified" were exercised against a real switch; the others come from the vendor utility.
 
 ## Transport
 - UDP. Client binds `29809`, switch listens on `29808`. Same L2 segment only. Requests can be sent to the broadcast address **or** unicast to the switch IP; replies come back to port 29809 from the switch IP.
@@ -17,7 +17,7 @@ Sending: discovery and the RSA key-exchange packet use static RC4; everything el
 
 ## Login handshake (new in fw ≥ 2023-02)
 1. **Key exchange:** op 3 (SET) packet with one TLV, type **528**, value = RSA-encrypted session key, encrypted with the *static* RC4.
-   - RSA is textbook (no padding), e = 65537, operands little-endian. The TL-SG108E v6 uses a **64-bit** modulus (see `internal/escp`); the vendor utility carries a 1024-bit modulus for some other models.
+   - RSA is textbook (no padding), e = 65537, operands little-endian. The TL-SG108E v6 uses a **64-bit** modulus (see `internal/wire`); the vendor utility carries a 1024-bit modulus for some other models.
    - TLV value layout (10 bytes): `00`, number of 16-bit words (4), then the ciphertext as 4 little-endian 16-bit words, least significant word first.
 2. **Reply:** op 4 with **error code 4098** means "session key accepted"; the reply is already encrypted with the session RC4.
 3. **Login:** op 3 with TLV 512 (username) and TLV 514 (password), both NUL-terminated strings, session RC4. Error code **0** = success.

@@ -1,15 +1,14 @@
 // Package escp is a client for the TP-Link Easy Smart UDP management protocol (ESCP), as
 // spoken by TL-SG108E v6 switches. It reads and writes the switch's settings, finds
 // switches on the network and validates every value before anything is sent. The wire
-// format is described in PROTOCOL.md in this directory.
+// format is described in PROTOCOL.md at the root of the repository.
 //
 // # Stability
 //
-// This package is version 0. It lives under internal/ in the Terraform provider today and
-// is written to be extracted into a module of its own; until that happens, and until it
-// has a 1.0 release, exported names, types and error values may change without notice.
-// Where something outside the code depends on a spelling (the names of Speed and QoSMode
-// values are part of the provider's Terraform state), the doc comment of that name says so.
+// The module is version 0: until a 1.0 release, exported names, types and error values may
+// change in any minor version, and every change is listed in CHANGELOG.md. Where something
+// outside the code depends on a spelling (the names of Speed and QoSMode values are kept in
+// saved state by the Terraform provider), the doc comment of that name says so.
 //
 // # Naming
 //
@@ -44,7 +43,7 @@
 // escptest (a fake switch for tests). Tests are named for the source they exercise; the ones
 // that cut across sources have a name of their own: cancel_test (cancellation), parsers_test,
 // readers_test, identity_test (identity and lookup by MAC address), write_gate_test, dryrun_test, fake_switch_test (the fake itself) and
-// helpers_test. CONTRIBUTING.md in the repository root is the checklist for adding or
+// helpers_test. CONTRIBUTING.md at the root of the repository is the checklist for adding or
 // changing a setting.
 //
 // # Identity: finding a switch by MAC address

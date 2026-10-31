@@ -8,7 +8,7 @@ import (
 )
 
 // QoSMode is the switch's QoS mode. The number is the wire byte; the name is the web UI's
-// and the Terraform provider's spelling and is part of the provider's state: do not change it.
+// and the Terraform provider's spelling, which consumers keep in saved state: do not change it.
 type QoSMode int
 
 // The QoS modes the switch knows. Per-port priorities only take effect in QoSPortBased.

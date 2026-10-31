@@ -1,8 +1,8 @@
 // Package safety holds the rules that decide whether a write to a switch is prudent:
 // which firmware builds the client was verified against, and what a port is used for
-// (link, link aggregation). It has no Terraform types and no logging; it reads from a
+// (link, link aggregation). It has no logging; it reads from a
 // switch only through the small interfaces it is given, and reports what it finds as
-// typed errors and values so each front end (the provider, a command line) words the
+// typed errors and values so each front end (a Terraform provider, a command line) words the
 // refusal in its own vocabulary.
 //
 // # Firmware
@@ -44,7 +44,7 @@
 // must exist, have no link and belong to no LAG (an edit of a LAG tolerates the members of
 // that group, through PortRule). The first offender comes back as a *PortUseError; branch on
 // its Reason and word the refusal, and the way to proceed, for your users. Whether to run the
-// check at all (an opt-in such as allow_disruptive) stays with the caller.
+// check at all (an opt-in such as a flag that allows disruptive writes) stays with the caller.
 //
 // # Stability
 //

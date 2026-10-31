@@ -30,8 +30,8 @@ type Port struct {
 	ActualFlowControl     bool
 }
 
-// Speed is a port's speed and duplex, spelled as the web UI and the Terraform
-// provider spell it. The values are part of the provider's state: do not change them.
+// Speed is a port's speed and duplex, spelled as the web UI spells it. Consumers keep the
+// values in saved state (the Terraform provider does): do not change them.
 type Speed string
 
 // The speeds a port can be configured to (codes 1..6 on the wire), and the one state

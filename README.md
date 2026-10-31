@@ -1,8 +1,8 @@
 # escp: a Go client for TP-Link Easy Smart switches
 
-`escp` talks the switches' native UDP management protocol (ESCP), as spoken by the vendor's configuration utility. It reads and writes the settings of a TL-SG108E v6, finds switches on the network, validates every value before anything is sent, and ships the safety gates and a fake switch that a front end needs to use it responsibly. It is the library behind the [Terraform provider](../../README.md) in this repository, and is written to be reused by a command line client and by other programs.
+`escp` talks the switches' native UDP management protocol (ESCP), as spoken by the vendor's configuration utility. It reads and writes the settings of a TL-SG108E v6, finds switches on the network, validates every value before anything is sent, and ships the safety gates and a fake switch that a front end needs to use it responsibly. It is the library behind the [Terraform provider](https://github.com/davidlukac/terraform-provider-tplinkeasysmart) for these switches, and is written to be reused by a command line client and by other programs.
 
-**Status: version 0.** The package lives under `internal/` and may change without notice until it is extracted into a module of its own and released as 1.0 (see the stability section of the package documentation). Which hardware and firmware it was verified on is in the [compatibility table](#compatibility); the wire format is in [PROTOCOL.md](PROTOCOL.md).
+**Status: version 0.** The API may change in any minor version until 1.0; [CHANGELOG.md](CHANGELOG.md) lists every change (see also the stability section of the package documentation). Which hardware and firmware it was verified on is in the [compatibility table](#compatibility); the wire format is in [PROTOCOL.md](PROTOCOL.md).
 
 > **The switch is real network equipment with no console.** A wrong write can cut the management path or the uplink, and recovery is a physical factory reset. Read [Writing safely](#writing-safely) before the first write.
 
@@ -10,11 +10,11 @@
 
 | Package | What it is | Public |
 |---|---|---|
-| `escp` (this directory) | the client, the domain types, validators, `Discover` | yes |
-| `escp/safety` | write gates (firmware, ports, impact, dry run) and the compatibility table | yes |
-| `escp/escptest` | a fake switch on a loopback UDP port, for tests | yes |
-| `escp/internal/wire` | packet codec, session crypto, the TLV catalogue | no |
-| `escp/internal/udp` | sharing the reply port between sockets | no |
+| `escp` (the repository root) | the client, the domain types, validators, `Discover` | yes |
+| `escp-go/safety` | write gates (firmware, ports, impact, dry run) and the compatibility table | yes |
+| `escp-go/escptest` | a fake switch on a loopback UDP port, for tests | yes |
+| `internal/wire` | packet codec, session crypto, the TLV catalogue | no |
+| `internal/udp` | sharing the reply port between sockets | no |
 
 The file layout inside `escp` (one file per setting) is described in the package overview, `go doc .`.
 
@@ -100,7 +100,7 @@ Deliberately **not** offered: user account, config restore, reboot, factory rese
 ## Data structures
 
 - **Ports are numbers from 1**: a `PortID` for one, a `PortSet` for a set (a comparable value held as the wire bitmap: no duplicates, ascending, `Union`/`Minus`/`Intersect`, `escp.NewPortSet(2, 3)` refuses a port outside 1 to `MaxPort`). A record that *is* a port has `ID` (`Port`, `PortConfig`, `PortStats`); a record that *refers to* a port has `Port` (`PortBandwidth`, `PortStorm`, `PortPVID`, `PortPriority`); a port with a role is named for it (`MTUVLAN.UplinkPort`, `Mirror.MirrorPort`).
-- **Closed sets are types** with `String`, `Parse...`, `Valid` and a list function: `Speed` (`ConfigurableSpeeds`), `QoSMode` (`QoSModes`), `Priority` (1 to 4, as the web UI shows it), `VLANMode` (`VLANModes`). The spellings are the web UI's and the Terraform provider's, and are part of its state.
+- **Closed sets are types** with `String`, `Parse...`, `Valid` and a list function: `Speed` (`ConfigurableSpeeds`), `QoSMode` (`QoSModes`), `Priority` (1 to 4, as the web UI shows it), `VLANMode` (`VLANModes`). The spellings are the web UI's and the Terraform provider's; consumers keep them in saved state, so they do not change.
 - **Readers return values, not pointers.** Counters in `PortStats` are the switch's 32-bit counters and wrap.
 - **Limits and validators are public** so a front end can refuse a bad value before it reaches the client: `PortID.Validate`, `VLANID.Validate`, `Kbps.Validate`, `VLANName.Validate`, `Hostname.Validate`, `ValidateLAG`, `ValidateIPConfig`, and the constants they use (`MaxPort`, `RateStepKbps`, `MaxBandwidthKbps`, `LAGGroupCount`, ...).
 
@@ -150,7 +150,7 @@ client, err := escp.Dial(escp.Config{ /* ... */ Logger: logger.With("request_id"
 - **Context fields.** What you attach with `Logger.With` comes along on every line. Every message is logged with the call's context (`...Context` methods), so a handler can add what lives there (trace id, tenant): the mapped diagnostic context of log4j and friends.
 - **Levels** are slog's four. Debug is the protocol (each request and reply: operation, sequence number, TLV types and sizes, never values), Info the lifecycle (session, lookup by MAC, writes), Warn a recoverable anomaly (lost packet, repeated download). Error is not used: failures are returned. Handlers for zap, zerolog and logr exist (`zapslog`, `logr.FromSlogHandler` and their kin) if your program does not use slog.
 - **Attribute names are the contract** (lower snake case, one meaning each). New ones can be added in any release, for example for hardware with PoE; none is renamed or removed before a major version. Message texts may change.
-- No message carries the password, user name or session key. The Terraform provider routes the logger to `tflog`, so `TF_LOG=DEBUG terraform plan` shows what the client does. A `forbidigo` lint rule keeps `fmt.Print*` and `log.*` out of the package.
+- No message carries the password, user name or session key. The Terraform provider routes the logger to `tflog`. A `forbidigo` lint rule keeps `fmt.Print*` and `log.*` out of the package.
 
 ## Compatibility
 
@@ -158,9 +158,9 @@ client, err := escp.Dial(escp.Config{ /* ... */ Logger: logger.With("request_id"
 
 | Switch | Hardware | Firmware | Status |
 |---|---|---|---|
-| TL-SG108E | v6 | 1.0.0 Build 20230218 | **Verified**: reads, writes, import and drift checked on a real device. The VLAN mode, 802.1Q group and PVID resources were not tried on this build (they are verified on 20250710; same protocol generation). |
-| TL-SG108E | v6 | 1.0.0 Build 20250710 | **Verified**: reads, imports and drift; the writes on unused ports (including mirror egress, unknown-unicast storm control and the VLAN mode, 802.1Q VLAN and PVID resources), the management address and the DHCP lease (the switch found again by its MAC address). LAG creation works as on 20230218 (group 1 takes ports 1-4, group 2 ports 5-8; see the `lag` page). |
-| TL-SG108E | v6 | builds newer than 20250710 | Untried; reads work, writes are refused unless `allow_unverified_firmware = true`; start with the read-only data sources |
+| TL-SG108E | v6 | 1.0.0 Build 20230218 | **Verified**: reads and writes checked on a real device, and the settings read back. The VLAN mode, 802.1Q VLAN and PVID writes were not tried on this build (they are verified on 20250710; same protocol generation). |
+| TL-SG108E | v6 | 1.0.0 Build 20250710 | **Verified**: reads; the writes on unused ports (including mirror egress, unknown-unicast storm control and the VLAN mode, 802.1Q VLAN and PVID), the management address and the DHCP lease (the switch found again by its MAC address). LAG creation works as on 20230218 (group 1 takes ports 1-4, group 2 ports 5-8). |
+| TL-SG108E | v6 | builds newer than 20250710 | Untried; reads work; `safety.FirmwareGate` refuses writes unless the caller opts in. Start with the reads |
 | TL-SG108E | other hardware versions | any | Untested |
 | Other Easy Smart models (TL-SG105E, TL-SG1016DE, ...) | any | any | Untested; reports wanted |
 | Any | any | firmware **before the 2023 RSA key exchange** | Not supported: the client always performs the key exchange and has never been tried against the older login |
@@ -173,4 +173,4 @@ ESCP has no real secrecy: the password travels in every write, protected only by
 
 ## See also
 
-[PROTOCOL.md](PROTOCOL.md) (wire format and measured behaviour) · [CONTRIBUTING.md](../../CONTRIBUTING.md) (how to add or change a setting) · `go doc -all .` and `pkgsite` for the full reference.
+[PROTOCOL.md](PROTOCOL.md) (wire format and measured behaviour) · [CONTRIBUTING.md](CONTRIBUTING.md) (how to add or change a setting) · `go doc -all .` and `pkgsite` for the full reference.

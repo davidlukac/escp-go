@@ -19,7 +19,7 @@ const (
 )
 
 // DefaultFirmware is the firmware version the switch reports until SetFirmware changes it:
-// the build the client and the provider were verified against.
+// the build the client was verified against first.
 const DefaultFirmware = "1.0.0 Build 20230218 Rel.50633"
 
 // BackupMode selects how the switch misbehaves when the configuration is read.

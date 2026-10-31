@@ -165,7 +165,7 @@ func TestLocalMAC(t *testing.T) {
 	})
 }
 
-// Several clients (several provider instances, one per switch) must be able to
+// Several clients (several programs or provider instances, one per switch) must be able to
 // hold the reply port at the same time.
 func TestSeveralClientsShareTheReplyPort(t *testing.T) {
 	port := escptest.FreeUDPPort(t)

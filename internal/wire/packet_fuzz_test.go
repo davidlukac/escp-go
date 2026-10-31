@@ -6,7 +6,7 @@ import (
 )
 
 // Everything below parses or transforms bytes that arrive over the network.
-// `go test` runs the seed corpus; run `go test -fuzz=<Name> -fuzztime=30s ./internal/escp/internal/wire`
+// `go test` runs the seed corpus; run `go test -fuzz=<Name> -fuzztime=30s ./internal/wire`
 // to explore further.
 
 // A valid captured reply: header (op 2, seq 59) + TLV 12 (LED on) + terminator.

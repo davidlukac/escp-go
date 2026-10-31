@@ -15,7 +15,7 @@ import (
 // Measures what the switch does when its DHCP flag is written: whether it asks for a lease at once,
 // how long that takes, what discovery reports meanwhile and afterwards, whether it still answers at
 // the old static address, and what a write of a static address or of the device description does
-// while DHCP is on. The answers decide how the provider may manage DHCP (docs/mac-addressing-design.md,
+// while DHCP is on. The answers decide how a consumer may manage DHCP (docs/mac-addressing-design.md,
 // section 4.5, in the private workspace). Every observation is a line starting with "OBS|"; what is
 // asserted is the restore: the switch must end at its static address with DHCP off.
 //

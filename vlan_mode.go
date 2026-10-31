@@ -8,7 +8,7 @@ import (
 
 // VLANMode is which of the switch's three VLAN modes is active. They exclude each other: the
 // vendor utility warns that switching discards the settings of the other modes. The values
-// are the spellings the Terraform provider keeps in its state, so they do not change.
+// are the spellings consumers keep in saved state (the Terraform provider does), so they do not change.
 type VLANMode string
 
 // The VLAN modes. VLANModeNone is what VLANMode reports for a switch with no mode on, or with
