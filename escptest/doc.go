@@ -30,9 +30,9 @@
 //
 // # Using it
 //
-// A test starts one switch and aims a client at it (see the example of Start):
-// Config.SwitchPort, Config.HostPort and Config.BroadcastAddr exist for this, because a real
-// switch always uses UDP ports 29808 and 29809. Setting is the fake's own type for requests and
+// A test starts one switch (Start; Listen when there is no testing.T) and aims a client at it, as the
+// examples do. Config.SwitchPort, Config.HostPort and Config.BroadcastAddr exist for this, because a
+// real switch always uses UDP ports 29808 and 29809. Setting is the fake's own type for requests and
 // replies, so a test outside the escp module needs nothing from the client's internals.
 //
 // # Stability

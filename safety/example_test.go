@@ -108,3 +108,79 @@ func ExampleDryRun() {
 	// refused: SetLAG has impact management, above the allowed traffic
 	// 2 recorded
 }
+
+// switchPorts is a switch with these ports, no link aggregation and no VLANs: the readers
+// PortGate asks, which a Client has.
+type switchPorts []escp.Port
+
+func (switchPorts) Info(context.Context) (escp.Info, error) { return escp.Info{}, nil }
+
+func (p switchPorts) Ports(context.Context) ([]escp.Port, error) { return p, nil }
+
+func (switchPorts) LAGs(context.Context) ([]escp.LAG, error) { return nil, nil }
+
+func (switchPorts) PortBasedVLAN(context.Context) (escp.PortBasedVLAN, error) {
+	return escp.PortBasedVLAN{}, nil
+}
+
+func (switchPorts) Dot1Q(context.Context) (escp.Dot1Q, error) { return escp.Dot1Q{}, nil }
+
+// MaxImpact refuses a write whose worst case is above a ceiling, whatever its arguments. A front
+// end that must never cut the management path allows nothing above traffic.
+func ExampleMaxImpact() {
+	gate := safety.MaxImpact(escp.ImpactTraffic)
+	ctx := context.Background()
+	for _, op := range []escp.Operation{
+		{Name: "SetLED", Impact: escp.ImpactCosmetic},
+		{Name: "SetPort", Impact: escp.ImpactTraffic},
+		{Name: "SetIPConfig", Impact: escp.ImpactManagement},
+	} {
+		fmt.Printf("%s: %v\n", op.Name, gate(ctx, firmware(""), op))
+	}
+	// Output:
+	// SetLED: <nil>
+	// SetPort: <nil>
+	// SetIPConfig: SetIPConfig has impact management, above the allowed traffic
+}
+
+// PortGate refuses a write that touches a port with a link or in a link aggregation group. It asks
+// the switch (a Client lists its ports) at the moment of the write.
+func ExamplePortGate() {
+	sw := switchPorts{
+		{ID: 1, ActualSpeed: escp.Speed1000Full},
+		{ID: 2, ActualSpeed: escp.SpeedLinkDown},
+	}
+	gate := safety.PortGate()
+	ctx := context.Background()
+	fmt.Println("port 2:", gate(ctx, sw, escp.Operation{Name: "SetPort", Ports: escp.MustPortSet(2)}))
+	fmt.Println("port 1:", gate(ctx, sw, escp.Operation{Name: "SetPort", Ports: escp.MustPortSet(1)}))
+	// Output:
+	// port 2: <nil>
+	// port 1: port 1 has a link up (1000Mbps-full)
+}
+
+// Chain runs its gates in order and stops at the first refusal, so the cheap checks go first. A
+// gate that needs the switch (PortGate) is only asked about writes that passed the others.
+func ExampleChain() {
+	sw := switchPorts{{ID: 1, ActualSpeed: escp.Speed1000Full}, {ID: 2, ActualSpeed: escp.SpeedLinkDown}}
+	gate := safety.Chain(safety.MaxImpact(escp.ImpactTraffic), safety.PortGate())
+	ctx := context.Background()
+	fmt.Println(gate(ctx, sw, escp.Operation{Name: "SetPort", Ports: escp.MustPortSet(2), Impact: escp.ImpactTraffic}))
+	fmt.Println(gate(ctx, sw, escp.Operation{Name: "SetPort", Ports: escp.MustPortSet(1), Impact: escp.ImpactTraffic}))
+	fmt.Println(gate(ctx, sw, escp.Operation{Name: "SetLAG", Ports: escp.MustPortSet(2), Impact: escp.ImpactManagement}))
+	// Output:
+	// <nil>
+	// port 1 has a link up (1000Mbps-full)
+	// SetLAG has impact management, above the allowed traffic
+}
+
+// The compatibility table says which switches and firmware builds the library was verified on;
+// FirmwareGate allows writes only on the verified ones.
+func ExampleCompatibilityRows() {
+	for _, row := range safety.CompatibilityRows()[:2] {
+		fmt.Printf("%s %s, firmware %s: %s\n", row.Model, row.Hardware, row.Firmware, row.Support)
+	}
+	// Output:
+	// TL-SG108E v6, firmware 1.0.0 Build 20230218: verified
+	// TL-SG108E v6, firmware 1.0.0 Build 20250710: verified
+}
