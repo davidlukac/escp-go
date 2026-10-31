@@ -8,6 +8,7 @@ whose commits this repository keeps.
 ## 0.2.0
 
 - **Breaking changes**, made together before consumers settle on the 0.1 names; none changes behaviour, wire bytes or error texts. Rename with the table below.
+
   | 0.1.0 | 0.2.0 |
   |---|---|
   | `VLAN8021Q`, `SetVLAN8021Q`, `DeleteVLAN8021Q` | `Dot1QVLAN`, `SetDot1QVLAN`, `DeleteDot1QVLAN` |
@@ -17,6 +18,7 @@ whose commits this repository keeps.
   | `escptest`: `sw.Configure(func(f *escptest.Switch) { f.DropSets = true })` | `sw.Configure(func(f *escptest.Faults) { f.DropSets = true })`: the fault fields (`GetFn`, `RSADrop`, `RSACode`, `DropSets`, `DiscoverReply`, `RejectSetsFrom`, `RejectCode`, `StaleAfterSet`, `OnSystemSet`, `AfterSystemSet`) are fields of `Faults`, and a `Switch` has no exported fields |
   | `escptest.Loopback`, `escptest.DefaultMAC`, `escptest.DefaultLease` (variables) | `escptest.Loopback()`, `escptest.DefaultMAC()`, `escptest.DefaultLease()` (functions) |
   | `sw.SetsDropped()`, `sw.Port7Setting()`, `sw.State()` | `sw.DroppedSets()`, `sw.PortSetting(port)`, `sw.LED()` and `sw.WriteCount()` |
+
 - **New:** `escptest.Listen`, `Switch.Close` and `FreePort` for code that has no `testing.TB`, such as an example; runnable examples with checked output for `Client.Info`, `Client.Ports`, a write behind a gate, `NewPortSet`, the `safety` gates and `escptest`.
 - **Documentation:** the package overview is short and user-facing; the guides are in `docs/` (getting started, writing safely, errors, logging, testing, architecture); the README is the front page. `make pkgdoc` renders the package pages as pkg.go.dev shows them.
 - **Internal:** the coverage tool moved to `internal/coverpolicy` (it was listed as a public command); the release workflow runs when a tag is pushed and verifies that the version installs.
