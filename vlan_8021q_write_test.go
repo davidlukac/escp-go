@@ -157,3 +157,9 @@ func TestVLANNameValidate(t *testing.T) {
 		}
 	}
 }
+
+func TestVLANNameString(t *testing.T) {
+	if got := VLANName("iot-2").String(); got != "iot-2" {
+		t.Fatalf("String() = %q, want the name as written", got)
+	}
+}
