@@ -11,7 +11,7 @@ Issues and pull requests are welcome. Open an issue first for a new setting or a
 
 ## 1. Code
 
-- [ ] A setting is one file named after it (`ports.go`: types, reader, writer, parser, validation) with its tests in the file of the same name (`ports_test.go`); the file map is in the package overview, `doc.go`. Settings depend on the client and the shared helpers, never on each other.
+- [ ] A setting is one file named after it (`ports.go`: types, reader, writer, parser, validation) with its tests in the file of the same name (`ports_test.go`); the file map and the naming conventions are in [docs/architecture.md](docs/architecture.md). Settings depend on the client and the shared helpers, never on each other.
 - [ ] The wire layout is written down in [`PROTOCOL.md`](PROTOCOL.md) first (TLV id, byte layout, source: capture, vendor code, or measured), including what is not verified.
 - [ ] Protocol numbers are named constants with a doc comment (`internal/wire` for TLV ids and sizes); no magic values and no layout bytes outside the client package.
 - [ ] A domain concept is a type, not a bare `int` or `string`, and so is a bound or limit computed from several inputs (`PortVLANLimit`: the larger of the reported group count and the port count). Signs a type is missing: a method taking a bare number of another kind than its receiver, a struct built only to call one of its methods, a cached field where `0` means both "not read" and "unknown", two same-typed numbers with different meanings side by side. The type owns the rule; callers do not re-check it.
@@ -35,7 +35,7 @@ Coverage must stay at 100% of reachable statements (`make cover`; exclusions onl
 
 ## 3. Documentation
 
-- [ ] The package documentation is current: doc comments on the exported API, `doc.go`, runnable examples (`example_test.go`) for new public entry points, and the README tables.
+- [ ] The documentation is current: doc comments on the exported API, runnable examples with checked output (`example_test.go`, `example_fake_test.go`; they run against the fake switch) for new public entry points, the README tables and the guides in `docs/`. `make pkgdoc` renders the package pages as pkg.go.dev shows them (HTML and text under `build/pkgdoc`); read the page of what you changed.
 - [ ] [`PROTOCOL.md`](PROTOCOL.md) describes the layout and its status (verified live on which firmware, vendor code only, or assumed).
 - [ ] **Hardware and firmware compatibility:** the one source is [`safety/compatibility.json`](safety/compatibility.json). Record there which hardware revision and firmware build the change was verified on, then run `make compat-table` to regenerate the README table. The firmware allow-list is read from the same file: a build becomes writable without the caller's opt-in only when a row with `"support": "verified"` names it, and only after it has really been verified on a switch.
 - [ ] `CHANGELOG.md` gets an entry at release time (`scripts/release.sh`), taken from the diff and not from memory; breaking changes are called out.
