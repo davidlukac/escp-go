@@ -11,21 +11,9 @@
 
 `escp` talks the switches' native UDP management protocol (ESCP), as spoken by the vendor's configuration utility. It reads and writes the settings of a TL-SG108E v6, finds switches on the network, validates every value before anything is sent, and ships the safety gates and a fake switch that a front end needs to use it responsibly. It is the library behind the [Terraform provider](https://github.com/davidlukac/terraform-provider-tplinkeasysmart) for these switches, and is written to be reused by a command line client and by other programs.
 
-**Status: version 0.** The API may change in any minor version until 1.0; [CHANGELOG.md](CHANGELOG.md) lists every change (see also the stability section of the package documentation). Which hardware and firmware it was verified on is in the [compatibility table](#compatibility); the wire format is in [PROTOCOL.md](PROTOCOL.md).
+**Status: version 0.** The API may change in any minor version until 1.0; [CHANGELOG.md](CHANGELOG.md) lists every change. Which hardware and firmware it was verified on is in the [compatibility table](#compatibility); the wire format is in [PROTOCOL.md](PROTOCOL.md).
 
-> **The switch is real network equipment with no console.** A wrong write can cut the management path or the uplink, and recovery is a physical factory reset. Read [Writing safely](#writing-safely) before the first write.
-
-## Packages
-
-| Package | What it is | Public |
-|---|---|---|
-| `escp` (the repository root) | the client, the domain types, validators, `Discover` | yes |
-| `escp-go/safety` | write gates (firmware, ports, impact, dry run) and the compatibility table | yes |
-| `escp-go/escptest` | a fake switch on a loopback UDP port, for tests | yes |
-| `internal/wire` | packet codec, session crypto, the TLV catalogue | no |
-| `internal/udp` | sharing the reply port between sockets | no |
-
-The file layout inside `escp` (one file per setting) is described in the package overview, `go doc .`.
+> **The switch is real network equipment with no console.** A wrong write can cut the management path or the uplink, and recovery is a physical factory reset. Read [Writing safely](docs/writing-safely.md) before the first write.
 
 ## Install
 
@@ -33,14 +21,7 @@ The file layout inside `escp` (one file per setting) is described in the package
 go get github.com/davidlukac/escp-go
 ```
 
-```go
-import "github.com/davidlukac/escp-go"       // package escp
-import "github.com/davidlukac/escp-go/safety" // write gates and the compatibility table
-```
-
-Go 1.26 or later. The module has one dependency, `golang.org/x/sys` (to share the reply port). It is tested on Linux, macOS and Windows against a fake switch; FreeBSD builds. On a system without a port-sharing option only one client per host works at a time. Pin an exact version while the module is 0.x (see the stability note above).
-
-Read-only runnable example, which lists the switches on the network (and the ports of one when `ESCP_HOST`, `ESCP_USERNAME` and `ESCP_PASSWORD` are set): [`examples/discover`](examples/discover/main.go).
+Go 1.26 or later. The module has one dependency, `golang.org/x/sys` (to share the reply port). It is tested on Linux, macOS and Windows against a fake switch; FreeBSD builds. Pin an exact version while the module is 0.x.
 
 ## Quick start
 
@@ -49,54 +30,43 @@ c, err := escp.Dial(escp.Config{Host: "192.0.2.11", Username: "admin", Password:
 if err != nil { /* ... */ }
 defer c.Close()
 
-info, err := c.Info(ctx)     // model, firmware, MAC, address: no credentials needed
-ports, err := c.Ports(ctx)   // reads cannot change the switch
+info, err := c.Info(ctx)   // model, firmware, MAC, address: no credentials needed
+ports, err := c.Ports(ctx) // reads cannot change the switch
 for _, p := range ports {
 	fmt.Printf("port %d: %s (configured %s)\n", p.ID, p.ActualSpeed, p.ConfiguredSpeed)
 }
 ```
 
-- `Dial` sends nothing and binds no socket; the first call does the key exchange.
-- A `Client` is safe for concurrent use but sends one request at a time, because the switch answers one at a time. **Use one `Client` per switch.** Clients for different switches work side by side; two for the same switch fail (the switch keeps one session).
-- Every method takes a `context.Context`. Cancelling it stops the call, and nothing is written once it is done.
-- `Discover(ctx, DiscoverOptions{})` finds the switches on the local network without credentials or addresses.
-
-## Finding a switch by MAC address
-
-A switch's address can change; its MAC address does not. Put it in the configuration and the client pins the identity and finds the switch when it has to:
-
-```go
-mac, _ := escp.ParseMAC("00:00:5e:00:53:01") // escp.MAC: a comparable value, the zero value means "no MAC"
-c, err := escp.Dial(escp.Config{MAC: mac, Username: user, Password: pw}) // no Host: found by discovery on the first request
-```
-
-- With `Config.MAC` set, a device that answers with another MAC is refused (`ErrWrongSwitch`, naming both) and nothing is written to it. The MAC is checked on every reply, the key exchange's included.
-- With no `Host`, or a `Host` that stops answering, the client looks the switch up by its MAC (a discovery probe that stops at the first reply from that switch, normally under a second; `ErrNotFound` when nobody answers, after a second try of the lookup, because one right after a management move once missed a switch that was there). `escp.Locate(ctx, mac, opts)` is the same lookup for a front end.
-- `Dial` still sends nothing; the lookup happens on the first request.
-
-## Writing safely
-
-Every write follows the same steps: the arguments are validated and a bad value is refused before anything is sent (`errors.Is(err, escp.ErrInvalid)`); the optional **write gate** is asked; the write is sent with the credentials; a refusal by the switch is a `*RejectedError`.
+A write goes through the same client; give it a gate so that it cannot touch what you did not intend:
 
 ```go
 c, err := escp.Dial(escp.Config{
-	Host: host, Username: user, Password: pw,
-	WriteGate: safety.Chain(
-		safety.FirmwareGate(),               // only firmware builds this client was verified against
-		safety.MaxImpact(escp.ImpactTraffic), // nothing that can cut the management path
-		safety.PortGate(),                    // only ports with no link and no LAG
-	),
+	Host: host, Username: user, Password: escp.Password(pw),
+	WriteGate: safety.Chain(safety.FirmwareGate(), safety.MaxImpact(escp.ImpactTraffic), safety.PortGate()),
 })
 err = c.SetPort(ctx, escp.PortConfig{ID: 3, Enabled: true, Speed: escp.SpeedAuto})
-var refused *safety.PortUseError
-if errors.As(err, &refused) { /* the gate refused; nothing was sent */ }
 ```
 
-- A gate sees the `Operation` (the method, the ports it names, its `Impact`) and returns an error to refuse. Gates are plain functions: write your own, or combine with `safety.Chain`.
-- **Impact** is the worst the method can do with any arguments: `ImpactCosmetic` (LED, device description), `ImpactTraffic` (port settings, rate limits, storm control, QoS, IGMP, mirroring, VLAN groups) or `ImpactManagement` (the IP settings, the VLAN mode, PVIDs, link aggregation, loop prevention).
-- `safety.NewDryRun()` records the operations a command would perform and sends none of them; it still needs a reachable switch, because some writers read first.
-- The client does not know which ports carry traffic and, apart from `SetIPConfig`, does not read back after a write. Deciding whether a write is prudent (`safety.UseOf` says what a port is used for) and verifying the result are the caller's job.
-- **Restoring is explicit.** There is no "reset": to put a setting back, write the value you recorded.
+The examples in the [package documentation](https://pkg.go.dev/github.com/davidlukac/escp-go) run against the fake switch and show their output; [`examples/discover`](examples/discover/main.go) is a small read-only program for a real network.
+
+## Guides
+
+| | |
+|---|---|
+| [Getting started](docs/getting-started.md) | connect, find switches, find a switch by its MAC address |
+| [Writing safely](docs/writing-safely.md) | what a write does; gates, impact classes, dry run |
+| [Errors](docs/errors.md) | telling the failures apart |
+| [Logging](docs/logging.md) | routing the library's log lines into yours |
+| [Testing](docs/testing.md) | the fake switch, `escptest` |
+| [Architecture](docs/architecture.md) | the code layout and conventions, for contributors |
+
+## Packages
+
+| Package | What it is |
+|---|---|
+| `escp-go` (package `escp`) | the client, the domain types, validators, `Discover` |
+| `escp-go/safety` | write gates (firmware, ports, impact, dry run) and the compatibility table |
+| `escp-go/escptest` | a fake switch on a loopback UDP port, for tests |
 
 ## What it can read and write
 
@@ -121,60 +91,12 @@ if errors.As(err, &refused) { /* the gate refused; nothing was sent */ }
 
 Deliberately **not** offered: user account, config restore, reboot, factory reset and firmware upgrade.
 
-## Data structures
+## Data you get back
 
-- **Ports are numbers from 1**: a `PortID` for one, a `PortSet` for a set (a comparable value held as the wire bitmap: no duplicates, ascending, `Union`/`Minus`/`Intersect`, `escp.NewPortSet(2, 3)` refuses a port outside 1 to `MaxPort`). A record that *is* a port has `ID` (`Port`, `PortConfig`, `PortStats`); a record that *refers to* a port has `Port` (`PortBandwidth`, `PortStorm`, `PortPVID`, `PortPriority`); a port with a role is named for it (`MTUVLAN.UplinkPort`, `Mirror.MirrorPort`).
+- **Ports are numbers from 1**: a `PortID` for one, a `PortSet` for a set (a comparable value held as the wire bitmap: no duplicates, ascending, `Union`/`Minus`/`Intersect`; `escp.NewPortSet(2, 3)` refuses a port outside 1 to `MaxPort`).
 - **Closed sets are types** with `String`, `Parse...`, `Valid` and a list function: `Speed` (`ConfigurableSpeeds`), `QoSMode` (`QoSModes`), `Priority` (1 to 4, as the web UI shows it), `VLANMode` (`VLANModes`). The spellings are the web UI's and the Terraform provider's; consumers keep them in saved state, so they do not change.
 - **Readers return values, not pointers.** Counters in `PortStats` are the switch's 32-bit counters and wrap.
-- **Limits and validators are public** so a front end can refuse a bad value before it reaches the client: `PortID.Validate`, `VLANID.Validate`, `Kbps.Validate`, `VLANName.Validate`, `Hostname.Validate`, `LAG.Validate`, `IPConfig.Validate`, `VLANModeSetting.Validate`, and the constants they use (`MaxPort`, `RateStepKbps`, `MaxBandwidthKbps`, `LAGGroupCount`, ...).
-
-## Errors
-
-Test with `errors.Is` and `errors.As`, never by message.
-
-| Error | Meaning |
-|---|---|
-| `ErrInvalid` | an argument was refused before any write was sent; the message names the value and what is allowed |
-| `ErrNoReply` | the switch did not answer in time |
-| `ErrRejected`, `*RejectedError` | the switch refused a write; the error carries the code (and, for the known ones, the reason) |
-| `ErrMoveUnconfirmed` | `SetIPConfig` lost track of the switch: look at both addresses before believing either |
-| `ErrNoInterface` | `Discover` has nowhere to send |
-| `ErrInvalidConfig` | a configuration backup that is not one |
-| `ErrReplyTooLarge` | a fragmented reply bigger than any switch sends |
-| `ErrWrongSwitch`, `*WrongSwitchError` | the device that answered is not the switch `Config.MAC` names; nothing was written to it |
-| `ErrNotFound` | no switch with that MAC answered a discovery probe |
-| `*safety.FirmwareError`, `*safety.PortUseError`, `*safety.ImpactError` | a gate refused; nothing was sent |
-
-## Testing against a fake switch
-
-`escptest` starts a UDP server on a loopback port that speaks the protocol (RSA key exchange, RC4, TLVs, fragments) and can misbehave on request (dropped packets, a mute switch, a switch that leaves after an address change, a broken backup). It is the same fake the library's own tests use.
-
-```go
-func TestMyCode(t *testing.T) {
-	f := escptest.Start(t)
-	f.EnableModel(map[int]escptest.LinkSpeed{1: escptest.Link1000Full}) // a stateful switch that enforces the measured rules
-	c, _ := escp.Dial(escp.Config{Host: "127.0.0.1", SwitchPort: f.Port(), HostPort: escptest.FreeUDPPort(t),
-		BroadcastAddr: escptest.Loopback(), Username: escptest.Username, Password: escptest.Password})
-	// ... use c, then ask f what it received: f.WriteCount(), f.AllSets()
-}
-```
-
-`SwitchPort`, `HostPort` and `BroadcastAddr` exist only for this; a real switch always uses 29808 and 29809.
-
-## Logging
-
-`Config.Logger` and `DiscoverOptions.Logger` take a `*slog.Logger`; the library logs nowhere else, and nil discards. You own the format, destination and level, so the library's lines look like the rest of your logs:
-
-```go
-logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
-client, err := escp.Dial(escp.Config{ /* ... */ Logger: logger.With("request_id", id)})
-```
-
-- **Identification.** Every line carries `component=escp` (the logger name of other frameworks); filter on it to keep or drop the library's lines. A client also attaches `host` and `mac`.
-- **Context fields.** What you attach with `Logger.With` comes along on every line. Every message is logged with the call's context (`...Context` methods), so a handler can add what lives there (trace id, tenant): the mapped diagnostic context of log4j and friends.
-- **Levels** are slog's four. Debug is the protocol (each request and reply: operation, sequence number, TLV types and sizes, never values), Info the lifecycle (session, lookup by MAC, writes), Warn a recoverable anomaly (lost packet, repeated download). Error is not used: failures are returned. Handlers for zap, zerolog and logr exist (`zapslog`, `logr.FromSlogHandler` and their kin) if your program does not use slog.
-- **Attribute names are the contract** (lower snake case, one meaning each). New ones can be added in any release, for example for hardware with PoE; none is renamed or removed before a major version. Message texts may change.
-- No message carries the password, user name or session key. The Terraform provider routes the logger to `tflog`. A `forbidigo` lint rule keeps `fmt.Print*` and `log.*` out of the package.
+- **Limits and validators are public** so a front end can refuse a bad value before it reaches the client: every input type has a `Validate` method (`PortID`, `VLANID`, `Kbps`, `VLANName`, `Hostname`, `LAG`, `IPConfig`, `VLANModeSetting`), and the constants they use are exported (`MaxPort`, `RateStepKbps`, `MaxBandwidthKbps`, `LAGGroupCount`, ...).
 
 ## Compatibility
 
@@ -201,4 +123,4 @@ This is an independent project. It is not affiliated with, endorsed by or suppor
 
 ## See also
 
-[PROTOCOL.md](PROTOCOL.md) (wire format and measured behaviour) · [CONTRIBUTING.md](CONTRIBUTING.md) (how to add or change a setting) · `go doc -all .` and `pkgsite` for the full reference.
+[Documentation index](docs/README.md) · [PROTOCOL.md](PROTOCOL.md) (wire format and measured behaviour) · [CONTRIBUTING.md](CONTRIBUTING.md) (how to add or change a setting) · [RELEASING.md](RELEASING.md) · [SECURITY.md](SECURITY.md)
