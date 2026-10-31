@@ -314,7 +314,7 @@ func TestRun(t *testing.T) {
 		{"badge prints the json", []string{"badge", good, root}, exitOK, `"message":"100.0%"`, ""},
 		{"no arguments explain the usage", nil, exitUsage, "", "usage: coverpolicy"},
 		{"an unknown command explains the usage", []string{"frobnicate", good}, exitUsage, "", "usage: coverpolicy"},
-		{"a missing profile", []string{"check", filepath.Join(root, "nope.out"), root}, exitUsage, "", "no such file"},
+		{"a missing profile", []string{"check", filepath.Join(root, "nope.out"), root}, exitUsage, "", "nope.out"},
 		{"a directory without go.mod", []string{"check", good, t.TempDir()}, exitUsage, "", "reading the module path"},
 		{"an unparseable profile", []string{"check", garbled, root}, exitUsage, "", "unparseable cover profile line"},
 	} {
