@@ -1,12 +1,18 @@
-# Publishes a version of the library. Manual only: pushing a tag publishes nothing by itself
-# for Go (the module proxy serves any tag of a public repository), this workflow checks the tag
-# and writes the GitHub release whose notes are the CHANGELOG section of that version.
+# Publishes a version of the library when its tag is pushed. For Go the tag on the public
+# repository is the release (the module proxy serves any tag), so this workflow does what is left:
+# it checks the tag, re-runs the checks on the tagged tree, writes the GitHub release whose notes
+# are the CHANGELOG section of that version, then asks the proxy and pkg.go.dev for the version and
+# proves that a fresh module can install it and build against all three packages.
 #
 # Procedure (RELEASING.md): the release PR is merged, `scripts/release.sh --tag X.Y.Z` tags the merge
-# commit, the owner pushes that tag, then:  gh workflow run release.yml -f tag=vX.Y.Z
+# commit, the owner pushes that tag (the owner's go-ahead is what publishes). To re-run for a tag
+# that exists (a failed step, a version released before this workflow did all of it):
+#   gh workflow run release.yml -f tag=vX.Y.Z      (every step is safe to repeat)
 name: Release
 
 on:
+  push:
+    tags: ["v*"]
   workflow_dispatch:
     inputs:
       tag:
@@ -19,13 +25,14 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
-      TAG: ${{ inputs.tag }}
+      TAG: ${{ inputs.tag || github.ref_name }}
+      MODULE: github.com/davidlukac/escp-go
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: refs/tags/${{ inputs.tag }}
+          ref: refs/tags/${{ inputs.tag || github.ref_name }}
           fetch-depth: 0
       - name: The tag is a version and is on main
         run: |
@@ -50,4 +57,45 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$TAG" --verify-tag --title "$TAG" --notes-file notes.md
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "the release $TAG exists already"
+          else
+            gh release create "$TAG" --verify-tag --title "$TAG" --notes-file notes.md
+          fi
+      # The proxy fetches a version the first time anyone asks. Ask now, so the version is cached
+      # and listed for pkg.go.dev, and retry: a new tag can take a moment to be visible.
+      - name: The module proxy serves the version
+        run: |
+          for i in 1 2 3 4 5 6; do
+            GOWORK=off GOFLAGS=-mod=mod GOPROXY=https://proxy.golang.org go list -m "$MODULE@$TAG" && exit 0
+            echo "not served yet, attempt $i"; sleep 20
+          done
+          exit 1
+      - name: A fresh module installs it and builds against every package
+        run: |
+          dir="$(mktemp -d)"
+          cd "$dir"
+          cat > main.go <<'GO'
+          package main
+
+          import (
+          	"fmt"
+
+          	"github.com/davidlukac/escp-go"
+          	"github.com/davidlukac/escp-go/escptest"
+          	"github.com/davidlukac/escp-go/safety"
+          )
+
+          func main() {
+          	mac, err := escp.ParseMAC("00:00:5e:00:53:01")
+          	fmt.Println(mac, err, safety.FirmwareGate() != nil, escptest.Username)
+          }
+          GO
+          go mod init example.com/consumer
+          GOWORK=off GOFLAGS=-mod=mod GOPROXY=https://proxy.golang.org go get "$MODULE@$TAG"
+          GOWORK=off GOPROXY=https://proxy.golang.org go run .
+      # pkg.go.dev indexes new versions from the proxy by itself; this asks it to do so now. Not
+      # fatal: the page appears either way.
+      - name: Ask pkg.go.dev to index the version
+        continue-on-error: true
+        run: curl -fsS -X POST "https://pkg.go.dev/fetch/$MODULE@$TAG"

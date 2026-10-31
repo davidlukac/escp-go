@@ -14,16 +14,16 @@ How a version of the library is cut and published. Maintainers only.
 
 1. On a branch: `scripts/release.sh X.Y.Z "what changed for users"` adds the `CHANGELOG.md` entry, runs `make cover lint vuln` and commits only the CHANGELOG. For a release that changes how a setting is written to a switch, also run the live tests (`go test -tags live`, see the README) on a test switch and say so in the PR.
 2. Open the PR, wait for CI, squash merge.
-3. On `main`, once merged and pulled: `scripts/release.sh --tag X.Y.Z` tags the merge commit locally. Push **that one tag** (the owner's go-ahead is needed).
-4. `gh workflow run release.yml -f tag=vX.Y.Z` re-runs the checks on the tagged tree and creates the GitHub release with the CHANGELOG section as its notes.
+3. On `main`, once merged and pulled: `scripts/release.sh --tag X.Y.Z` tags the merge commit locally. Push **that one tag** (the owner's go-ahead is needed: the push is what publishes).
+4. The tag push starts `release.yml`, which does the rest: it checks that the tag is a version on `main`, re-runs `make cover lint vuln` on the tagged tree, creates the GitHub release with the CHANGELOG section as its notes, waits until `proxy.golang.org` serves the version, installs it in a fresh module and builds a program against `escp`, `safety` and `escptest`, and asks pkg.go.dev to index it. Watch it: `gh run watch`. To repeat it for an existing tag: `gh workflow run release.yml -f tag=vX.Y.Z` (every step is safe to repeat).
 
 ## Publishing
 
-There is no registry upload. The tag on the public repository is the release:
+There is no registry upload. The tag on the public repository is the release, and `release.yml` proves it is installable. By hand, the same checks are:
 
-- `proxy.golang.org` fetches a version the first time anyone asks for it. Ask once, so the version is cached and pkg.go.dev indexes it: `GOPROXY=https://proxy.golang.org go list -m github.com/davidlukac/escp-go@vX.Y.Z`.
-- Check it from a scratch module: `go mod init scratch && go get github.com/davidlukac/escp-go@vX.Y.Z && go build`.
-- pkg.go.dev shows the documentation once the license is detected (MIT).
+- `GOPROXY=https://proxy.golang.org go list -m github.com/davidlukac/escp-go@vX.Y.Z` (caches the version in the proxy).
+- In a scratch module: `go get github.com/davidlukac/escp-go@vX.Y.Z` and build something that imports the packages.
+- `curl -X POST https://pkg.go.dev/fetch/github.com/davidlukac/escp-go@vX.Y.Z` asks pkg.go.dev to index it; the page shows the documentation once the license is detected (MIT).
 - Consumers (the provider, the command line client) bump with Dependabot or `go get`.
 
 ## Local development with a consumer
