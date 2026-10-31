@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/escptest"
+	"github.com/davidlukac/escp-go/escptest"
 )
 
 func TestRejectedErrorNamesTheCodeAndMatchesErrAuth(t *testing.T) {

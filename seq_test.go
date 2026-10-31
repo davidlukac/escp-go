@@ -3,7 +3,7 @@ package escp
 import (
 	"testing"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
+	"github.com/davidlukac/escp-go/internal/wire"
 )
 
 // Every random input maps into its own range, and the two ranges share no number: a reply to a

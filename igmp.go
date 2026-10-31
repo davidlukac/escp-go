@@ -7,7 +7,7 @@ import (
 	"net"
 	"net/netip"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
+	"github.com/davidlukac/escp-go/internal/wire"
 )
 
 // Layout of a learned multicast group entry (TLV 4353): IPv4 address, VLAN id

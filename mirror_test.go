@@ -5,8 +5,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/escptest"
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
+	"github.com/davidlukac/escp-go/escptest"
+	"github.com/davidlukac/escp-go/internal/wire"
 )
 
 // A source port outside 1 to MaxPort cannot be put in a PortSet at all (see portset_test); the

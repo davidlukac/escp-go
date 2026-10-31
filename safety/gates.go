@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
+	"github.com/davidlukac/escp-go"
 )
 
 // Chain combines write gates into one that asks each in turn and stops at the first refusal. A

@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/escptest"
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/safety"
+	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/escptest"
+	"github.com/davidlukac/escp-go/internal/wire"
+	"github.com/davidlukac/escp-go/safety"
 )
 
 // The gates of the safety package, composed as a front end would, against the real client and the

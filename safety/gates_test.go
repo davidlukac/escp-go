@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
+	"github.com/davidlukac/escp-go"
 )
 
 var errFirst, errSecond = errors.New("first gate"), errors.New("second gate")

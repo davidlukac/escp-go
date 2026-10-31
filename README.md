@@ -2,7 +2,7 @@
 
 `escp` talks the switches' native UDP management protocol (ESCP), as spoken by the vendor's configuration utility. It reads and writes the settings of a TL-SG108E v6, finds switches on the network, validates every value before anything is sent, and ships the safety gates and a fake switch that a front end needs to use it responsibly. It is the library behind the [Terraform provider](../../README.md) in this repository, and is written to be reused by a command line client and by other programs.
 
-**Status: version 0.** The package lives under `internal/` and may change without notice until it is extracted into a module of its own and released as 1.0 (see the stability section of the package documentation). Which hardware and firmware it was verified on is in the [compatibility table](../../README.md#compatibility); the wire format is in [PROTOCOL.md](PROTOCOL.md).
+**Status: version 0.** The package lives under `internal/` and may change without notice until it is extracted into a module of its own and released as 1.0 (see the stability section of the package documentation). Which hardware and firmware it was verified on is in the [compatibility table](#compatibility); the wire format is in [PROTOCOL.md](PROTOCOL.md).
 
 > **The switch is real network equipment with no console.** A wrong write can cut the management path or the uplink, and recovery is a physical factory reset. Read [Writing safely](#writing-safely) before the first write.
 
@@ -151,6 +151,21 @@ client, err := escp.Dial(escp.Config{ /* ... */ Logger: logger.With("request_id"
 - **Levels** are slog's four. Debug is the protocol (each request and reply: operation, sequence number, TLV types and sizes, never values), Info the lifecycle (session, lookup by MAC, writes), Warn a recoverable anomaly (lost packet, repeated download). Error is not used: failures are returned. Handlers for zap, zerolog and logr exist (`zapslog`, `logr.FromSlogHandler` and their kin) if your program does not use slog.
 - **Attribute names are the contract** (lower snake case, one meaning each). New ones can be added in any release, for example for hardware with PoE; none is renamed or removed before a major version. Message texts may change.
 - No message carries the password, user name or session key. The Terraform provider routes the logger to `tflog`, so `TF_LOG=DEBUG terraform plan` shows what the client does. A `forbidigo` lint rule keeps `fmt.Print*` and `log.*` out of the package.
+
+## Compatibility
+
+<!-- compatibility-table:begin (generated from safety/compatibility.json: make compat-table) -->
+
+| Switch | Hardware | Firmware | Status |
+|---|---|---|---|
+| TL-SG108E | v6 | 1.0.0 Build 20230218 | **Verified**: reads, writes, import and drift checked on a real device. The VLAN mode, 802.1Q group and PVID resources were not tried on this build (they are verified on 20250710; same protocol generation). |
+| TL-SG108E | v6 | 1.0.0 Build 20250710 | **Verified**: reads, imports and drift; the writes on unused ports (including mirror egress, unknown-unicast storm control and the VLAN mode, 802.1Q VLAN and PVID resources), the management address and the DHCP lease (the switch found again by its MAC address). LAG creation works as on 20230218 (group 1 takes ports 1-4, group 2 ports 5-8; see the `lag` page). |
+| TL-SG108E | v6 | builds newer than 20250710 | Untried; reads work, writes are refused unless `allow_unverified_firmware = true`; start with the read-only data sources |
+| TL-SG108E | other hardware versions | any | Untested |
+| Other Easy Smart models (TL-SG105E, TL-SG1016DE, ...) | any | any | Untested; reports wanted |
+| Any | any | firmware **before the 2023 RSA key exchange** | Not supported: the client always performs the key exchange and has never been tried against the older login |
+
+<!-- compatibility-table:end -->
 
 ## Security
 

@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/escptest"
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
+	"github.com/davidlukac/escp-go/escptest"
+	"github.com/davidlukac/escp-go/internal/wire"
 )
 
 // A call whose context is already cancelled sends nothing: not the key exchange, not the write.

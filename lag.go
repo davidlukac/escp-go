@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
+	"github.com/davidlukac/escp-go/internal/wire"
 )
 
 // Layout of a LAG entry (TLV 4608): group id (1 byte), member port mask (maskLen bytes).

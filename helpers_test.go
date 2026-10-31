@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/escptest"
+	"github.com/davidlukac/escp-go/escptest"
 )
 
 // newBoundClient dials a client on a free local port and binds its socket

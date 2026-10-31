@@ -3,7 +3,7 @@ package safety
 import (
 	"fmt"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
+	"github.com/davidlukac/escp-go"
 )
 
 // PortUse is what a write to one port could disturb. It states facts only: how a

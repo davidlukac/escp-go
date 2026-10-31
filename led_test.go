@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/escptest"
+	"github.com/davidlukac/escp-go/escptest"
 )
 
 func TestLEDRoundTrip(t *testing.T) {

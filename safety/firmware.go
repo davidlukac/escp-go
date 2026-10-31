@@ -6,7 +6,7 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
+	"github.com/davidlukac/escp-go"
 )
 
 // verifiedFirmwareBuilds is the allow-list behind VerifiedFirmwareBuilds: the builds of the

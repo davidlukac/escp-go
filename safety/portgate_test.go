@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
+	"github.com/davidlukac/escp-go"
 )
 
 // switchView is a switch as the gate can read it, counting the reads.

@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/udp"
+	"github.com/davidlukac/escp-go/internal/udp"
 )
 
 // Client talks ESCP to one switch. It is safe for concurrent use; requests

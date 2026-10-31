@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/escptest"
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
+	"github.com/davidlukac/escp-go/escptest"
+	"github.com/davidlukac/escp-go/internal/wire"
 )
 
 // The fake can only answer from 127.0.0.1, so a "move" here changes the mask and the gateway

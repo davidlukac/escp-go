@@ -13,8 +13,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/udp"
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
+	"github.com/davidlukac/escp-go/internal/udp"
+	"github.com/davidlukac/escp-go/internal/wire"
 )
 
 // defaultDiscoverWindow is how long Discover listens when DiscoverOptions.Window is zero.

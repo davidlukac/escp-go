@@ -7,7 +7,7 @@ import (
 	"net/netip"
 	"time"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
+	"github.com/davidlukac/escp-go/internal/wire"
 )
 
 // Info asks the switch to describe itself with a discovery probe: model, firmware, hardware,

@@ -3,7 +3,7 @@ package escp
 import (
 	"context"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
+	"github.com/davidlukac/escp-go/internal/wire"
 )
 
 // VLANMode is which of the switch's three VLAN modes is active. They exclude each other: the

@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/escptest"
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
+	"github.com/davidlukac/escp-go/escptest"
+	"github.com/davidlukac/escp-go/internal/wire"
 )
 
 // discoverTLVs is the body of a discovery reply for a switch with the given MAC, address and name.

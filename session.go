@@ -9,7 +9,7 @@ import (
 	"math/big"
 	"net"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
+	"github.com/davidlukac/escp-go/internal/wire"
 )
 
 // randReader is the entropy source for session keys; tests replace it to

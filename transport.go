@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
+	"github.com/davidlukac/escp-go/internal/wire"
 )
 
 // maxDatagram is the receive buffer size; ESCP packets are well below it.

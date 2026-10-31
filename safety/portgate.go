@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
+	"github.com/davidlukac/escp-go"
 )
 
 // ErrCannotCheckPorts is what PortGate returns when it cannot establish what the ports are used

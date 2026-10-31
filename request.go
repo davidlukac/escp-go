@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
+	"github.com/davidlukac/escp-go/internal/wire"
 )
 
 func boolByte(b bool) byte {

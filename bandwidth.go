@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
+	"github.com/davidlukac/escp-go/internal/wire"
 )
 
 // PortBandwidth holds a port's rate limits in kbps; 0 means unlimited.

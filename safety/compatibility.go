@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
+	"github.com/davidlukac/escp-go"
 )
 
 // Support says how far a hardware and firmware combination has been verified.

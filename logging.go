@@ -3,7 +3,7 @@ package escp
 import (
 	"log/slog"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
+	"github.com/davidlukac/escp-go/internal/wire"
 )
 
 // The library logs through the *slog.Logger the caller passes in Config.Logger (clients) or

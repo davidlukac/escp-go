@@ -7,7 +7,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
+	"github.com/davidlukac/escp-go/internal/wire"
 )
 
 // Everything below parses or transforms bytes that arrive over the network.

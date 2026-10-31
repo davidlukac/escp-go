@@ -8,13 +8,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
+	"github.com/davidlukac/escp-go"
 )
 
 var updateReadme = flag.Bool("update-readme", false, "rewrite the compatibility table in README.md from compatibility.json")
 
 const (
-	readmeBegin = "<!-- compatibility-table:begin (generated from internal/escp/safety/compatibility.json: make compat-table) -->"
+	readmeBegin = "<!-- compatibility-table:begin (generated from safety/compatibility.json: make compat-table) -->"
 	readmeEnd   = "<!-- compatibility-table:end -->"
 )
 
@@ -96,7 +96,7 @@ func TestRenderCompatibility(t *testing.T) {
 // The README shows the table generated from compatibility.json, so the documentation cannot
 // differ from what the firmware gate enforces. `make compat-table` rewrites it.
 func TestReadmeCompatibilityTable(t *testing.T) {
-	path := filepath.Join("..", "..", "..", "README.md")
+	path := filepath.Join("..", "README.md")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)

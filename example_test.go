@@ -8,8 +8,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/safety"
+	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/safety"
 )
 
 // The examples that talk to a switch have no Output comment, so they are compiled but never

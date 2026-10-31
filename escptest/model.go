@@ -3,7 +3,7 @@ package escptest
 import (
 	"encoding/binary"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp/internal/wire"
+	"github.com/davidlukac/escp-go/internal/wire"
 )
 
 // LinkSpeed is the actual speed code of a port that has a link, as the switch reports it

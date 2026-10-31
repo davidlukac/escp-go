@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/davidlukac/terraform-provider-tplinkeasysmart/internal/escp"
+	"github.com/davidlukac/escp-go"
 )
 
 func TestUseOf(t *testing.T) {
