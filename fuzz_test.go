@@ -123,7 +123,7 @@ func FuzzAcceptDatagram(f *testing.F) {
 // FuzzParseMAC: no text makes ParseMAC panic, and whatever it accepts prints back as the lower-case
 // colon form that parses to the same value.
 func FuzzParseMAC(f *testing.F) {
-	for _, s := range []string{"c0:3a:55:6c:81:61", "C0-3A-55-6C-81-61", "", "c03a556c8161", "c0:3a-55:6c:81:61", "0000.5e00.5301"} {
+	for _, s := range []string{"00:00:5e:00:53:01", "00-00-5E-00-53-01", "", "00005e005301", "00:00-5e:00:53:01", "0000.5e00.5301"} {
 		f.Add(s)
 	}
 	f.Fuzz(func(t *testing.T, s string) {
