@@ -62,11 +62,11 @@ The examples in the [package documentation](https://pkg.go.dev/github.com/davidl
 
 ## Packages
 
-| Package | What it is |
-|---|---|
-| `escp-go` (package `escp`) | the client, the domain types, validators, `Discover` |
-| `escp-go/safety` | write gates (firmware, ports, impact, dry run) and the compatibility table |
-| `escp-go/escptest` | a fake switch on a loopback UDP port, for tests |
+| Package | Import path | What it is |
+|---|---|---|
+| `escp` | `github.com/davidlukac/escp-go` | the client, the domain types, validators, `Discover` |
+| `safety` | `github.com/davidlukac/escp-go/safety` | write gates (firmware, ports, impact, dry run) and the compatibility table |
+| `escptest` | `github.com/davidlukac/escp-go/escptest` | a fake switch on a loopback UDP port, for tests |
 
 ## What it can read and write
 
