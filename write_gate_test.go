@@ -43,10 +43,10 @@ var writeCalls = map[string]func(context.Context, *Client) error{
 		return c.SetStormControl(ctx, StormConfig{Port: 2, UnknownUnicast: true, Multicast: false, Broadcast: false, RateKbps: 64})
 	},
 	"SetHostname": func(ctx context.Context, c *Client) error { return c.SetHostname(ctx, "sw-test") },
-	"SetVLAN8021Q": func(ctx context.Context, c *Client) error {
-		return c.SetVLAN8021Q(ctx, VLAN8021Q{ID: 10, Name: "test", Untagged: MustPortSet(2)})
+	"SetDot1QVLAN": func(ctx context.Context, c *Client) error {
+		return c.SetDot1QVLAN(ctx, Dot1QVLAN{ID: 10, Name: "test", Untagged: MustPortSet(2)})
 	},
-	"DeleteVLAN8021Q": func(ctx context.Context, c *Client) error { return c.DeleteVLAN8021Q(ctx, 10) },
+	"DeleteDot1QVLAN": func(ctx context.Context, c *Client) error { return c.DeleteDot1QVLAN(ctx, 10) },
 	"SetPVIDs":        func(ctx context.Context, c *Client) error { return c.SetPVIDs(ctx, map[PortID]VLANID{2: 1}) },
 	"SetVLANMode": func(ctx context.Context, c *Client) error {
 		return c.SetVLANMode(ctx, VLANModeSetting{Mode: VLANModeMTU, UplinkPort: 8})
@@ -230,8 +230,8 @@ var writeOperations = map[string]Operation{
 	"SetQoSMode":        {Name: "SetQoSMode", Impact: ImpactTraffic},
 	"SetPortPriorities": {Name: "SetPortPriorities", Ports: MustPortSet(2), Impact: ImpactTraffic},
 	"SetStormControl":   {Name: "SetStormControl", Ports: MustPortSet(2), Impact: ImpactTraffic},
-	"SetVLAN8021Q":      {Name: "SetVLAN8021Q", Ports: MustPortSet(2), Impact: ImpactTraffic, Replaces: GroupDot1QVLAN, ID: 10},
-	"DeleteVLAN8021Q":   {Name: "DeleteVLAN8021Q", Impact: ImpactTraffic, Replaces: GroupDot1QVLAN, ID: 10},
+	"SetDot1QVLAN":      {Name: "SetDot1QVLAN", Ports: MustPortSet(2), Impact: ImpactTraffic, Replaces: GroupDot1QVLAN, ID: 10},
+	"DeleteDot1QVLAN":   {Name: "DeleteDot1QVLAN", Impact: ImpactTraffic, Replaces: GroupDot1QVLAN, ID: 10},
 	"SetPortBasedVLAN":  {Name: "SetPortBasedVLAN", Ports: MustPortSet(3, 4), Impact: ImpactTraffic, Replaces: GroupPortVLAN, ID: 2},
 	"SetLAG":            {Name: "SetLAG", Ports: MustPortSet(2, 3), Impact: ImpactManagement, Replaces: GroupLAG, ID: 1},
 	"SetLoopPrevention": {Name: "SetLoopPrevention", Impact: ImpactManagement},
@@ -296,7 +296,7 @@ func TestOperationPortsFollowTheArguments(t *testing.T) {
 		}, MustPortSet(5, 1, 2, 3)},
 		{"a disabled mirror names none", func(c *Client) error { return c.SetPortMirror(ctx, Mirror{}) }, 0},
 		{"an 802.1Q VLAN names its tagged and its untagged ports", func(c *Client) error {
-			return c.SetVLAN8021Q(ctx, VLAN8021Q{ID: 20, Tagged: MustPortSet(8), Untagged: MustPortSet(3, 4)})
+			return c.SetDot1QVLAN(ctx, Dot1QVLAN{ID: 20, Tagged: MustPortSet(8), Untagged: MustPortSet(3, 4)})
 		}, MustPortSet(8, 3, 4)},
 		{"several PVIDs are all named", func(c *Client) error { return c.SetPVIDs(ctx, map[PortID]VLANID{6: 1, 2: 1, 4: 1}) }, MustPortSet(2, 4, 6)},
 		{"several priorities are all named", func(c *Client) error {
@@ -363,7 +363,7 @@ func TestARemovedGroupIsStillReportedAsReplaced(t *testing.T) {
 	}{
 		{"LAG", func(c *Client) error { return c.SetLAG(ctx, 2, 0) }, Operation{Name: "SetLAG", Impact: ImpactManagement, Replaces: GroupLAG, ID: 2}},
 		{"port-based VLAN", func(c *Client) error { return c.SetPortBasedVLAN(ctx, 3, 0) }, Operation{Name: "SetPortBasedVLAN", Impact: ImpactTraffic, Replaces: GroupPortVLAN, ID: 3}},
-		{"802.1Q VLAN", func(c *Client) error { return c.DeleteVLAN8021Q(ctx, 20) }, Operation{Name: "DeleteVLAN8021Q", Impact: ImpactTraffic, Replaces: GroupDot1QVLAN, ID: 20}},
+		{"802.1Q VLAN", func(c *Client) error { return c.DeleteDot1QVLAN(ctx, 20) }, Operation{Name: "DeleteDot1QVLAN", Impact: ImpactTraffic, Replaces: GroupDot1QVLAN, ID: 20}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

@@ -116,7 +116,7 @@ if errors.As(err, &refused) { /* the gate refused; nothing was sent */ }
 | VLAN mode | `VLANMode` | `SetVLANMode` | `VLANMode`, `VLANModeSetting` | management |
 | MTU VLAN | `MTUVLAN` | (through `SetVLANMode`) | `MTUVLAN` | |
 | Port-based VLAN | `PortBasedVLAN` | `SetPortBasedVLAN` | `PortBasedVLAN`, `PortVLAN` | traffic |
-| 802.1Q VLAN and PVID | `Dot1Q` | `SetVLAN8021Q`, `DeleteVLAN8021Q`, `SetPVIDs` | `Dot1Q`, `VLAN8021Q`, `PortPVID` | traffic, management |
+| 802.1Q VLAN and PVID | `Dot1Q` | `SetDot1QVLAN`, `DeleteDot1QVLAN`, `SetPVIDs` | `Dot1Q`, `Dot1QVLAN`, `PortPVID` | traffic, management |
 | Configuration file | `ConfigBackup` | (restore is not offered) | `ConfigFile` | |
 
 Deliberately **not** offered: user account, config restore, reboot, factory reset and firmware upgrade.
@@ -126,7 +126,7 @@ Deliberately **not** offered: user account, config restore, reboot, factory rese
 - **Ports are numbers from 1**: a `PortID` for one, a `PortSet` for a set (a comparable value held as the wire bitmap: no duplicates, ascending, `Union`/`Minus`/`Intersect`, `escp.NewPortSet(2, 3)` refuses a port outside 1 to `MaxPort`). A record that *is* a port has `ID` (`Port`, `PortConfig`, `PortStats`); a record that *refers to* a port has `Port` (`PortBandwidth`, `PortStorm`, `PortPVID`, `PortPriority`); a port with a role is named for it (`MTUVLAN.UplinkPort`, `Mirror.MirrorPort`).
 - **Closed sets are types** with `String`, `Parse...`, `Valid` and a list function: `Speed` (`ConfigurableSpeeds`), `QoSMode` (`QoSModes`), `Priority` (1 to 4, as the web UI shows it), `VLANMode` (`VLANModes`). The spellings are the web UI's and the Terraform provider's; consumers keep them in saved state, so they do not change.
 - **Readers return values, not pointers.** Counters in `PortStats` are the switch's 32-bit counters and wrap.
-- **Limits and validators are public** so a front end can refuse a bad value before it reaches the client: `PortID.Validate`, `VLANID.Validate`, `Kbps.Validate`, `VLANName.Validate`, `Hostname.Validate`, `ValidateLAG`, `ValidateIPConfig`, and the constants they use (`MaxPort`, `RateStepKbps`, `MaxBandwidthKbps`, `LAGGroupCount`, ...).
+- **Limits and validators are public** so a front end can refuse a bad value before it reaches the client: `PortID.Validate`, `VLANID.Validate`, `Kbps.Validate`, `VLANName.Validate`, `Hostname.Validate`, `LAG.Validate`, `IPConfig.Validate`, `VLANModeSetting.Validate`, and the constants they use (`MaxPort`, `RateStepKbps`, `MaxBandwidthKbps`, `LAGGroupCount`, ...).
 
 ## Errors
 

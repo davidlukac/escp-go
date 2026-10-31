@@ -87,22 +87,22 @@ func (g LAGID) Range() (first, last PortID) {
 	return PortID(int(g-1)*LAGPortsPerGroup + 1), PortID(int(g) * LAGPortsPerGroup)
 }
 
-// ValidateLAG checks a group number and member ports against the limits
-// above. An empty port set (removing the group) only needs a valid group.
-func ValidateLAG(group LAGID, ports PortSet) error {
-	if err := group.Validate(); err != nil {
+// Validate checks the group number and the member ports against the limits above. An empty
+// port set (removing the group) only needs a valid group. The error matches ErrInvalid.
+func (l LAG) Validate() error {
+	if err := l.ID.Validate(); err != nil {
 		return err
 	}
-	if ports.IsEmpty() {
+	if l.Ports.IsEmpty() {
 		return nil
 	}
-	if ports.Len() < LAGMinPorts || ports.Len() > LAGPortsPerGroup {
-		return invalidf("escp: a LAG takes %d to %d ports, got %d", LAGMinPorts, LAGPortsPerGroup, ports.Len())
+	if l.Ports.Len() < LAGMinPorts || l.Ports.Len() > LAGPortsPerGroup {
+		return invalidf("escp: a LAG takes %d to %d ports, got %d", LAGMinPorts, LAGPortsPerGroup, l.Ports.Len())
 	}
-	first, last := group.Range()
-	for _, p := range ports.Ports() {
+	first, last := l.ID.Range()
+	for _, p := range l.Ports.Ports() {
 		if p < first || p > last {
-			return invalidf("escp: port %d cannot be in LAG %d (LAG %d takes ports %d-%d)", p, group, group, first, last)
+			return invalidf("escp: port %d cannot be in LAG %d (LAG %d takes ports %d-%d)", p, l.ID, l.ID, first, last)
 		}
 	}
 	return nil
@@ -140,7 +140,7 @@ func (c *Client) LAGs(ctx context.Context) ([]LAG, error) {
 
 // SetLAG creates or replaces a link aggregation group: TLV 4608 with the group
 // id and the member port mask. An empty port set removes the group. Group
-// and ports are checked against ValidateLAG first. The switch itself refuses
+// and ports are checked against LAG.Validate first. The switch itself refuses
 // ports that conflict with mirroring, a port-based VLAN, a bandwidth limit or
 // storm control, and member ports that differ in speed, negotiation, flow control,
 // enabled state or (in port-based QoS mode) QoS priority, or that are half duplex;
@@ -149,7 +149,7 @@ func (c *Client) LAGs(ctx context.Context) ([]LAG, error) {
 // afterwards (see SetPort). Changing a group whose ports carry traffic can cut the
 // uplink; callers must guard against that.
 func (c *Client) SetLAG(ctx context.Context, group LAGID, ports PortSet) error {
-	if err := ValidateLAG(group, ports); err != nil {
+	if err := (LAG{ID: group, Ports: ports}).Validate(); err != nil {
 		return err
 	}
 	if err := c.requirePorts(ctx, ports); err != nil {

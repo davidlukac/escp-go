@@ -67,9 +67,9 @@ func (c *Client) VLANMode(ctx context.Context) (VLANModeSetting, error) {
 	return VLANModeFrom(mtu, pb.Enabled, q.Enabled), nil
 }
 
-// ValidateVLANMode checks a setting for SetVLANMode: one of VLANModes; for the MTU VLAN a
-// valid uplink port, for the others none.
-func ValidateVLANMode(s VLANModeSetting) error {
+// Validate checks the setting for SetVLANMode: one of VLANModes; for the MTU VLAN a valid
+// uplink port, for the others none. The error matches ErrInvalid.
+func (s VLANModeSetting) Validate() error {
 	switch s.Mode {
 	case VLANModeMTU:
 		return s.UplinkPort.Validate()
@@ -88,7 +88,7 @@ func ValidateVLANMode(s VLANModeSetting) error {
 // Callers must guard. With the MTU VLAN every port can only talk to the uplink port. Writing
 // the mode the switch already has is harmless but not skipped: compare with VLANMode first.
 func (c *Client) SetVLANMode(ctx context.Context, s VLANModeSetting) error {
-	if err := ValidateVLANMode(s); err != nil {
+	if err := s.Validate(); err != nil {
 		return err
 	}
 	var tlv wire.TLV
@@ -100,7 +100,7 @@ func (c *Client) SetVLANMode(ctx context.Context, s VLANModeSetting) error {
 		tlv = wire.TLV{Type: wire.TLVVLANMTU, Value: []byte{boolByte(true), byte(s.UplinkPort)}}
 	case VLANModePortBased:
 		tlv = wire.TLV{Type: wire.TLVVLANPortBased, Value: []byte{boolByte(true)}}
-	default: // VLANModeDot1Q: ValidateVLANMode refused every other mode
+	default: // VLANModeDot1Q: Validate refused every other mode
 		tlv = wire.TLV{Type: wire.TLVVLAN8021Q, Value: []byte{boolByte(true)}}
 	}
 	op := Operation{Name: "SetVLANMode", Impact: ImpactManagement}

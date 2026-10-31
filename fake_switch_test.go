@@ -133,8 +133,8 @@ func TestFakeModelVLANModesAndDot1Q(t *testing.T) {
 		t.Fatalf("mode = %v, want 802.1q and the others off", m)
 	}
 	// Two VLANs whose ids share a leading byte must stay apart.
-	for _, v := range []VLAN8021Q{{ID: 20, Name: "a", Untagged: MustPortSet(3)}, {ID: 21, Name: "b", Tagged: MustPortSet(4)}} {
-		if err := c.SetVLAN8021Q(ctx, v); err != nil {
+	for _, v := range []Dot1QVLAN{{ID: 20, Name: "a", Untagged: MustPortSet(3)}, {ID: 21, Name: "b", Tagged: MustPortSet(4)}} {
+		if err := c.SetDot1QVLAN(ctx, v); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -142,7 +142,7 @@ func TestFakeModelVLANModesAndDot1Q(t *testing.T) {
 	if err != nil || len(q.VLANs) != 3 || q.MaxVLAN == 0 || len(q.PVIDs) != 8 {
 		t.Fatalf("Dot1Q = %+v, %v; want VLAN 1, 20 and 21, a maximum and eight PVIDs", q, err)
 	}
-	if err := c.DeleteVLAN8021Q(ctx, 20); err != nil {
+	if err := c.DeleteDot1QVLAN(ctx, 20); err != nil {
 		t.Fatal(err)
 	}
 	if q, _ = c.Dot1Q(ctx); len(q.VLANs) != 2 || q.VLANs[1].ID != 21 {

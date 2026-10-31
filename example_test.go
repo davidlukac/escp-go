@@ -134,13 +134,13 @@ func ExampleQoSModes() {
 	// 2 dscp-802.1p
 }
 
-func ExampleValidateIPConfig() {
+func ExampleIPConfig_Validate() {
 	ok := escp.IPConfig{IP: netip.MustParseAddr("192.0.2.11"), Netmask: netip.MustParseAddr("255.255.255.0"), Gateway: netip.MustParseAddr("192.0.2.1")}
-	fmt.Println(escp.ValidateIPConfig(ok))
+	fmt.Println(ok.Validate())
 
 	bad := ok
 	bad.Gateway = netip.MustParseAddr("192.168.78.1") // another subnet: the switch would be unreachable
-	fmt.Println(escp.ValidateIPConfig(bad) != nil)
+	fmt.Println(bad.Validate() != nil)
 	// Output:
 	// <nil>
 	// true

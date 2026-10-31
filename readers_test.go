@@ -114,14 +114,14 @@ func readCases() []readCase {
 				th(wire.TLVVLANPortBased, "01"), {Type: wire.TLVVLANPortBasedVID, Value: []byte{1}}}},
 		},
 		{
-			name: "VLAN8021Q asks for the VLAN table and the PVIDs separately",
+			name: "Dot1QVLAN asks for the VLAN table and the PVIDs separately",
 			script: map[wire.TLVType][]wire.TLV{
 				wire.TLVVLAN8021QVLAN: {th(wire.TLVVLAN8021Q, "00"), th(wire.TLVVLAN8021QMax, "20")},
 				wire.TLVVLAN8021QPVID: {th(wire.TLVVLAN8021QPVID, "010001")},
 			},
 			requests: [][]wire.TLVType{{wire.TLVVLAN8021QVLAN}, {wire.TLVVLAN8021QPVID}},
 			call:     func(c *Client, ctx context.Context) (any, error) { return c.Dot1Q(ctx) },
-			want:     Dot1Q{MaxVLAN: 32, VLANs: []VLAN8021Q{}, PVIDs: []PortPVID{{Port: 1, PVID: 1}}},
+			want:     Dot1Q{MaxVLAN: 32, VLANs: []Dot1QVLAN{}, PVIDs: []PortPVID{{Port: 1, PVID: 1}}},
 			bad: map[wire.TLVType][]wire.TLV{
 				wire.TLVVLAN8021QVLAN: {th(wire.TLVVLAN8021Q, "01"), {Type: wire.TLVVLAN8021QVLAN, Value: []byte{0, 1}}},
 				wire.TLVVLAN8021QPVID: nil,

@@ -240,7 +240,7 @@ func cfgOf(ip, mask, gw string) IPConfig {
 	return IPConfig{IP: netip.MustParseAddr(ip), Netmask: netip.MustParseAddr(mask), Gateway: netip.MustParseAddr(gw)}
 }
 
-func TestValidateIPConfig(t *testing.T) {
+func TestIPConfigValidate(t *testing.T) {
 	good := []IPConfig{
 		cfgOf("192.0.2.13", "255.255.255.0", "192.0.2.1"),
 		cfgOf("192.0.2.14", "255.255.0.0", "192.0.2.2"),
@@ -248,7 +248,7 @@ func TestValidateIPConfig(t *testing.T) {
 		cfgOf("192.0.2.13", "255.255.255.252", "192.0.2.14"), // /30: two hosts
 	}
 	for _, cfg := range good {
-		if err := ValidateIPConfig(cfg); err != nil {
+		if err := cfg.Validate(); err != nil {
 			t.Errorf("%s: %v", cfg, err)
 		}
 	}
@@ -275,7 +275,7 @@ func TestValidateIPConfig(t *testing.T) {
 	}
 	for _, tt := range bad {
 		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateIPConfig(tt.cfg)
+			err := tt.cfg.Validate()
 			if err == nil || !strings.Contains(err.Error(), tt.want) {
 				t.Fatalf("want an error containing %q, got %v", tt.want, err)
 			}
