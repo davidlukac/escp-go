@@ -1,0 +1,11 @@
+# coverage output (make cover / cover-html)
+cover.out
+coverage.html
+
+# build output
+bin/
+dist/
+
+# a local go.work that links a consumer to this checkout (never committed)
+go.work
+go.work.sum
