@@ -6,16 +6,16 @@ import (
 )
 
 func TestParseMAC(t *testing.T) {
-	want := MAC{0xc0, 0x3a, 0x55, 0x6c, 0x81, 0x61}
-	for _, s := range []string{"c0:3a:55:6c:81:61", "C0:3A:55:6C:81:61", "c0-3a-55-6c-81-61", "C0-3a-55-6C-81-61"} {
+	want := MAC{0x00, 0x00, 0x5e, 0x00, 0x53, 0x01}
+	for _, s := range []string{"00:00:5e:00:53:01", "00:00:5E:00:53:01", "00-00-5e-00-53-01", "00-00-5E-00-53-01"} {
 		got, err := ParseMAC(s)
 		if err != nil || got != want {
 			t.Errorf("ParseMAC(%q) = %v, %v; want %v", s, got, err, want)
 		}
 	}
 	// Refused: not hex, too short, too long, mixed separators, and the forms net.ParseMAC also reads.
-	for _, s := range []string{"", "zz:3a:55:6c:81:61", "c0:3a:55:6c:81", "c0:3a:55:6c:81:61:00:01", "c0:3a-55:6c:81:61", "c03a556c8161",
-		"c03a.556c.8161", "02:00:5e:10:00:00:00:01", " c0:3a:55:6c:81:61", "c0:3a:55:6c:81:61\n"} {
+	for _, s := range []string{"", "zz:00:5e:00:53:01", "00:00:5e:00:53", "00:00:5e:00:53:01:00:01", "00:00-5e:00:53:01", "00005e005301",
+		"0000.5e00.5301", "02:00:5e:10:00:00:00:01", " 00:00:5e:00:53:01", "00:00:5e:00:53:01\n"} {
 		if got, err := ParseMAC(s); !errors.Is(err, ErrInvalid) || !got.IsZero() {
 			t.Errorf("ParseMAC(%q) = %v, %v; want the zero MAC and ErrInvalid", s, got, err)
 		}
@@ -23,8 +23,8 @@ func TestParseMAC(t *testing.T) {
 }
 
 func TestMACStringAndZero(t *testing.T) {
-	m := MAC{0xc0, 0x3a, 0x55, 0x6c, 0x81, 0x61}
-	if m.String() != "c0:3a:55:6c:81:61" || m.IsZero() {
+	m := MAC{0x00, 0x00, 0x5e, 0x00, 0x53, 0x01}
+	if m.String() != "00:00:5e:00:53:01" || m.IsZero() {
 		t.Fatalf("%v zero=%t", m.String(), m.IsZero())
 	}
 	if (MAC{}).String() != "" || !(MAC{}).IsZero() {

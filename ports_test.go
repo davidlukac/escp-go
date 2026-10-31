@@ -19,7 +19,7 @@ func TestSetPortWire(t *testing.T) {
 	if err := c.SetPort(context.Background(), PortConfig{ID: 7, Enabled: true, Speed: Speed1000Full, FlowControl: true}); err != nil {
 		t.Fatal(err)
 	}
-	got := f.Port7Setting()
+	got := f.PortSetting(7)
 	want := []byte{7, 1, 0, 6, 0, 1, 0}
 	if string(got) != string(want) {
 		t.Fatalf("wire bytes %v, want %v", got, want)
@@ -29,6 +29,24 @@ func TestSetPortWire(t *testing.T) {
 	}
 	if err := c.SetPort(context.Background(), PortConfig{ID: 0, Enabled: true, Speed: "auto", FlowControl: false}); err == nil {
 		t.Fatal("port 0 must be rejected")
+	}
+}
+
+// PortSetting answers for the port it is asked about, and nil for one nothing was written to.
+func TestFakePortSettingIsPerPort(t *testing.T) {
+	f := escptest.Start(t)
+	c := dialFake(t, f, "secret")
+	if got := f.PortSetting(3); got != nil {
+		t.Fatalf("before any write: %v, want nil", got)
+	}
+	if err := c.SetPort(context.Background(), PortConfig{ID: 3, Enabled: true, Speed: Speed1000Full}); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.PortSetting(3); len(got) != 7 || got[0] != 3 {
+		t.Fatalf("port 3: %v, want its own 7-byte row", got)
+	}
+	if got := f.PortSetting(7); got != nil {
+		t.Fatalf("port 7 was not written, got %v", got)
 	}
 }
 
@@ -50,7 +68,7 @@ func TestSetPortWireStateAndFlowControlAreNotSwapped(t *testing.T) {
 			if err := c.SetPort(context.Background(), tc.cfg); err != nil {
 				t.Fatal(err)
 			}
-			got := f.Port7Setting()
+			got := f.PortSetting(7)
 			if string(got) != string(tc.want) {
 				t.Fatalf("wire bytes %v, want %v", got, tc.want)
 			}
@@ -169,7 +187,7 @@ func TestSetPortWireEverySpeedAndTheFlowControlThatIsAllowed(t *testing.T) {
 				if flow {
 					want[5] = 1
 				}
-				if got := f.Port7Setting(); string(got) != string(want) {
+				if got := f.PortSetting(7); string(got) != string(want) {
 					t.Fatalf("wire bytes %v, want %v", got, want)
 				}
 			})

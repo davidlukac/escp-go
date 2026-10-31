@@ -29,9 +29,8 @@ func TestConfigBackupDoesNotWriteSettings(t *testing.T) {
 	if _, err := c.ConfigBackup(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	led, _, sets := f.State()
-	if !led || sets != 0 {
-		t.Fatalf("a backup must not change anything: led=%v sets=%d", led, sets)
+	if led, writes := f.LED(), f.WriteCount(); !led || writes != 0 {
+		t.Fatalf("a backup must not change anything: led=%v writes=%d", led, writes)
 	}
 }
 

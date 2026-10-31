@@ -135,7 +135,7 @@ func TestLiveDHCPProbe(t *testing.T) {
 
 	// 3. A static address written while DHCP is on: is it ignored (the vendor notes say so)?
 	if leased.DHCP {
-		other := IPConfig{IP: netip.MustParseAddr("192.168.77.14"), Netmask: static.Netmask, Gateway: static.Gateway}
+		other := IPConfig{IP: netip.MustParseAddr("192.0.2.14"), Netmask: static.Netmask, Gateway: static.Gateway}
 		setSystem(byMAC, true, other)
 		after := watch(15*time.Second, nil)
 		obs("%s after a static address was written with DHCP on: ip %s dhcp=%t (was %s)", since(), after.IP, after.DHCP, leased.IP)

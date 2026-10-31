@@ -74,18 +74,18 @@ func ExampleDiscover() {
 // Name a switch by its MAC address: the client pins the identity (a device with another MAC is never
 // written to) and finds the switch by itself when its address is not known or has changed.
 func ExampleParseMAC() {
-	mac, err := escp.ParseMAC("C0-3A-55-6C-81-61")
+	mac, err := escp.ParseMAC("00-00-5E-00-53-01")
 	fmt.Println(mac, err)
-	_, err = escp.ParseMAC("c03a556c8161")
+	_, err = escp.ParseMAC("00005e005301")
 	fmt.Println(err)
 	// Output:
-	// c0:3a:55:6c:81:61 <nil>
-	// escp: "c03a556c8161" is not a MAC address; write it as aa:bb:cc:dd:ee:ff (colons or hyphens)
+	// 00:00:5e:00:53:01 <nil>
+	// escp: "00005e005301" is not a MAC address; write it as aa:bb:cc:dd:ee:ff (colons or hyphens)
 }
 
 // Find one switch by its MAC address, wherever it is on the segment. Like Discover, run it on its own.
 func ExampleLocate() {
-	mac, _ := escp.ParseMAC("c0:3a:55:6c:81:61")
+	mac, _ := escp.ParseMAC("00:00:5e:00:53:01")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	info, err := escp.Locate(ctx, mac, escp.DiscoverOptions{})
@@ -99,7 +99,7 @@ func ExampleLocate() {
 // Let the switch lease its address. The leased address is not known in advance, so the client must
 // have the switch's MAC: it looks the switch up by it and follows it to the lease.
 func ExampleClient_EnableDHCP() {
-	mac, _ := escp.ParseMAC("c0:3a:55:6c:81:61")
+	mac, _ := escp.ParseMAC("00:00:5e:00:53:01")
 	c, err := escp.Dial(escp.Config{MAC: mac, Username: "admin", Password: escp.Password(os.Getenv("SWITCH_PASSWORD"))})
 	if err != nil {
 		fmt.Println(err)
@@ -135,7 +135,7 @@ func ExampleQoSModes() {
 }
 
 func ExampleValidateIPConfig() {
-	ok := escp.IPConfig{IP: netip.MustParseAddr("192.168.77.11"), Netmask: netip.MustParseAddr("255.255.255.0"), Gateway: netip.MustParseAddr("192.168.77.1")}
+	ok := escp.IPConfig{IP: netip.MustParseAddr("192.0.2.11"), Netmask: netip.MustParseAddr("255.255.255.0"), Gateway: netip.MustParseAddr("192.0.2.1")}
 	fmt.Println(escp.ValidateIPConfig(ok))
 
 	bad := ok
