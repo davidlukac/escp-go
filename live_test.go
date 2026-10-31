@@ -18,12 +18,12 @@ import (
 // (the restore is deferred before the first write and checked by reading back). The ones that
 // can cut access need an extra variable and say so. Run with:
 //
-//	export TPLINK_EASYSMART_HOST=... TPLINK_EASYSMART_USERNAME=... TPLINK_EASYSMART_PASSWORD=...
-//	go test -tags live -run Live ./internal/escp -v
+//	export ESCP_HOST=... ESCP_USERNAME=... ESCP_PASSWORD=...
+//	go test -tags live -run Live . -v
 func liveClient(t *testing.T) *Client {
 	t.Helper()
-	c, err := Dial(Config{Host: os.Getenv("TPLINK_EASYSMART_HOST"), Username: os.Getenv("TPLINK_EASYSMART_USERNAME"),
-		Password: Password(os.Getenv("TPLINK_EASYSMART_PASSWORD")), Timeout: 3 * time.Second})
+	c, err := Dial(Config{Host: os.Getenv("ESCP_HOST"), Username: os.Getenv("ESCP_USERNAME"),
+		Password: Password(os.Getenv("ESCP_PASSWORD")), Timeout: 3 * time.Second})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,20 +128,20 @@ func TestLiveLoopPreventionToggle(t *testing.T) {
 
 // The unused ports the live tests may write to. Switch 01 uses ports 6 and 7
 // (and mirrors port 4); another switch has other free ports, so they can be
-// chosen with TPLINK_EASYSMART_LIVE_PORTS="a,b" and TPLINK_EASYSMART_LIVE_SOURCE
+// chosen with ESCP_LIVE_PORTS="a,b" and ESCP_LIVE_SOURCE
 // (the port whose traffic the mirror test copies). Every test still aborts
 // unless its ports are link-down and in no LAG.
 func liveTestPorts(t *testing.T) (first, second, source PortID) {
 	t.Helper()
 	first, second, source = 6, 7, 4
-	if v := os.Getenv("TPLINK_EASYSMART_LIVE_PORTS"); v != "" {
+	if v := os.Getenv("ESCP_LIVE_PORTS"); v != "" {
 		if _, err := fmt.Sscanf(v, "%d,%d", &first, &second); err != nil {
-			t.Fatalf("TPLINK_EASYSMART_LIVE_PORTS=%q: want \"a,b\": %v", v, err)
+			t.Fatalf("ESCP_LIVE_PORTS=%q: want \"a,b\": %v", v, err)
 		}
 	}
-	if v := os.Getenv("TPLINK_EASYSMART_LIVE_SOURCE"); v != "" {
+	if v := os.Getenv("ESCP_LIVE_SOURCE"); v != "" {
 		if _, err := fmt.Sscanf(v, "%d", &source); err != nil {
-			t.Fatalf("TPLINK_EASYSMART_LIVE_SOURCE=%q: %v", v, err)
+			t.Fatalf("ESCP_LIVE_SOURCE=%q: %v", v, err)
 		}
 	}
 	return first, second, source
@@ -554,12 +554,12 @@ func TestLiveHostnameRename(t *testing.T) {
 }
 
 // Two clients (one per switch, as two aliases of a multi-switch consumer would be) must work at
-// the same time on the shared reply port. Needs TPLINK_EASYSMART_SECOND_HOST; it only sends
+// the same time on the shared reply port. Needs ESCP_SECOND_HOST; it only sends
 // the unauthenticated discovery request to the second switch, no credentials.
 func TestLiveTwoClientsShareThePort(t *testing.T) {
-	second := os.Getenv("TPLINK_EASYSMART_SECOND_HOST")
+	second := os.Getenv("ESCP_SECOND_HOST")
 	if second == "" {
-		t.Skip("set TPLINK_EASYSMART_SECOND_HOST to run (discovery only, no credentials are sent to it)")
+		t.Skip("set ESCP_SECOND_HOST to run (discovery only, no credentials are sent to it)")
 	}
 	a := liveClient(t)
 	b, err := Dial(Config{Host: second, Timeout: 3 * time.Second})
@@ -613,11 +613,11 @@ func vlanModesE(c *Client) (mtu MTUVLAN, portBased PortBasedVLAN, dot1q Dot1Q, e
 // Switches the VLAN mode to 802.1Q, builds a test VLAN on two unused ports, changes
 // the PVID of one of them, and puts everything back, including the original mode.
 // It can cut management access if the switch does not behave as the vendor
-// utility documents, so it only runs with TPLINK_EASYSMART_LIVE_VLAN_MODE=1 and
+// utility documents, so it only runs with ESCP_LIVE_VLAN_MODE=1 and
 // only on a switch that is in port-based mode with the default VLAN 1.
 func TestLiveVLAN8021QOnUnusedPorts(t *testing.T) {
-	if os.Getenv("TPLINK_EASYSMART_LIVE_VLAN_MODE") != "1" {
-		t.Skip("set TPLINK_EASYSMART_LIVE_VLAN_MODE=1 to switch the VLAN mode of the switch")
+	if os.Getenv("ESCP_LIVE_VLAN_MODE") != "1" {
+		t.Skip("set ESCP_LIVE_VLAN_MODE=1 to switch the VLAN mode of the switch")
 	}
 	a, b, _ := liveTestPorts(t)
 	const testVLAN = 20
@@ -726,15 +726,15 @@ func pvidByPort(q Dot1Q, port PortID) (VLANID, bool) {
 }
 
 // Management IP (owner-approved on 2026-10-19 for switch 03 only). Moves the
-// switch to TPLINK_EASYSMART_LIVE_NEWIP (same subnet, unused address), checks
+// switch to ESCP_LIVE_NEWIP (same subnet, unused address), checks
 // that it answers there and not at the old address, then moves it back. Only
 // the address changes; the mask and gateway stay. Needs ping monitoring.
 func TestLiveIPChange(t *testing.T) {
-	newIP, _ := netip.ParseAddr(os.Getenv("TPLINK_EASYSMART_LIVE_NEWIP"))
-	newMask, _ := netip.ParseAddr(os.Getenv("TPLINK_EASYSMART_LIVE_NEWMASK"))
-	newGW, _ := netip.ParseAddr(os.Getenv("TPLINK_EASYSMART_LIVE_NEWGATEWAY"))
+	newIP, _ := netip.ParseAddr(os.Getenv("ESCP_LIVE_NEWIP"))
+	newMask, _ := netip.ParseAddr(os.Getenv("ESCP_LIVE_NEWMASK"))
+	newGW, _ := netip.ParseAddr(os.Getenv("ESCP_LIVE_NEWGATEWAY"))
 	if !newIP.IsValid() && !newMask.IsValid() && !newGW.IsValid() {
-		t.Skip("set TPLINK_EASYSMART_LIVE_NEWIP (an unused address in the subnet), _NEWMASK or _NEWGATEWAY")
+		t.Skip("set ESCP_LIVE_NEWIP (an unused address in the subnet), _NEWMASK or _NEWGATEWAY")
 	}
 	c, ctx := liveClient(t), context.Background()
 	before, err := c.Info(ctx)
@@ -778,8 +778,8 @@ func TestLiveIPChange(t *testing.T) {
 			return
 		}
 		if cur.IP != orig.IP || cur.Netmask != orig.Netmask || cur.Gateway != orig.Gateway {
-			r, err := Dial(Config{Host: cur.IP.String(), Username: os.Getenv("TPLINK_EASYSMART_USERNAME"),
-				Password: Password(os.Getenv("TPLINK_EASYSMART_PASSWORD")), Timeout: 3 * time.Second})
+			r, err := Dial(Config{Host: cur.IP.String(), Username: os.Getenv("ESCP_USERNAME"),
+				Password: Password(os.Getenv("ESCP_PASSWORD")), Timeout: 3 * time.Second})
 			if err != nil {
 				t.Errorf("RESTORE dial %s: %v", cur.IP, err)
 				return
@@ -813,13 +813,13 @@ func TestLiveIPChange(t *testing.T) {
 	}
 }
 
-// TestLiveIPSet moves the switch (reached at TPLINK_EASYSMART_HOST) to
-// TPLINK_EASYSMART_LIVE_SETIP without restoring: it is the manual way back
+// TestLiveIPSet moves the switch (reached at ESCP_HOST) to
+// ESCP_LIVE_SETIP without restoring: it is the manual way back
 // when TestLiveIPChange could not restore.
 func TestLiveIPSet(t *testing.T) {
-	target := net.ParseIP(os.Getenv("TPLINK_EASYSMART_LIVE_SETIP"))
+	target := net.ParseIP(os.Getenv("ESCP_LIVE_SETIP"))
 	if target == nil {
-		t.Skip("set TPLINK_EASYSMART_LIVE_SETIP")
+		t.Skip("set ESCP_LIVE_SETIP")
 	}
 	c, ctx := liveClient(t), context.Background()
 	before, err := c.Info(ctx)

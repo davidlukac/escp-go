@@ -1,0 +1,53 @@
+# Publishes a version of the library. Manual only: pushing a tag publishes nothing by itself
+# for Go (the module proxy serves any tag of a public repository), this workflow checks the tag
+# and writes the GitHub release whose notes are the CHANGELOG section of that version.
+#
+# Procedure (RELEASING.md): the release PR is merged, `scripts/release.sh --tag X.Y.Z` tags the merge
+# commit, the owner pushes that tag, then:  gh workflow run release.yml -f tag=vX.Y.Z
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to publish, for example v0.1.0 (must exist on the remote)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ inputs.tag }}
+          fetch-depth: 0
+      - name: The tag is a version and is on main
+        run: |
+          case "$TAG" in v[0-9]*.[0-9]*.[0-9]*) ;; *) echo "not a version tag: $TAG"; exit 1;; esac
+          git fetch origin main
+          git merge-base --is-ancestor "$TAG" origin/main || { echo "$TAG is not on main"; exit 1; }
+      - uses: ./.github/actions/setup
+        with:
+          go-version: stable
+      - name: Tests and checks of the tagged tree
+        run: |
+          make cover
+          make lint
+          make vuln
+      - name: The notes of this version are in the CHANGELOG
+        run: |
+          version="${TAG#v}"
+          awk -v v="$version" '$0 == "## " v {on=1; next} /^## / {on=0} on' CHANGELOG.md > notes.md
+          [ -s notes.md ] || { echo "CHANGELOG.md has no section '## $version'"; exit 1; }
+          cat notes.md
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$TAG" --verify-tag --title "$TAG" --notes-file notes.md

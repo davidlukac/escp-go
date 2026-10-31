@@ -1,0 +1,20 @@
+name: Set up Go
+description: Go from go.mod (module and build cache on), or the version asked for.
+inputs:
+  go-version:
+    description: Go version to install ("stable", "1.27.x"); empty or "go.mod" uses the version in go.mod.
+    default: ""
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        # `cond && '' || x` is broken in expressions ('' is falsy), so the
+        # "use go.mod" case is spelled out on both inputs.
+        go-version: ${{ inputs.go-version != '' && inputs.go-version != 'go.mod' && inputs.go-version || '' }}
+        go-version-file: ${{ (inputs.go-version == '' || inputs.go-version == 'go.mod') && 'go.mod' || '' }}
+        cache: true
+        # the pinned linter, vulnerability scanner and API checker (devtools/go.mod) are built from source and cached too
+        cache-dependency-path: |
+          go.sum
+          devtools/go.sum

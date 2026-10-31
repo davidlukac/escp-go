@@ -19,24 +19,24 @@ import (
 // section 4.5, in the private workspace). Every observation is a line starting with "OBS|"; what is
 // asserted is the restore: the switch must end at its static address with DHCP off.
 //
-// This changes the management address of the switch: it needs TPLINK_EASYSMART_LIVE_DHCP=1, the
-// switch's MAC in TPLINK_EASYSMART_MAC (the switch is found by it wherever the lease puts it), a
+// This changes the management address of the switch: it needs ESCP_LIVE_DHCP=1, the
+// switch's MAC in ESCP_MAC (the switch is found by it wherever the lease puts it), a
 // router whose DHCP server hands out an address, and a switch that is free to lose its address
 // for a minute (switch 03). Take a configuration backup first and watch the pings.
 func TestLiveDHCPProbe(t *testing.T) {
-	if os.Getenv("TPLINK_EASYSMART_LIVE_DHCP") != "1" {
-		t.Skip("set TPLINK_EASYSMART_LIVE_DHCP=1 to switch the DHCP flag of the switch on and back off")
+	if os.Getenv("ESCP_LIVE_DHCP") != "1" {
+		t.Skip("set ESCP_LIVE_DHCP=1 to switch the DHCP flag of the switch on and back off")
 	}
-	mac, err := ParseMAC(os.Getenv("TPLINK_EASYSMART_MAC"))
+	mac, err := ParseMAC(os.Getenv("ESCP_MAC"))
 	if err != nil {
-		t.Fatalf("TPLINK_EASYSMART_MAC must name the switch: %v", err)
+		t.Fatalf("ESCP_MAC must name the switch: %v", err)
 	}
-	for _, ro := range strings.Split(os.Getenv("TPLINK_EASYSMART_LIVE_READONLY_MACS"), ",") {
+	for _, ro := range strings.Split(os.Getenv("ESCP_LIVE_READONLY_MACS"), ",") {
 		if strings.EqualFold(strings.TrimSpace(ro), mac.String()) {
-			t.Fatalf("refusing: %s is listed in TPLINK_EASYSMART_LIVE_READONLY_MACS", mac)
+			t.Fatalf("refusing: %s is listed in ESCP_LIVE_READONLY_MACS", mac)
 		}
 	}
-	user, pass := os.Getenv("TPLINK_EASYSMART_USERNAME"), os.Getenv("TPLINK_EASYSMART_PASSWORD")
+	user, pass := os.Getenv("ESCP_USERNAME"), os.Getenv("ESCP_PASSWORD")
 	obs := func(format string, args ...any) { t.Logf("OBS|"+format, args...) }
 	dial := func(host string) *Client {
 		t.Helper()
@@ -48,7 +48,7 @@ func TestLiveDHCPProbe(t *testing.T) {
 		return c
 	}
 	ctx := context.Background()
-	c := dial(os.Getenv("TPLINK_EASYSMART_HOST"))
+	c := dial(os.Getenv("ESCP_HOST"))
 	info0, err := c.Info(ctx)
 	if err != nil {
 		t.Fatal(err)

@@ -1,0 +1,33 @@
+name: Hardware report
+description: You tried the library on a switch that is not in the compatibility table
+labels: [hardware]
+body:
+  - type: input
+    id: model
+    attributes:
+      label: Switch model and hardware version
+    validations:
+      required: true
+  - type: input
+    id: firmware
+    attributes:
+      label: Firmware
+    validations:
+      required: true
+  - type: dropdown
+    id: result
+    attributes:
+      label: What worked
+      multiple: true
+      options:
+        - Discover / Info
+        - Reading the settings
+        - Writing settings
+        - Nothing, the login was rejected
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Details
+      description: Anything that differed from the TL-SG108E v6. Redact MAC addresses and credentials.
