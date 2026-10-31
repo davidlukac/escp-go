@@ -115,7 +115,7 @@ func TestAuthenticatedRequestFailures(t *testing.T) {
 		if err := c.SetLED(context.Background(), false); !errors.Is(err, ErrNoReply) {
 			t.Fatalf("want ErrNoReply, got %v", err)
 		}
-		if led, _, sets := f.State(); !led || sets != 0 {
+		if led, writes := f.LED(), f.WriteCount(); !led || writes != 0 {
 			t.Fatal("an unanswered SET must not have been applied by the fake")
 		}
 	})
@@ -199,7 +199,7 @@ func TestBadPassword(t *testing.T) {
 	if err := c.SetLED(context.Background(), false); !errors.Is(err, ErrRejected) {
 		t.Fatalf("want ErrRejected, got %v", err)
 	}
-	if led, _, sets := f.State(); !led || sets != 0 {
+	if led, writes := f.LED(), f.WriteCount(); !led || writes != 0 {
 		t.Fatal("switch must be untouched after a rejected SET")
 	}
 }

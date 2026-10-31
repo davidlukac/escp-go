@@ -22,8 +22,8 @@ func TestCancelledContextSendsNothing(t *testing.T) {
 	if n := f.WriteCount(); n != 0 {
 		t.Fatalf("the cancelled call wrote %d time(s)", n)
 	}
-	if led, _, sets := f.State(); !led || sets != 0 {
-		t.Fatalf("the switch was touched: led=%v sets=%d", led, sets)
+	if led, writes := f.LED(), f.WriteCount(); !led || writes != 0 {
+		t.Fatalf("the switch was touched: led=%v writes=%d", led, writes)
 	}
 	// Not a datagram reached the switch. A later request, once answered, shows that everything
 	// before it was processed, but not that both datagrams of its own probe were counted yet when

@@ -24,7 +24,7 @@ func TestLEDRoundTrip(t *testing.T) {
 	if err := c.SetLED(ctx, true); err != nil {
 		t.Fatal(err)
 	}
-	if led, _, sets := f.State(); !led || sets != 2 {
-		t.Fatalf("fake state led=%v sets=%d", led, sets)
+	if led, writes := f.LED(), f.WriteCount(); !led || writes != 2 {
+		t.Fatalf("fake state led=%v writes=%d", led, writes)
 	}
 }

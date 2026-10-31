@@ -66,9 +66,9 @@ type Switch struct {
 
 	mu               sync.Mutex
 	hostname         string
-	history          [][]wire.TLV // every accepted SET, in order
-	lastSet          []wire.TLV   // settings TLVs (credentials stripped) of the most recent accepted SET
-	port7            []byte
+	history          [][]wire.TLV    // every accepted SET, in order
+	lastSet          []wire.TLV      // settings TLVs (credentials stripped) of the most recent accepted SET
+	portSets         map[byte][]byte // the last port row SET addressed to each port
 	setIP            []byte
 	mac              [6]byte                 // zero means the default address
 	staleDiscoveries int                     // the next n discoveries still report 127.0.0.9, like a network whose caches have not caught up
@@ -76,8 +76,6 @@ type Switch struct {
 	led              bool
 	firmware         string
 	session          []byte
-	gets             int
-	sets             int
 	dropNth          int // drop the nth received packet (1-based) to test retries
 	dropFirst        int // drop the first n received packets
 	droppedSets      int // authenticated SETs ignored under DropSets
@@ -314,12 +312,11 @@ func (f *Switch) LastSet() []Setting {
 	return toSettings(f.lastSet)
 }
 
-// State returns the LED state and how many LED/hostname/port-7 writes and LED reads
-// the switch has handled (sets counts writes of those three settings only).
-func (f *Switch) State() (led bool, gets, sets int) {
+// LED is the LED state the switch holds: the last LED SET it accepted.
+func (f *Switch) LED() bool {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return f.led, f.gets, f.sets
+	return f.led
 }
 
 // SetFirmware changes the firmware version the switch reports in discovery replies.
@@ -343,11 +340,11 @@ func (f *Switch) IPSent() []byte {
 	return append([]byte(nil), f.setIP...)
 }
 
-// Port7Setting is the value of the last port SET addressed to port 7 (nil before any).
-func (f *Switch) Port7Setting() []byte {
+// PortSetting is the 7-byte value of the last port SET addressed to port (nil before any).
+func (f *Switch) PortSetting(port int) []byte {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return append([]byte(nil), f.port7...)
+	return append([]byte(nil), f.portSets[byte(port)]...)
 }
 
 // DecryptSessionKey recovers the session key from the RSA key-exchange value a client sent.
@@ -602,10 +599,12 @@ func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV, viaSe
 			}
 		}
 		f.mu.Unlock()
-		if v, ok := find(wire.TLVPorts); ok && len(v) == 7 && v[0] == 7 {
+		if v, ok := find(wire.TLVPorts); ok && len(v) == 7 {
 			f.mu.Lock()
-			f.port7 = append([]byte(nil), v...)
-			f.sets++
+			if f.portSets == nil {
+				f.portSets = map[byte][]byte{}
+			}
+			f.portSets[v[0]] = append([]byte(nil), v...)
 			f.mu.Unlock()
 		}
 		if v, ok := find(wire.TLVHostname); ok {
@@ -625,13 +624,11 @@ func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV, viaSe
 				gw, _ := find(wire.TLVGateway)
 				f.addr = map[wire.TLVType][]byte{wire.TLVIP: ip, wire.TLVNetmask: mask, wire.TLVGateway: gw}
 			}
-			f.sets++
 			f.mu.Unlock()
 		}
 		if v, ok := find(wire.TLVLED); ok && len(v) == 1 {
 			f.mu.Lock()
 			f.led = v[0] == 1
-			f.sets++
 			f.mu.Unlock()
 		}
 		if _, isSystem := find(wire.TLVHostname); isSystem {
@@ -698,7 +695,6 @@ func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV, viaSe
 		}
 		if _, ok := find(wire.TLVLED); ok {
 			f.mu.Lock()
-			f.gets++
 			v := byte(0)
 			if f.led {
 				v = 1
