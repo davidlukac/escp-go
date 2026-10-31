@@ -9,3 +9,6 @@ dist/
 # a local go.work that links a consumer to this checkout (never committed)
 go.work
 go.work.sum
+
+# rendered package documentation (scripts/pkgdoc.sh)
+build/
