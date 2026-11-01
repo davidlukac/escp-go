@@ -5,6 +5,31 @@ version; a breaking change is called out as such. The history before 0.1.0 is th
 `internal/escp` of [terraform-provider-tplinkeasysmart](https://github.com/davidlukac/terraform-provider-tplinkeasysmart),
 whose commits this repository keeps.
 
+## 0.3.0
+
+- **Breaking changes**, made together before 1.0 so that consumers rename once (a consumer that does not use these names is not affected). None changes wire bytes. Rename with the table below.
+
+  | 0.2.0 | 0.3.0 |
+  |---|---|
+  | `WriteGate` is `func(ctx, escp.InfoReader, Operation) error`; `InfoReader` | `func(ctx, escp.Reader, Operation) error`; `escp.Reader` has every reader of the switch (`Info`, `System`, `LED`, `LoopPrevention`, `Ports`, `LAGs`, `PortMirror`, `Bandwidth`, `StormControl`, `QoS`, `IGMP`, `VLANMode`, `MTUVLAN`, `PortBasedVLAN`, `Dot1Q`), and `*Client` implements it. A gate no longer type-asserts at run time; a test double embeds `escp.Reader` |
+  | `Operation{Replaces: escp.GroupLAG, ID: 3}`; `GroupKind`, `GroupLAG`, `GroupPortVLAN`, `GroupDot1QVLAN`, `Operation.ID` | `Operation{Replaces: escp.Group{LAG: 3}}`; `Group` has `LAG LAGID`, `PortVLAN PortVLANID`, `Dot1QVLAN VLANID` and `IsZero()`; read `op.Replaces.LAG` and so on. `safety.PortGate` treats a group that names more than one kind as unreadable and refuses |
+  | `ErrInvalidConfig` | `ErrInvalidConfigFile` (it is about a configuration *file*; `ErrInvalid` is the general refusal) |
+  | `Dot1Q.MaxVLAN`, `PortBasedVLAN.MaxVLAN` | `Dot1Q.MaxVLANs`, `PortBasedVLAN.MaxGroups` |
+  | `PortBandwidth.IngressKbps`, `EgressKbps` | `PortBandwidth.Ingress`, `Egress` (still `Kbps`) |
+  | `PortStorm.RateKbps`, `StormConfig.RateKbps` | `Rate` |
+  | `Mirror.MirrorPort` | `Mirror.Destination` |
+  | `Client.PortStatistics` | `Client.PortStats` |
+  | `SetPVIDs(ctx, map[PortID]VLANID)` | `SetPVIDs(ctx, []PortPVID)` |
+  | `SetPortPriorities(ctx, map[PortID]Priority)` | `SetPortPriorities(ctx, []PortPriority)` |
+
+  `SetPVIDs` and `SetPortPriorities` now take what their readers return, like `SetLAG` and `SetPortBasedVLAN`; a port listed twice is refused with `ErrInvalid`, and the first fault is reported in the order given (it was map order, so a request with several faults named a different one on each run).
+
+- **Fixes:** `Dial` refuses a `Config` it cannot use (`Config{}`, a negative `Timeout`, a UDP port outside 1 to 65535) with an error that matches `ErrInvalid`, instead of failing on the first call; the check is also available as `Config.Validate()`. A read the switch refuses, and a refused session key, are now a `*RejectedError` that matches `ErrRejected`, as `docs/errors.md` promised (only writes were). A `Password` no longer appears in clear text when a struct holding it is encoded (`json.Marshal`): it encodes as `[redacted]`; decoding is unchanged, and `ConfigFile` is deliberately not redacted (encode `Base64()`).
+- **New:** a `Validate` method for every value a writer takes (`PortConfig`, `StormConfig`, `PortBandwidth`, `Mirror`, `Dot1QVLAN`, `PortPVID`, `PortPriority`), called by the writers, so a front end refuses at plan time exactly what the writer would refuse, with the same error; `ParseVLANMode`.
+- **Visible text:** `safety.ErrDryRun` reads `safety: dry run: ...`; in `SetPort`, when both the port and the speed are wrong, the port is reported first. Matching by `errors.Is` is unchanged.
+- **Documentation and policy:** the doc comments, guides and `PROTOCOL.md` no longer refer to anything private to the maintainer's workspace; a code of conduct (Contributor Covenant 2.1); the versioning convention for 0.x: a break or an addition is a minor version, a fix a patch.
+- **Quality gates** (for contributors, no API change): a stricter linter in CI and the pre-commit hook (complexity limits, `unparam`, `gocritic`, `nolintlint`, `exhaustive` and others) and the long functions it found split; mutation testing with gremlins (`make mutation`, `make mutation-diff`, a weekly full run that fails below 90% efficacy, informational on pull requests); tests that pin what the mutation runs found; the coverage policy lets only a process entry point (`func main`) be excluded (30 excluded statements became 3); `escptest`'s packet handler is split into one method per operation.
+
 ## 0.2.0
 
 - **Breaking changes**, made together before consumers settle on the 0.1 names; none changes behaviour or wire bytes. The one visible text that changes is the name of an 802.1Q write as a write gate sees it: `Operation.Name`, and so `*safety.ImpactError` messages, the `operation` log attribute and the dry-run list, is now `SetDot1QVLAN` / `DeleteDot1QVLAN` (was `SetVLAN8021Q` / `DeleteVLAN8021Q`), following the method names. Rename with the table below.
