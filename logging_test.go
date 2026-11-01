@@ -237,7 +237,7 @@ func TestLoggerNamesAWriteTheGateRefused(t *testing.T) {
 	f := escptest.Start(t)
 	log, rec := newLogRecorder()
 	refuse := func(c *Config) {
-		c.WriteGate = func(context.Context, InfoReader, Operation) error { return errors.New("not today") }
+		c.WriteGate = func(context.Context, Reader, Operation) error { return errors.New("not today") }
 	}
 	c := dialLogged(t, f, "secret", log, refuse)
 	if err := c.SetLED(context.Background(), false); err == nil {

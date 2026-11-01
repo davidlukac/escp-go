@@ -106,7 +106,7 @@ func TestWriteGateRefusalSendsNothingForAnyWriteMethod(t *testing.T) {
 			var consulted int
 			c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 300 * time.Millisecond,
 				SwitchPort: f.Port(), BroadcastAddr: escptest.Loopback(),
-				WriteGate: func(context.Context, InfoReader, Operation) error { consulted++; return errGateRefused }})
+				WriteGate: func(context.Context, Reader, Operation) error { consulted++; return errGateRefused }})
 			c.allowLoopback = true
 			t.Cleanup(func() { c.Close() })
 			if err := call(context.Background(), c); !errors.Is(err, errGateRefused) {
@@ -135,7 +135,7 @@ func TestWriteGateThatAllowsLetsEveryWriteMethodThrough(t *testing.T) {
 			f.EnableModel(nil) // the pre-write read of the other limiter needs a switch that answers
 			c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 300 * time.Millisecond,
 				SwitchPort: f.Port(), BroadcastAddr: escptest.Loopback(),
-				WriteGate: func(context.Context, InfoReader, Operation) error { return nil }})
+				WriteGate: func(context.Context, Reader, Operation) error { return nil }})
 			c.allowLoopback = true
 			t.Cleanup(func() { c.Close() })
 			if err := call(context.Background(), c); err != nil {
@@ -153,7 +153,7 @@ func TestWriteGateDoesNotAffectReads(t *testing.T) {
 	f := escptest.Start(t)
 	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 300 * time.Millisecond,
 		SwitchPort: f.Port(), BroadcastAddr: escptest.Loopback(),
-		WriteGate: func(context.Context, InfoReader, Operation) error { return errGateRefused }})
+		WriteGate: func(context.Context, Reader, Operation) error { return errGateRefused }})
 	t.Cleanup(func() { c.Close() })
 	ctx := context.Background()
 	if _, err := c.Info(ctx); err != nil {
@@ -174,7 +174,7 @@ func TestWriteGateMayReadThroughTheClient(t *testing.T) {
 	var firmware Firmware
 	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 300 * time.Millisecond,
 		SwitchPort: f.Port(), BroadcastAddr: escptest.Loopback(),
-		WriteGate: func(ctx context.Context, sw InfoReader, _ Operation) error {
+		WriteGate: func(ctx context.Context, sw Reader, _ Operation) error {
 			info, err := sw.Info(ctx)
 			firmware = info.Firmware
 			return err
@@ -232,10 +232,10 @@ var writeOperations = map[string]Operation{
 	"SetQoSMode":        {Name: "SetQoSMode", Impact: ImpactTraffic},
 	"SetPortPriorities": {Name: "SetPortPriorities", Ports: MustPortSet(2), Impact: ImpactTraffic},
 	"SetStormControl":   {Name: "SetStormControl", Ports: MustPortSet(2), Impact: ImpactTraffic},
-	"SetDot1QVLAN":      {Name: "SetDot1QVLAN", Ports: MustPortSet(2), Impact: ImpactTraffic, Replaces: GroupDot1QVLAN, ID: 10},
-	"DeleteDot1QVLAN":   {Name: "DeleteDot1QVLAN", Impact: ImpactTraffic, Replaces: GroupDot1QVLAN, ID: 10},
-	"SetPortBasedVLAN":  {Name: "SetPortBasedVLAN", Ports: MustPortSet(3, 4), Impact: ImpactTraffic, Replaces: GroupPortVLAN, ID: 2},
-	"SetLAG":            {Name: "SetLAG", Ports: MustPortSet(2, 3), Impact: ImpactManagement, Replaces: GroupLAG, ID: 1},
+	"SetDot1QVLAN":      {Name: "SetDot1QVLAN", Ports: MustPortSet(2), Impact: ImpactTraffic, Replaces: Group{Dot1QVLAN: 10}},
+	"DeleteDot1QVLAN":   {Name: "DeleteDot1QVLAN", Impact: ImpactTraffic, Replaces: Group{Dot1QVLAN: 10}},
+	"SetPortBasedVLAN":  {Name: "SetPortBasedVLAN", Ports: MustPortSet(3, 4), Impact: ImpactTraffic, Replaces: Group{PortVLAN: 2}},
+	"SetLAG":            {Name: "SetLAG", Ports: MustPortSet(2, 3), Impact: ImpactManagement, Replaces: Group{LAG: 1}},
 	"SetLoopPrevention": {Name: "SetLoopPrevention", Impact: ImpactManagement},
 	"SetPVIDs":          {Name: "SetPVIDs", Ports: MustPortSet(2), Impact: ImpactManagement},
 	"SetVLANMode":       {Name: "SetVLANMode", Ports: MustPortSet(8), Impact: ImpactManagement},
@@ -251,7 +251,7 @@ func operationsOf(t *testing.T, call func(context.Context, *Client) error) []Ope
 	var seen []Operation
 	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 300 * time.Millisecond,
 		SwitchPort: f.Port(), BroadcastAddr: escptest.Loopback(),
-		WriteGate: func(_ context.Context, _ InfoReader, op Operation) error { seen = append(seen, op); return nil }})
+		WriteGate: func(_ context.Context, _ Reader, op Operation) error { seen = append(seen, op); return nil }})
 	c.allowLoopback = true
 	t.Cleanup(func() { c.Close() })
 	if err := call(context.Background(), c); err != nil {
@@ -330,7 +330,7 @@ func TestGateChangingItsOperationChangesNothingThatIsSent(t *testing.T) {
 	f := escptest.Start(t)
 	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 300 * time.Millisecond,
 		SwitchPort: f.Port(), BroadcastAddr: escptest.Loopback(),
-		WriteGate: func(_ context.Context, _ InfoReader, op Operation) error {
+		WriteGate: func(_ context.Context, _ Reader, op Operation) error {
 			op.Ports = MustPortSet(8)
 			return nil
 		}})
@@ -363,9 +363,9 @@ func TestARemovedGroupIsStillReportedAsReplaced(t *testing.T) {
 		call func(c *Client) error
 		want Operation
 	}{
-		{"LAG", func(c *Client) error { return c.SetLAG(ctx, LAG{ID: 2, Ports: 0}) }, Operation{Name: "SetLAG", Impact: ImpactManagement, Replaces: GroupLAG, ID: 2}},
-		{"port-based VLAN", func(c *Client) error { return c.SetPortBasedVLAN(ctx, PortVLAN{ID: 3, Ports: 0}) }, Operation{Name: "SetPortBasedVLAN", Impact: ImpactTraffic, Replaces: GroupPortVLAN, ID: 3}},
-		{"802.1Q VLAN", func(c *Client) error { return c.DeleteDot1QVLAN(ctx, 20) }, Operation{Name: "DeleteDot1QVLAN", Impact: ImpactTraffic, Replaces: GroupDot1QVLAN, ID: 20}},
+		{"LAG", func(c *Client) error { return c.SetLAG(ctx, LAG{ID: 2, Ports: 0}) }, Operation{Name: "SetLAG", Impact: ImpactManagement, Replaces: Group{LAG: 2}}},
+		{"port-based VLAN", func(c *Client) error { return c.SetPortBasedVLAN(ctx, PortVLAN{ID: 3, Ports: 0}) }, Operation{Name: "SetPortBasedVLAN", Impact: ImpactTraffic, Replaces: Group{PortVLAN: 3}}},
+		{"802.1Q VLAN", func(c *Client) error { return c.DeleteDot1QVLAN(ctx, 20) }, Operation{Name: "DeleteDot1QVLAN", Impact: ImpactTraffic, Replaces: Group{Dot1QVLAN: 20}}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

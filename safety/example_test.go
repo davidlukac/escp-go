@@ -9,11 +9,18 @@ import (
 	"github.com/davidlukac/escp-go/safety"
 )
 
-// firmware is an escp.InfoReader that reports a fixed firmware version.
-type firmware string
+// firmware is an escp.Reader that reports a fixed firmware version. A gate is handed the client in
+// real use; a test hands it a double that implements the reads the gate makes and embeds the
+// interface for the rest (a read the gate was not expected to make panics).
+func firmware(version string) escp.Reader { return reportedFirmware{version: version} }
 
-func (f firmware) Info(context.Context) (escp.Info, error) {
-	return escp.Info{Firmware: escp.ParseFirmware(string(f))}, nil
+type reportedFirmware struct {
+	escp.Reader
+	version string
+}
+
+func (f reportedFirmware) Info(context.Context) (escp.Info, error) {
+	return escp.Info{Firmware: escp.ParseFirmware(f.version)}, nil
 }
 
 // A gate belongs to one switch: it remembers a verified build, so each switch gets its own.
@@ -109,21 +116,24 @@ func ExampleDryRun() {
 	// 2 recorded
 }
 
-// switchPorts is a switch with these ports, no link aggregation and no VLANs: the readers
-// PortGate asks, which a Client has.
-type switchPorts []escp.Port
+// switchPorts is a switch with these ports, no link aggregation and no VLANs: the reads PortGate
+// makes, which a Client has. Any other read panics.
+func switchPorts(ports ...escp.Port) escp.Reader { return portsOnly{ports: ports} }
 
-func (switchPorts) Info(context.Context) (escp.Info, error) { return escp.Info{}, nil }
+type portsOnly struct {
+	escp.Reader
+	ports []escp.Port
+}
 
-func (p switchPorts) Ports(context.Context) ([]escp.Port, error) { return p, nil }
+func (p portsOnly) Ports(context.Context) ([]escp.Port, error) { return p.ports, nil }
 
-func (switchPorts) LAGs(context.Context) ([]escp.LAG, error) { return nil, nil }
+func (portsOnly) LAGs(context.Context) ([]escp.LAG, error) { return nil, nil }
 
-func (switchPorts) PortBasedVLAN(context.Context) (escp.PortBasedVLAN, error) {
+func (portsOnly) PortBasedVLAN(context.Context) (escp.PortBasedVLAN, error) {
 	return escp.PortBasedVLAN{}, nil
 }
 
-func (switchPorts) Dot1Q(context.Context) (escp.Dot1Q, error) { return escp.Dot1Q{}, nil }
+func (portsOnly) Dot1Q(context.Context) (escp.Dot1Q, error) { return escp.Dot1Q{}, nil }
 
 // MaxImpact refuses a write whose worst case is above a ceiling, whatever its arguments. A front
 // end that must never cut the management path allows nothing above traffic.
@@ -146,10 +156,10 @@ func ExampleMaxImpact() {
 // PortGate refuses a write that touches a port with a link or in a link aggregation group. It asks
 // the switch (a Client lists its ports) at the moment of the write.
 func ExamplePortGate() {
-	sw := switchPorts{
-		{ID: 1, ActualSpeed: escp.Speed1000Full},
-		{ID: 2, ActualSpeed: escp.SpeedLinkDown},
-	}
+	sw := switchPorts(
+		escp.Port{ID: 1, ActualSpeed: escp.Speed1000Full},
+		escp.Port{ID: 2, ActualSpeed: escp.SpeedLinkDown},
+	)
 	gate := safety.PortGate()
 	ctx := context.Background()
 	fmt.Println("port 2:", gate(ctx, sw, escp.Operation{Name: "SetPort", Ports: escp.MustPortSet(2)}))
@@ -162,7 +172,7 @@ func ExamplePortGate() {
 // Chain runs its gates in order and stops at the first refusal, so the cheap checks go first. A
 // gate that needs the switch (PortGate) is only asked about writes that passed the others.
 func ExampleChain() {
-	sw := switchPorts{{ID: 1, ActualSpeed: escp.Speed1000Full}, {ID: 2, ActualSpeed: escp.SpeedLinkDown}}
+	sw := switchPorts(escp.Port{ID: 1, ActualSpeed: escp.Speed1000Full}, escp.Port{ID: 2, ActualSpeed: escp.SpeedLinkDown})
 	gate := safety.Chain(safety.MaxImpact(escp.ImpactTraffic), safety.PortGate())
 	ctx := context.Background()
 	fmt.Println(gate(ctx, sw, escp.Operation{Name: "SetPort", Ports: escp.MustPortSet(2), Impact: escp.ImpactTraffic}))

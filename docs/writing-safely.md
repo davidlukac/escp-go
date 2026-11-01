@@ -24,7 +24,7 @@ A runnable version is `ExampleConfig_writeGate` in the package documentation.
 
 ## Gates
 
-A gate is a plain function, `func(ctx, escp.InfoReader, escp.Operation) error`; write your own or combine with `safety.Chain`, which stops at the first refusal.
+A gate is a plain function, `func(ctx, escp.Reader, escp.Operation) error`; write your own or combine with `safety.Chain`, which stops at the first refusal.
 
 | Gate | Refuses |
 |---|---|
