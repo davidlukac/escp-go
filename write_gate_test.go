@@ -348,10 +348,10 @@ func TestGateChangingItsOperationChangesNothingThatIsSent(t *testing.T) {
 	}
 }
 
-func TestImpactValidIsExactlyTheThreeClasses(t *testing.T) {
+func TestImpactValidateAcceptsExactlyTheThreeClasses(t *testing.T) {
 	for i, want := range map[Impact]bool{0: false, ImpactCosmetic: true, ImpactTraffic: true, ImpactManagement: true, ImpactManagement + 1: false, -1: false} {
-		if i.Valid() != want {
-			t.Errorf("Impact(%d).Valid() = %v, want %v", int(i), i.Valid(), want)
+		if err := i.Validate(); (err == nil) != want || (err != nil && !errors.Is(err, ErrInvalid)) {
+			t.Errorf("Impact(%d).Validate() = %v, want valid=%v", int(i), err, want)
 		}
 	}
 }

@@ -74,6 +74,13 @@ func ParseSpeed(name string) (Speed, error) {
 	return "", invalidf("escp: unknown speed %q (valid: %v)", name, configurableSpeeds)
 }
 
+// Validate reports whether s is a speed a port can be configured to (ParseSpeed's set);
+// SpeedLinkDown is only ever reported and is refused. The error matches ErrInvalid.
+func (s Speed) Validate() error {
+	_, err := ParseSpeed(string(s))
+	return err
+}
+
 // UnmarshalText reads a speed name, so that a decoder refuses what no port has: the six configurable
 // speeds and SpeedLinkDown (a reading reports it). An error matches ErrInvalid. The text of a Speed is
 // the value itself, so nothing is needed to encode one.

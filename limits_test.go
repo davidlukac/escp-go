@@ -6,13 +6,13 @@ import (
 )
 
 func TestKbpsValidate(t *testing.T) {
-	for _, k := range []Kbps{0, 64, 128, 1024, MaxBandwidthKbps} {
+	for _, k := range []Kbps{0, 64, 128, 1024, MaxBandwidth} {
 		if err := k.Validate(); err != nil {
 			t.Errorf("%d kbps: %v", int(k), err)
 		}
 	}
 	// Not a multiple of the step, negative, and above the largest limit the web UI offers.
-	for _, k := range []Kbps{-64, -1, 1, 63, 100, MaxBandwidthKbps + 64, 2000000} {
+	for _, k := range []Kbps{-64, -1, 1, 63, 100, MaxBandwidth + 64, 2000000} {
 		if err := k.Validate(); !errors.Is(err, ErrInvalid) {
 			t.Errorf("%d kbps: got %v, want ErrInvalid", int(k), err)
 		}

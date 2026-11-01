@@ -25,7 +25,7 @@ type PortStorm struct {
 	UnknownUnicast bool // limit unknown-unicast traffic
 	Multicast      bool // limit multicast traffic
 	Broadcast      bool // limit broadcast traffic
-	Rate           Kbps // the limit, a multiple of RateStepKbps; 0 when none is set
+	Rate           Kbps // the limit, a multiple of RateStep; 0 when none is set
 	// Enabled mirrors the web UI: a rate is set and at least one traffic type is selected.
 	Enabled bool
 }
@@ -71,15 +71,15 @@ type StormConfig struct {
 func (cfg StormConfig) limited() bool { return cfg.UnknownUnicast || cfg.Multicast || cfg.Broadcast }
 
 // Validate checks the setting before it is written: a valid port, and either a traffic type with a
-// rate (a multiple of RateStepKbps, at least one step, at most MaxBandwidthKbps) or no traffic type
+// rate (a multiple of RateStep, at least one step, at most MaxBandwidth) or no traffic type
 // and no rate. The error matches ErrInvalid.
 func (cfg StormConfig) Validate() error {
 	if err := cfg.Port.Validate(); err != nil {
 		return err
 	}
 	switch {
-	case cfg.limited() && (cfg.Rate < RateStepKbps || cfg.Rate.Validate() != nil):
-		return invalidf("escp: storm control on port %d needs a rate that is a multiple of %d kbps between %d and %d, got %d", cfg.Port, RateStepKbps, RateStepKbps, MaxBandwidthKbps, cfg.Rate)
+	case cfg.limited() && (cfg.Rate < RateStep || cfg.Rate.Validate() != nil):
+		return invalidf("escp: storm control on port %d needs a rate that is a multiple of %d kbps between %d and %d, got %d", cfg.Port, RateStep, RateStep, MaxBandwidth, cfg.Rate)
 	case !cfg.limited() && cfg.Rate != 0:
 		return invalidf("escp: storm control on port %d has a rate (%d) but no traffic type selected", cfg.Port, cfg.Rate)
 	}
@@ -88,7 +88,7 @@ func (cfg StormConfig) Validate() error {
 
 // SetStormControl configures storm control on one port. Following the vendor
 // utility: selecting any traffic type requires a rate (a multiple of 64 kbps,
-// at least 64, at most MaxBandwidthKbps); selecting none disables it and the
+// at least 64, at most MaxBandwidth); selecting none disables it and the
 // rate must be 0. A rate on a port that carries traffic drops its excess
 // broadcast/multicast; callers must guard against that. Storm control is refused (ErrInvalid) on a port that has an
 // ingress limit: the switch would remove the limit without saying so.

@@ -42,8 +42,8 @@ func TestValidatorsAndWritersAgree(t *testing.T) {
 		{"bandwidth: unlimited", PortBandwidth{Port: 3}.Validate, func() error { return c.SetBandwidth(ctx, PortBandwidth{Port: 3}) }, true},
 		{"bandwidth: port 0", PortBandwidth{Ingress: 128}.Validate, func() error { return c.SetBandwidth(ctx, PortBandwidth{Ingress: 128}) }, false},
 		{"bandwidth: a bad ingress rate", PortBandwidth{Port: 3, Ingress: 100}.Validate, func() error { return c.SetBandwidth(ctx, PortBandwidth{Port: 3, Ingress: 100}) }, false},
-		{"bandwidth: a bad egress rate", PortBandwidth{Port: 3, Egress: MaxBandwidthKbps + RateStepKbps}.Validate, func() error {
-			return c.SetBandwidth(ctx, PortBandwidth{Port: 3, Egress: MaxBandwidthKbps + RateStepKbps})
+		{"bandwidth: a bad egress rate", PortBandwidth{Port: 3, Egress: MaxBandwidth + RateStep}.Validate, func() error {
+			return c.SetBandwidth(ctx, PortBandwidth{Port: 3, Egress: MaxBandwidth + RateStep})
 		}, false},
 
 		{"mirror: off", Mirror{}.Validate, func() error { return c.SetPortMirror(ctx, Mirror{}) }, true},

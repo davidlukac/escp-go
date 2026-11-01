@@ -67,18 +67,15 @@ const (
 	bwEntryLen   = bwOffRate + 4
 )
 
-// MaxBandwidthKbps is the largest limit the web UI offers.
-const MaxBandwidthKbps = 1000000
-
 // Validate checks the limits before they are written: a valid port and, in each direction, 0
-// (unlimited) or a multiple of RateStepKbps up to MaxBandwidthKbps. The error matches ErrInvalid.
+// (unlimited) or a multiple of RateStep up to MaxBandwidth. The error matches ErrInvalid.
 func (b PortBandwidth) Validate() error {
 	if err := b.Port.Validate(); err != nil {
 		return err
 	}
 	for _, rate := range []Kbps{b.Ingress, b.Egress} {
 		if rate.Validate() != nil {
-			return invalidf("escp: invalid rate %d kbps for port %d: use 0 (unlimited) or a multiple of %d up to %d", rate, b.Port, RateStepKbps, MaxBandwidthKbps)
+			return invalidf("escp: invalid rate %d kbps for port %d: use 0 (unlimited) or a multiple of %d up to %d", rate, b.Port, RateStep, MaxBandwidth)
 		}
 	}
 	return nil

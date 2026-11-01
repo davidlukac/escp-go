@@ -34,6 +34,13 @@ func ParseVLANMode(name string) (VLANMode, error) {
 	return "", invalidf("escp: unknown VLAN mode %q (valid: %v)", name, VLANModes())
 }
 
+// Validate reports whether m is a mode SetVLANMode accepts (ParseVLANMode's set); VLANModeNone is
+// only ever reported and is refused. The error matches ErrInvalid.
+func (m VLANMode) Validate() error {
+	_, err := ParseVLANMode(string(m))
+	return err
+}
+
 // UnmarshalText reads a mode name, so that a decoder refuses what no switch reports: the three modes
 // and VLANModeNone (a reading names it). An error matches ErrInvalid. The text of a VLANMode is the
 // value itself, so nothing is needed to encode one.
@@ -54,18 +61,18 @@ type VLANModeSetting struct {
 	UplinkPort PortID
 }
 
-// VLANModeFrom names the active mode from the three mode flags the switch reports. No flag, or
-// more than one, is VLANModeNone: a state the client cannot write, shown as it is instead of
-// being hidden.
-func VLANModeFrom(mtu MTUVLAN, portBased, dot1q bool) VLANModeSetting {
+// VLANModeFrom names the active mode from the three readings that carry a mode flag (MTUVLAN,
+// PortBasedVLAN and Dot1Q, each with its Enabled). No flag, or more than one, is VLANModeNone: a
+// state the client cannot write, shown as it is instead of being hidden.
+func VLANModeFrom(mtu MTUVLAN, portBased PortBasedVLAN, dot1q Dot1Q) VLANModeSetting {
 	active, st := 0, VLANModeSetting{Mode: VLANModeNone}
 	if mtu.Enabled {
 		active, st = active+1, VLANModeSetting{Mode: VLANModeMTU, UplinkPort: mtu.UplinkPort}
 	}
-	if portBased {
+	if portBased.Enabled {
 		active, st = active+1, VLANModeSetting{Mode: VLANModePortBased}
 	}
-	if dot1q {
+	if dot1q.Enabled {
 		active, st = active+1, VLANModeSetting{Mode: VLANModeDot1Q}
 	}
 	if active != 1 {
@@ -88,7 +95,7 @@ func (c *Client) VLANMode(ctx context.Context) (VLANModeSetting, error) {
 	if err != nil {
 		return VLANModeSetting{}, err
 	}
-	return VLANModeFrom(mtu, pb.Enabled, q.Enabled), nil
+	return VLANModeFrom(mtu, pb, q), nil
 }
 
 // Validate checks the setting for SetVLANMode: one of VLANModes; for the MTU VLAN a valid

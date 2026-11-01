@@ -43,8 +43,8 @@ func ParseImpact(name string) (Impact, error) {
 // MarshalText is the name of the class, as String spells it; a value that is no class is an error,
 // since a name that no decoder reads back would lose it.
 func (i Impact) MarshalText() ([]byte, error) {
-	if !i.Valid() {
-		return nil, invalidf("escp: %d is not an impact class", int(i))
+	if err := i.Validate(); err != nil {
+		return nil, err
 	}
 	return []byte(i.String()), nil
 }
@@ -59,8 +59,13 @@ func (i *Impact) UnmarshalText(text []byte) error {
 	return nil
 }
 
-// Valid reports whether i is one of the three classes.
-func (i Impact) Valid() bool { return i >= ImpactCosmetic && i <= ImpactManagement }
+// Validate reports whether i is one of the three classes; the error matches ErrInvalid.
+func (i Impact) Validate() error {
+	if i < ImpactCosmetic || i > ImpactManagement {
+		return invalidf("escp: %d is not an impact class", int(i))
+	}
+	return nil
+}
 
 // String returns the lower-case name of the class, or unknown(n) for a value that is none.
 func (i Impact) String() string {

@@ -31,7 +31,7 @@ func TestVLANModeFrom(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := VLANModeFrom(tc.mtu, tc.portBased, tc.dot1q); got != tc.want {
+			if got := VLANModeFrom(tc.mtu, PortBasedVLAN{Enabled: tc.portBased}, Dot1Q{Enabled: tc.dot1q}); got != tc.want {
 				t.Fatalf("got %+v, want %+v", got, tc.want)
 			}
 		})

@@ -49,7 +49,7 @@ func (e *ImpactError) Error() string {
 // closed. A ceiling that is not an impact class refuses everything. The refusal is an *ImpactError.
 func MaxImpact(ceiling escp.Impact) escp.WriteGate {
 	return func(_ context.Context, _ escp.Reader, op escp.Operation) error {
-		if !ceiling.Valid() || !op.Impact.Valid() || op.Impact > ceiling {
+		if ceiling.Validate() != nil || op.Impact.Validate() != nil || op.Impact > ceiling {
 			return &ImpactError{Op: op, Max: ceiling}
 		}
 		return nil

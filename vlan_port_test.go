@@ -95,7 +95,7 @@ func TestPortVLANLimitCheck(t *testing.T) {
 		{"and still refuses beyond it", 0, 0, MaxPortVLANID + 1, "invalid port-based VLAN id 256"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			err := PortBasedVLAN{MaxGroups: c.max}.GroupLimit(c.ports).Check(c.id)
+			err := PortBasedVLAN{MaxGroups: c.max}.GroupLimit(System{PortCount: c.ports}).Check(c.id)
 			if c.wantErr == "" {
 				if err != nil {
 					t.Fatal(err)
@@ -115,15 +115,15 @@ func TestPortVLANLimit(t *testing.T) {
 		want          PortVLANLimit
 		known         bool
 	}{{8, 8, 8, true}, {8, 24, 24, true}, {32, 24, 32, true}, {0, 8, 8, true}, {8, 0, 8, true}, {0, 0, 0, false}} {
-		got := NewPortVLANLimit(c.groups, c.ports)
+		got := PortBasedVLAN{MaxGroups: c.groups}.GroupLimit(System{PortCount: c.ports})
 		if got != c.want || got.Known() != c.known {
 			t.Errorf("groups %d, ports %d: limit %d (known %t), want %d (known %t)", c.groups, c.ports, got, got.Known(), c.want, c.known)
 		}
 	}
-	if NewPortVLANLimit(8, 24).String() != "24" {
+	if (PortBasedVLAN{MaxGroups: 8}).GroupLimit(System{PortCount: 24}).String() != "24" {
 		t.Error("a limit prints as its number")
 	}
-	if got := (PortBasedVLAN{MaxGroups: 8}).GroupLimit(24); got != 24 {
+	if got := (PortBasedVLAN{MaxGroups: 8}).GroupLimit(System{PortCount: 24}); got != 24 {
 		t.Errorf("GroupLimit = %d, want 24", got)
 	}
 }
