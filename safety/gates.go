@@ -22,7 +22,7 @@ func Chain(gates ...escp.WriteGate) escp.WriteGate {
 	if len(live) == 0 {
 		return nil
 	}
-	return func(ctx context.Context, sw escp.InfoReader, op escp.Operation) error {
+	return func(ctx context.Context, sw escp.Reader, op escp.Operation) error {
 		for _, g := range live {
 			if err := g(ctx, sw, op); err != nil {
 				return err
@@ -48,7 +48,7 @@ func (e *ImpactError) Error() string {
 // that declares no valid Impact is refused too, so a writer that forgot to classify itself fails
 // closed. A ceiling that is not an impact class refuses everything. The refusal is an *ImpactError.
 func MaxImpact(ceiling escp.Impact) escp.WriteGate {
-	return func(_ context.Context, _ escp.InfoReader, op escp.Operation) error {
+	return func(_ context.Context, _ escp.Reader, op escp.Operation) error {
 		if !ceiling.Valid() || !op.Impact.Valid() || op.Impact > ceiling {
 			return &ImpactError{Op: op, Max: ceiling}
 		}
@@ -78,7 +78,7 @@ func NewDryRun() *DryRun { return &DryRun{} }
 // Gate returns the gate to put in escp.Config: it records the operation and refuses it with
 // ErrDryRun.
 func (d *DryRun) Gate() escp.WriteGate {
-	return func(_ context.Context, _ escp.InfoReader, op escp.Operation) error {
+	return func(_ context.Context, _ escp.Reader, op escp.Operation) error {
 		d.mu.Lock()
 		defer d.mu.Unlock()
 		d.ops = append(d.ops, op)

@@ -12,14 +12,14 @@ import (
 var errFirst, errSecond = errors.New("first gate"), errors.New("second gate")
 
 func allow(calls *[]string, name string) escp.WriteGate {
-	return func(context.Context, escp.InfoReader, escp.Operation) error {
+	return func(context.Context, escp.Reader, escp.Operation) error {
 		*calls = append(*calls, name)
 		return nil
 	}
 }
 
 func refuse(calls *[]string, name string, err error) escp.WriteGate {
-	return func(context.Context, escp.InfoReader, escp.Operation) error {
+	return func(context.Context, escp.Reader, escp.Operation) error {
 		*calls = append(*calls, name)
 		return err
 	}
@@ -55,7 +55,7 @@ func TestChain(t *testing.T) {
 	})
 	t.Run("the operation reaches every gate unchanged", func(t *testing.T) {
 		var seen []escp.Operation
-		spy := func(_ context.Context, _ escp.InfoReader, o escp.Operation) error { seen = append(seen, o); return nil }
+		spy := func(_ context.Context, _ escp.Reader, o escp.Operation) error { seen = append(seen, o); return nil }
 		want := escp.Operation{Name: "SetLAG", Ports: escp.MustPortSet(5, 6), Impact: escp.ImpactManagement}
 		if err := Chain(spy, spy)(ctx, nil, want); err != nil || len(seen) != 2 || !reflect.DeepEqual(seen[0], want) || !reflect.DeepEqual(seen[1], want) {
 			t.Fatalf("err=%v seen=%+v", err, seen)

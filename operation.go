@@ -41,18 +41,19 @@ func (i Impact) String() string {
 	return fmt.Sprintf("unknown(%d)", int(i))
 }
 
-// GroupKind says which kind of group of ports a write replaces.
-type GroupKind int
+// Group names the group of ports a write replaces or removes, by the id the switch knows it by.
+// At most one field is set; the zero value is no group.
+type Group struct {
+	// LAG is a link aggregation group (SetLAG).
+	LAG LAGID
+	// PortVLAN is a port-based VLAN group (SetPortBasedVLAN).
+	PortVLAN PortVLANID
+	// Dot1QVLAN is an 802.1Q VLAN (SetDot1QVLAN, DeleteDot1QVLAN).
+	Dot1QVLAN VLANID
+}
 
-// The groups a write can replace. The zero value is no group.
-const (
-	// GroupLAG: a link aggregation group; Operation.ID is its number.
-	GroupLAG GroupKind = iota + 1
-	// GroupPortVLAN: a port-based VLAN group; Operation.ID is its id.
-	GroupPortVLAN
-	// GroupDot1QVLAN: an 802.1Q VLAN; Operation.ID is its VLAN id.
-	GroupDot1QVLAN
-)
+// IsZero reports whether no group is named.
+func (g Group) IsZero() bool { return g == Group{} }
 
 // Operation describes a write to a WriteGate before it is sent.
 type Operation struct {
@@ -69,8 +70,7 @@ type Operation struct {
 	// Impact is the class of the method; see Impact. It is an upper bound for the method,
 	// not a verdict on these arguments: it does not know which port is the uplink.
 	Impact Impact
-	// Replaces and ID say which group the write replaces or removes, when it does: its
-	// current members lose their membership unless the write names them again.
-	Replaces GroupKind
-	ID       int
+	// Replaces is the group the write replaces or removes, when it does: its current members lose
+	// their membership unless the write names them again.
+	Replaces Group
 }

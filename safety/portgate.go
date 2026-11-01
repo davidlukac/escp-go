@@ -13,14 +13,6 @@ import (
 // because a gate that cannot look must not wave a write through.
 var ErrCannotCheckPorts = errors.New("safety: cannot check what the ports are used for")
 
-// portReader is what PortGate reads through: the client has all of it.
-type portReader interface {
-	Ports(ctx context.Context) ([]escp.Port, error)
-	LAGs(ctx context.Context) ([]escp.LAG, error)
-	PortBasedVLAN(ctx context.Context) (escp.PortBasedVLAN, error)
-	Dot1Q(ctx context.Context) (escp.Dot1Q, error)
-}
-
 // PortGate returns a gate that refuses a write unless every port it touches is free: it must
 // exist, have no link and belong to no LAG (CheckPorts, with the same *PortUseError). It looks
 // at the ports the operation names and, for a write that replaces or removes a group of ports
@@ -34,75 +26,84 @@ type portReader interface {
 // enforced by the library instead of by its own code. A front end with an opt-in leaves it out.
 // Failures to look are refused with ErrCannotCheckPorts.
 func PortGate() escp.WriteGate {
-	return func(ctx context.Context, sw escp.InfoReader, op escp.Operation) error {
+	return func(ctx context.Context, sw escp.Reader, op escp.Operation) error {
 		touched := op.Ports
-		if op.Replaces == 0 && touched.IsEmpty() {
+		if op.Replaces.IsZero() && touched.IsEmpty() {
 			return nil
 		}
-		r, ok := sw.(portReader)
-		if !ok {
-			return fmt.Errorf("%w: %T cannot list ports", ErrCannotCheckPorts, sw)
-		}
-		if op.Replaces != 0 {
-			members, err := membersOf(ctx, r, op.Replaces, op.ID)
-			if err != nil {
-				return fmt.Errorf("%w: %w", ErrCannotCheckPorts, err)
-			}
-			touched = touched.Union(members)
-		}
-		if touched.IsEmpty() {
-			return nil
-		}
-		all, err := r.Ports(ctx)
+		members, err := membersOf(ctx, sw, op.Replaces)
 		if err != nil {
 			return fmt.Errorf("%w: %w", ErrCannotCheckPorts, err)
 		}
-		rule := PortRule{}
-		if op.Replaces == escp.GroupLAG {
-			rule.TolerateLAG = escp.LAGID(op.ID) // the group number of a LAG write is the LAG id
+		touched = touched.Union(members)
+		if touched.IsEmpty() {
+			return nil
 		}
-		return CheckPorts(all, rule, touched)
+		all, err := sw.Ports(ctx)
+		if err != nil {
+			return fmt.Errorf("%w: %w", ErrCannotCheckPorts, err)
+		}
+		return CheckPorts(all, PortRule{TolerateLAG: op.Replaces.LAG}, touched)
 	}
 }
 
-// membersOf lists the ports that belong to a group now (none for a group that does not exist yet).
-func membersOf(ctx context.Context, r portReader, kind escp.GroupKind, id int) (escp.PortSet, error) {
-	switch kind {
-	case escp.GroupLAG:
-		lags, err := r.LAGs(ctx)
+// membersOf lists the ports that belong to the group now (none for no group, or one that does not
+// exist yet). A Group that names more than one kind is read for all of them, so the answer fails closed.
+func membersOf(ctx context.Context, r escp.Reader, g escp.Group) (escp.PortSet, error) {
+	var members escp.PortSet
+	for _, read := range []struct {
+		named bool
+		read  func() (escp.PortSet, error)
+	}{
+		{g.LAG != 0, func() (escp.PortSet, error) { return lagMembers(ctx, r, g.LAG) }},
+		{g.PortVLAN != 0, func() (escp.PortSet, error) { return portVLANMembers(ctx, r, g.PortVLAN) }},
+		{g.Dot1QVLAN != 0, func() (escp.PortSet, error) { return dot1qMembers(ctx, r, g.Dot1QVLAN) }},
+	} {
+		if !read.named {
+			continue
+		}
+		ports, err := read.read()
 		if err != nil {
 			return 0, err
 		}
-		want := escp.LAGID(id)
-		for _, l := range lags {
-			if l.ID == want {
-				return l.Ports, nil
-			}
+		members = members.Union(ports)
+	}
+	return members, nil
+}
+
+func lagMembers(ctx context.Context, r escp.Reader, id escp.LAGID) (escp.PortSet, error) {
+	lags, err := r.LAGs(ctx)
+	if err != nil {
+		return 0, err
+	}
+	for _, l := range lags {
+		if l.ID == id {
+			return l.Ports, nil
 		}
-	case escp.GroupPortVLAN:
-		v, err := r.PortBasedVLAN(ctx)
-		if err != nil {
-			return 0, err
+	}
+	return 0, nil
+}
+
+func portVLANMembers(ctx context.Context, r escp.Reader, id escp.PortVLANID) (escp.PortSet, error) {
+	v, err := r.PortBasedVLAN(ctx)
+	if err != nil {
+		return 0, err
+	}
+	if ports, ok := v.Group(id); ok {
+		return ports, nil
+	}
+	return 0, nil
+}
+
+func dot1qMembers(ctx context.Context, r escp.Reader, id escp.VLANID) (escp.PortSet, error) {
+	q, err := r.Dot1Q(ctx)
+	if err != nil {
+		return 0, err
+	}
+	for _, v := range q.VLANs {
+		if v.ID == id {
+			return v.Tagged.Union(v.Untagged), nil
 		}
-		want := escp.PortVLANID(id)
-		for _, g := range v.VLANs {
-			if g.ID == want {
-				return g.Ports, nil
-			}
-		}
-	case escp.GroupDot1QVLAN:
-		q, err := r.Dot1Q(ctx)
-		if err != nil {
-			return 0, err
-		}
-		want := escp.VLANID(id) // the group number of a 802.1Q write is the VLAN id
-		for _, v := range q.VLANs {
-			if v.ID == want {
-				return v.Tagged.Union(v.Untagged), nil
-			}
-		}
-	default:
-		return 0, fmt.Errorf("safety: unknown group kind %d", kind)
 	}
 	return 0, nil
 }

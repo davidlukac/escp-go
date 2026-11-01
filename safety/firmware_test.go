@@ -67,6 +67,7 @@ func TestVerifiedFirmwareBuildsIsACopy(t *testing.T) {
 
 // infoSource is a switch that reports a firmware version, or fails to.
 type infoSource struct {
+	escp.Reader
 	firmware string
 	err      error
 	reads    int

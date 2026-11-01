@@ -10,13 +10,14 @@ import (
 
 // switchView is a switch as the gate can read it, counting the reads.
 type switchView struct {
-	ports    []escp.Port
-	lags     []escp.LAG
-	pvlans   escp.PortBasedVLAN
-	dot1q    escp.Dot1Q
-	failWith error  // the read named in failOn fails with it
-	failOn   string // "Ports", "LAGs", "PortBasedVLAN" or "Dot1Q"
-	reads    int
+	escp.Reader // the reads a gate does not make panic if they are made
+	ports       []escp.Port
+	lags        []escp.LAG
+	pvlans      escp.PortBasedVLAN
+	dot1q       escp.Dot1Q
+	failWith    error  // the read named in failOn fails with it
+	failOn      string // "Ports", "LAGs", "PortBasedVLAN" or "Dot1Q"
+	reads       int
 }
 
 func (s *switchView) Info(context.Context) (escp.Info, error) { return escp.Info{}, nil }
@@ -72,20 +73,21 @@ func TestPortGate(t *testing.T) {
 		{"a port the switch does not have", escp.Operation{Name: "SetPort", Ports: escp.MustPortSet(9)}, &PortUseError{Port: 9, Reason: PortMissing}, 1},
 		{"an idle LAG member is refused when not editing its LAG", escp.Operation{Name: "SetPort", Ports: escp.MustPortSet(2)}, &PortUseError{Port: 2, Reason: PortInLAG, LAG: 1}, 1},
 
-		{"a new LAG over free ports", escp.Operation{Name: "SetLAG", Ports: escp.MustPortSet(3, 4), Replaces: escp.GroupLAG, ID: 3}, nil, 2},
-		{"a LAG edit tolerates the group's own idle member", escp.Operation{Name: "SetLAG", Ports: escp.MustPortSet(5, 3), Replaces: escp.GroupLAG, ID: 2}, nil, 2},
-		{"removing a LAG whose member carries the uplink is refused", escp.Operation{Name: "SetLAG", Replaces: escp.GroupLAG, ID: 1}, &PortUseError{Port: 1, Reason: PortLinkUp, Speed: "1000Mbps-full", LAG: 1}, 2},
-		{"replacing a LAG's members is refused for the member it drops", escp.Operation{Name: "SetLAG", Ports: escp.MustPortSet(3, 4), Replaces: escp.GroupLAG, ID: 1}, &PortUseError{Port: 1, Reason: PortLinkUp, Speed: "1000Mbps-full", LAG: 1}, 2},
-		{"a LAG edit does not tolerate another group's member", escp.Operation{Name: "SetLAG", Ports: escp.MustPortSet(2, 3), Replaces: escp.GroupLAG, ID: 2}, &PortUseError{Port: 2, Reason: PortInLAG, LAG: 1}, 2},
+		{"a new LAG over free ports", escp.Operation{Name: "SetLAG", Ports: escp.MustPortSet(3, 4), Replaces: escp.Group{LAG: 3}}, nil, 2},
+		{"a LAG edit tolerates the group's own idle member", escp.Operation{Name: "SetLAG", Ports: escp.MustPortSet(5, 3), Replaces: escp.Group{LAG: 2}}, nil, 2},
+		{"removing a LAG whose member carries the uplink is refused", escp.Operation{Name: "SetLAG", Replaces: escp.Group{LAG: 1}}, &PortUseError{Port: 1, Reason: PortLinkUp, Speed: "1000Mbps-full", LAG: 1}, 2},
+		{"replacing a LAG's members is refused for the member it drops", escp.Operation{Name: "SetLAG", Ports: escp.MustPortSet(3, 4), Replaces: escp.Group{LAG: 1}}, &PortUseError{Port: 1, Reason: PortLinkUp, Speed: "1000Mbps-full", LAG: 1}, 2},
+		{"a LAG edit does not tolerate another group's member", escp.Operation{Name: "SetLAG", Ports: escp.MustPortSet(2, 3), Replaces: escp.Group{LAG: 2}}, &PortUseError{Port: 2, Reason: PortInLAG, LAG: 1}, 2},
 
-		{"a port-based group over free ports", escp.Operation{Name: "SetPortBasedVLAN", Ports: escp.MustPortSet(3), Replaces: escp.GroupPortVLAN, ID: 2}, nil, 2},
-		{"removing the group that holds the uplink is refused", escp.Operation{Name: "SetPortBasedVLAN", Replaces: escp.GroupPortVLAN, ID: 1}, &PortUseError{Port: 1, Reason: PortLinkUp, Speed: "1000Mbps-full", LAG: 1}, 2},
-		{"removing a group that has no members touches nothing", escp.Operation{Name: "SetLAG", Replaces: escp.GroupLAG, ID: 3}, nil, 1},
-		{"a group that does not exist yet has no old members", escp.Operation{Name: "SetPortBasedVLAN", Ports: escp.MustPortSet(4), Replaces: escp.GroupPortVLAN, ID: 7}, nil, 2},
+		{"a port-based group over free ports", escp.Operation{Name: "SetPortBasedVLAN", Ports: escp.MustPortSet(3), Replaces: escp.Group{PortVLAN: 2}}, nil, 2},
+		{"removing the group that holds the uplink is refused", escp.Operation{Name: "SetPortBasedVLAN", Replaces: escp.Group{PortVLAN: 1}}, &PortUseError{Port: 1, Reason: PortLinkUp, Speed: "1000Mbps-full", LAG: 1}, 2},
+		{"removing a group that has no members touches nothing", escp.Operation{Name: "SetLAG", Replaces: escp.Group{LAG: 3}}, nil, 1},
+		{"a group that does not exist yet has no old members", escp.Operation{Name: "SetPortBasedVLAN", Ports: escp.MustPortSet(4), Replaces: escp.Group{PortVLAN: 7}}, nil, 2},
 
-		{"an 802.1Q VLAN without a linked member", escp.Operation{Name: "SetDot1QVLAN", Ports: escp.MustPortSet(4), Replaces: escp.GroupDot1QVLAN, ID: 20}, &PortUseError{Port: 6, Reason: PortLinkUp, Speed: "100Mbps-full"}, 2},
-		{"rewriting VLAN 1 so that it drops the uplink is refused", escp.Operation{Name: "SetDot1QVLAN", Ports: escp.MustPortSet(3, 4), Replaces: escp.GroupDot1QVLAN, ID: 1}, &PortUseError{Port: 1, Reason: PortLinkUp, Speed: "1000Mbps-full", LAG: 1}, 2},
-		{"deleting VLAN 1 names no port and is still refused", escp.Operation{Name: "DeleteDot1QVLAN", Replaces: escp.GroupDot1QVLAN, ID: 1}, &PortUseError{Port: 1, Reason: PortLinkUp, Speed: "1000Mbps-full", LAG: 1}, 2},
+		{"an 802.1Q VLAN that does not exist yet has no old members", escp.Operation{Name: "SetDot1QVLAN", Ports: escp.MustPortSet(4), Replaces: escp.Group{Dot1QVLAN: 99}}, nil, 2},
+		{"an 802.1Q VLAN without a linked member", escp.Operation{Name: "SetDot1QVLAN", Ports: escp.MustPortSet(4), Replaces: escp.Group{Dot1QVLAN: 20}}, &PortUseError{Port: 6, Reason: PortLinkUp, Speed: "100Mbps-full"}, 2},
+		{"rewriting VLAN 1 so that it drops the uplink is refused", escp.Operation{Name: "SetDot1QVLAN", Ports: escp.MustPortSet(3, 4), Replaces: escp.Group{Dot1QVLAN: 1}}, &PortUseError{Port: 1, Reason: PortLinkUp, Speed: "1000Mbps-full", LAG: 1}, 2},
+		{"deleting VLAN 1 names no port and is still refused", escp.Operation{Name: "DeleteDot1QVLAN", Replaces: escp.Group{Dot1QVLAN: 1}}, &PortUseError{Port: 1, Reason: PortLinkUp, Speed: "1000Mbps-full", LAG: 1}, 2},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -113,15 +115,10 @@ func TestPortGateRefusesWhenItCannotLook(t *testing.T) {
 	ctx := context.Background()
 	boom := errors.New("no reply")
 	named := escp.Operation{Name: "SetPort", Ports: escp.MustPortSet(3)}
-	t.Run("the reader cannot list ports", func(t *testing.T) {
-		err := PortGate()(ctx, plainReader{}, named)
-		if !errors.Is(err, ErrCannotCheckPorts) {
-			t.Fatalf("got %v", err)
-		}
-	})
-	t.Run("an operation that names nothing and replaces nothing needs no reader", func(t *testing.T) {
-		if err := PortGate()(ctx, plainReader{}, escp.Operation{Name: "SetLED"}); err != nil {
-			t.Fatal(err)
+	t.Run("an operation that names nothing and replaces nothing reads nothing", func(t *testing.T) {
+		sw := view()
+		if err := PortGate()(ctx, sw, escp.Operation{Name: "SetLED"}); err != nil || sw.reads != 0 {
+			t.Fatalf("got %v after %d reads", err, sw.reads)
 		}
 	})
 	for _, tc := range []struct {
@@ -129,10 +126,10 @@ func TestPortGateRefusesWhenItCannotLook(t *testing.T) {
 		op     escp.Operation
 	}{
 		{"Ports", named},
-		{"Ports", escp.Operation{Name: "SetLAG", Ports: escp.MustPortSet(3, 4), Replaces: escp.GroupLAG, ID: 1}}, // the groups read fine, the ports do not
-		{"LAGs", escp.Operation{Name: "SetLAG", Ports: escp.MustPortSet(3, 4), Replaces: escp.GroupLAG, ID: 1}},
-		{"PortBasedVLAN", escp.Operation{Name: "SetPortBasedVLAN", Ports: escp.MustPortSet(3), Replaces: escp.GroupPortVLAN, ID: 2}},
-		{"Dot1Q", escp.Operation{Name: "SetDot1QVLAN", Ports: escp.MustPortSet(3), Replaces: escp.GroupDot1QVLAN, ID: 20}},
+		{"Ports", escp.Operation{Name: "SetLAG", Ports: escp.MustPortSet(3, 4), Replaces: escp.Group{LAG: 1}}}, // the groups read fine, the ports do not
+		{"LAGs", escp.Operation{Name: "SetLAG", Ports: escp.MustPortSet(3, 4), Replaces: escp.Group{LAG: 1}}},
+		{"PortBasedVLAN", escp.Operation{Name: "SetPortBasedVLAN", Ports: escp.MustPortSet(3), Replaces: escp.Group{PortVLAN: 2}}},
+		{"Dot1Q", escp.Operation{Name: "SetDot1QVLAN", Ports: escp.MustPortSet(3), Replaces: escp.Group{Dot1QVLAN: 20}}},
 	} {
 		op := tc.op
 		t.Run("reading "+tc.reader+" fails for "+op.Name, func(t *testing.T) {
@@ -144,23 +141,24 @@ func TestPortGateRefusesWhenItCannotLook(t *testing.T) {
 			}
 		})
 	}
-	t.Run("a group kind it does not know", func(t *testing.T) {
-		err := PortGate()(ctx, view(), escp.Operation{Name: "SetX", Replaces: escp.GroupKind(99), ID: 1})
-		if !errors.Is(err, ErrCannotCheckPorts) {
-			t.Fatalf("got %v", err)
-		}
-	})
+	_ = named
 }
 
-// plainReader is an InfoReader that cannot list ports.
-type plainReader struct{}
-
-func (plainReader) Info(context.Context) (escp.Info, error) { return escp.Info{}, nil }
+// A Group that names several kinds is read for all of them: the answer fails closed.
+func TestPortGateReadsEveryGroupAnOperationNames(t *testing.T) {
+	sw := view()
+	op := escp.Operation{Name: "SetX", Replaces: escp.Group{LAG: 2, PortVLAN: 1}}
+	err := PortGate()(context.Background(), sw, op)
+	var got *PortUseError
+	if !errors.As(err, &got) || got.Port != 1 { // port 1 is in port-based group 1 and linked
+		t.Fatalf("got %v, want port 1 refused", err)
+	}
+}
 
 func TestPortGateUsesTheNamedPortsEvenWhenTheGroupIsEmpty(t *testing.T) {
 	sw := view()
 	sw.lags = nil // no LAG exists yet
-	err := PortGate()(context.Background(), sw, escp.Operation{Name: "SetLAG", Ports: escp.MustPortSet(6, 3), Replaces: escp.GroupLAG, ID: 2})
+	err := PortGate()(context.Background(), sw, escp.Operation{Name: "SetLAG", Ports: escp.MustPortSet(6, 3), Replaces: escp.Group{LAG: 2}})
 	var got *PortUseError
 	if !errors.As(err, &got) || got.Port != 6 {
 		t.Fatalf("got %v, want port 6 refused", err)

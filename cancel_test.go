@@ -46,7 +46,7 @@ func TestCancellationBetweenTwoWritesStopsTheSecond(t *testing.T) {
 	var consulted int
 	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 300 * time.Millisecond,
 		SwitchPort: f.Port(), BroadcastAddr: escptest.Loopback(),
-		WriteGate: func(context.Context, InfoReader, Operation) error {
+		WriteGate: func(context.Context, Reader, Operation) error {
 			if consulted++; consulted == 2 {
 				cancel()
 			}
