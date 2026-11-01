@@ -23,7 +23,11 @@ if err != nil { /* ... */ }
 defer c.Close()
 
 info, err := c.Info(ctx)   // model, firmware, MAC, address: no credentials needed
+if err != nil { /* ... */ }
+fmt.Println(info.Model, info.Firmware, info.MAC)
+
 ports, err := c.Ports(ctx) // reads cannot change the switch
+if err != nil { /* ... */ }
 for _, p := range ports {
 	fmt.Printf("port %d: %s (configured %s)\n", p.ID, p.ActualSpeed, p.ConfiguredSpeed)
 }
@@ -37,7 +41,7 @@ for _, p := range ports {
 
 ## Find switches
 
-`Discover` finds the switches on the local network without credentials or addresses. Run it on its own: it listens on UDP port 29809, which a `Client` or the vendor's utility on the same host would share out unpredictably.
+`Discover` finds the switches on the local network without credentials or addresses. It listens on UDP port 29809, the port every client of the host shares (see above), so it can run next to a `Client`: on macOS it found both test switches three times out of three while a client was reading. Where the system gives a datagram to only one of the sockets that share a port, either of them could miss a reply (whether the switches address their replies to the broadcast address, which every sharing socket receives, or to the host, was not captured), so run `Discover` on its own when you can; a program that holds the port exclusively, such as an old Easy Smart utility, makes it fail to bind.
 
 ```go
 switches, err := escp.Discover(ctx, escp.DiscoverOptions{Window: 2 * time.Second})
