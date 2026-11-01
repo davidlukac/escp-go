@@ -311,6 +311,28 @@ func TestDiscoverUnknownInterfaceOnThisHost(t *testing.T) {
 	}
 }
 
+// hostInterfaces reads this machine's interfaces (nothing is sent). Whatever it finds must be usable
+// for a probe: a hardware address and a broadcast address each.
+func TestHostInterfacesAreUsableOnes(t *testing.T) {
+	ifs, err := hostInterfaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, ifc := range ifs {
+		if ifc.Name == "" || ifc.MAC.IsZero() || len(ifc.Broadcasts) == 0 {
+			t.Errorf("%+v is not an interface a probe can leave through", ifc)
+		}
+	}
+}
+
+func TestInterfacesOfReportsAListingThatFails(t *testing.T) {
+	boom := errors.New("no netlink")
+	_, err := interfacesOf(func() ([]net.Interface, error) { return nil, boom }, nil)
+	if !errors.Is(err, boom) || !strings.Contains(err.Error(), "listing network interfaces") {
+		t.Fatalf("got %v", err)
+	}
+}
+
 func TestUsableInterfaces(t *testing.T) {
 	up := net.FlagUp | net.FlagBroadcast
 	mac := net.HardwareAddr{2, 0, 0, 0, 0, 1}

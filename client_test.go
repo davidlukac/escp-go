@@ -214,6 +214,15 @@ func TestLocalMAC(t *testing.T) {
 // The first interface with a hardware address is not the one that holds the address: the lookup
 // must follow the address, skip what cannot be listed or has no hardware address, and give zero
 // for an address no interface holds. (The test above depends on the host's own interfaces.)
+// The lookup a client uses is Locate on this host's interfaces. A zero MAC is refused before
+// anything is sent, so the wrapper can be called without touching the network.
+func TestHostLocatorIsLocate(t *testing.T) {
+	_, err := hostLocator(nil)(context.Background(), MAC{})
+	if !errors.Is(err, ErrInvalid) {
+		t.Fatalf("a lookup of the zero MAC = %v, want ErrInvalid", err)
+	}
+}
+
 func TestMacHolding(t *testing.T) {
 	macA, macB := net.HardwareAddr{2, 0, 0, 0, 0, 0xa}, net.HardwareAddr{2, 0, 0, 0, 0, 0xb}
 	ifs := []net.Interface{
