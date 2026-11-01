@@ -11,11 +11,11 @@ c, err := escp.Dial(escp.Config{
 	Host: host, Username: user, Password: escp.Password(pw),
 	WriteGate: safety.Chain(
 		safety.FirmwareGate(),                // only firmware builds this client was verified against
-		safety.MaxImpact(escp.ImpactTraffic), // nothing that can cut the management path
+		safety.MaxImpact(escp.ImpactTraffic), // nothing that can cut the management path: no port setting, VLAN, LAG, address...
 		safety.PortGate(),                    // only ports with no link and no LAG
 	),
 })
-err = c.SetPort(ctx, escp.PortConfig{ID: 3, Enabled: true, Speed: escp.SpeedAuto})
+err = c.SetBandwidth(ctx, escp.PortBandwidth{Port: 3, Ingress: 10240})
 var refused *safety.PortUseError
 if errors.As(err, &refused) { /* the gate refused; nothing was sent */ }
 ```
@@ -29,7 +29,7 @@ A gate is a plain function, `func(ctx, escp.Reader, escp.Operation) error`; writ
 | Gate | Refuses |
 |---|---|
 | `safety.FirmwareGate()` | a write on a firmware build this library was not verified against (`*safety.FirmwareError`) |
-| `safety.MaxImpact(i)` | a write whose worst case is above `i` (`*safety.ImpactError`) |
+| `safety.MaxImpact(i)` | a write whose class is above `i` (`*safety.ImpactError`) |
 | `safety.PortGate()` | a write that touches a port with a link, in a link aggregation group, or that the switch does not have (`*safety.PortUseError`); for a write that replaces a group of ports it checks the group's current members too |
 | `safety.NewDryRun().Gate()` | every write, with `safety.ErrDryRun`, after recording the operation; `Operations()` lists what would have been written |
 
@@ -37,11 +37,13 @@ A gate is a plain function, `func(ctx, escp.Reader, escp.Operation) error`; writ
 
 ## Impact
 
-`Impact` is the worst a method can do with any arguments:
+`Impact` classes the kind of change a method is, by what it can do to the way the switch is reached. A method that can cut the management path or the uplink with the right arguments is `ImpactManagement`, whichever port it is aimed at; the class does not know which port is the uplink (that is what `PortGate` and your own knowledge are for).
 
 - `ImpactCosmetic`: the LED, the device description.
-- `ImpactTraffic`: port settings, rate limits, storm control, QoS, IGMP, mirroring, VLAN groups.
-- `ImpactManagement`: the IP settings, the VLAN mode, PVIDs, link aggregation, loop prevention.
+- `ImpactTraffic`: rate limits, storm control, QoS and IGMP snooping: they slow or drop some traffic but take no port, address or VLAN away.
+- `ImpactManagement`: the IP settings and DHCP, the VLAN mode, port-based and 802.1Q VLAN membership and PVIDs, port settings (a port turned off or retuned), link aggregation, port mirroring and loop prevention.
+
+**Choosing a ceiling.** `MaxImpact(ImpactTraffic)` is the strict gate: it refuses every method of the third class, so a front end that only tunes rates and QoS cannot cut anything by mistake. A front end that does write port settings or VLANs allows `ImpactManagement` and puts its protection elsewhere: `PortGate` (free ports only), its own confirmation, a dry run first.
 
 ## What the client does not do
 

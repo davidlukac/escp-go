@@ -110,19 +110,19 @@ func ExampleConfig_writeGate() {
 	defer func() { _ = c.Close() }()
 
 	ctx := context.Background()
-	err = c.SetPort(ctx, escp.PortConfig{ID: 1, Enabled: false, Speed: escp.SpeedAuto})
+	err = c.SetBandwidth(ctx, escp.PortBandwidth{Port: 1, Ingress: 64})
 	var inUse *safety.PortUseError
 	if errors.As(err, &inUse) {
 		fmt.Println("refused:", err)
 	}
 	fmt.Println("writes reaching the switch:", sw.WriteCount())
 
-	err = c.SetPort(ctx, escp.PortConfig{ID: 2, Enabled: false, Speed: escp.SpeedAuto})
+	err = c.SetBandwidth(ctx, escp.PortBandwidth{Port: 2, Ingress: 64})
 	fmt.Println("port 2:", err, "- writes reaching the switch:", sw.WriteCount())
 	// Output:
 	// refused: port 1 has a link up (1000Mbps-full)
 	// writes reaching the switch: 0
-	// port 2: <nil> - writes reaching the switch: 1
+	// port 2: <nil> - writes reaching the switch: 2
 }
 
 // A set of ports is a value: no duplicates, ascending, and a port the switch cannot have is refused.

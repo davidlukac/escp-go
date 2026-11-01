@@ -96,7 +96,7 @@ func ExampleDryRun() {
 
 	for _, op := range []escp.Operation{
 		{Name: "SetLED", Impact: escp.ImpactCosmetic},
-		{Name: "SetPort", Ports: escp.MustPortSet(7), Impact: escp.ImpactTraffic},
+		{Name: "SetBandwidth", Ports: escp.MustPortSet(7), Impact: escp.ImpactTraffic},
 		{Name: "SetLAG", Ports: escp.MustPortSet(5, 6), Impact: escp.ImpactManagement},
 	} {
 		err := gate(ctx, firmware(""), op)
@@ -111,7 +111,7 @@ func ExampleDryRun() {
 	fmt.Println(len(dry.Operations()), "recorded")
 	// Output:
 	// would write: SetLED
-	// would write: SetPort
+	// would write: SetBandwidth
 	// refused: SetLAG has impact management, above the allowed traffic
 	// 2 recorded
 }
@@ -142,14 +142,16 @@ func ExampleMaxImpact() {
 	ctx := context.Background()
 	for _, op := range []escp.Operation{
 		{Name: "SetLED", Impact: escp.ImpactCosmetic},
-		{Name: "SetPort", Impact: escp.ImpactTraffic},
+		{Name: "SetBandwidth", Impact: escp.ImpactTraffic},
+		{Name: "SetPort", Impact: escp.ImpactManagement},
 		{Name: "SetIPConfig", Impact: escp.ImpactManagement},
 	} {
 		fmt.Printf("%s: %v\n", op.Name, gate(ctx, firmware(""), op))
 	}
 	// Output:
 	// SetLED: <nil>
-	// SetPort: <nil>
+	// SetBandwidth: <nil>
+	// SetPort: SetPort has impact management, above the allowed traffic
 	// SetIPConfig: SetIPConfig has impact management, above the allowed traffic
 }
 
@@ -175,8 +177,8 @@ func ExampleChain() {
 	sw := switchPorts(escp.Port{ID: 1, ActualSpeed: escp.Speed1000Full}, escp.Port{ID: 2, ActualSpeed: escp.SpeedLinkDown})
 	gate := safety.Chain(safety.MaxImpact(escp.ImpactTraffic), safety.PortGate())
 	ctx := context.Background()
-	fmt.Println(gate(ctx, sw, escp.Operation{Name: "SetPort", Ports: escp.MustPortSet(2), Impact: escp.ImpactTraffic}))
-	fmt.Println(gate(ctx, sw, escp.Operation{Name: "SetPort", Ports: escp.MustPortSet(1), Impact: escp.ImpactTraffic}))
+	fmt.Println(gate(ctx, sw, escp.Operation{Name: "SetBandwidth", Ports: escp.MustPortSet(2), Impact: escp.ImpactTraffic}))
+	fmt.Println(gate(ctx, sw, escp.Operation{Name: "SetBandwidth", Ports: escp.MustPortSet(1), Impact: escp.ImpactTraffic}))
 	fmt.Println(gate(ctx, sw, escp.Operation{Name: "SetLAG", Ports: escp.MustPortSet(2), Impact: escp.ImpactManagement}))
 	// Output:
 	// <nil>
