@@ -65,6 +65,29 @@ type Config struct {
 	Logger *slog.Logger
 }
 
+// maxUDPPort is the highest UDP port number.
+const maxUDPPort = 1<<16 - 1
+
+// Validate checks the configuration the way Dial does, before anything is resolved or sent: a switch
+// to talk to (Host or MAC), no negative Timeout, ports that are UDP ports and an IPv4 BroadcastAddr.
+// The zero value of every optional field is valid (it selects the default). The error matches
+// ErrInvalid.
+func (cfg Config) Validate() error {
+	switch {
+	case cfg.Host == "" && cfg.MAC.IsZero():
+		return invalidf("escp: Config needs a Host or a MAC to find the switch by")
+	case cfg.Timeout < 0:
+		return invalidf("escp: negative Timeout %v", cfg.Timeout)
+	case cfg.SwitchPort < 0 || cfg.SwitchPort > maxUDPPort:
+		return invalidf("escp: SwitchPort %d is not a UDP port (1 to %d, or 0 for %d)", cfg.SwitchPort, maxUDPPort, defaultSwitchPort)
+	case cfg.HostPort < 0 || cfg.HostPort > maxUDPPort:
+		return invalidf("escp: HostPort %d is not a UDP port (1 to %d, or 0 for %d)", cfg.HostPort, maxUDPPort, defaultHostPort)
+	case cfg.BroadcastAddr.IsValid() && !cfg.BroadcastAddr.Is4():
+		return invalidf("escp: BroadcastAddr %s is not an IPv4 address", cfg.BroadcastAddr)
+	}
+	return nil
+}
+
 // InfoReader is the part of a Client that a WriteGate may use. It only reads.
 type InfoReader interface {
 	Info(ctx context.Context) (Info, error)

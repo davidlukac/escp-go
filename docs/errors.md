@@ -6,7 +6,7 @@ Test errors with `errors.Is` and `errors.As`, never by message.
 |---|---|
 | `ErrInvalid` | an argument was refused before any write was sent; the message names the value and what is allowed |
 | `ErrNoReply` | the switch did not answer in time |
-| `ErrRejected`, `*RejectedError` | the switch refused a write; the error carries the code (`ReplyCode`) and, for the known ones, the reason |
+| `ErrRejected`, `*RejectedError` | the switch answered with a non-zero code: it refused a write, would not report a setting or did not accept the session key; the error carries the code (`ReplyCode`) and, for the known ones, the reason |
 | `ErrMoveUnconfirmed` | `SetIPConfig` lost track of the switch: look at both addresses before believing either |
 | `ErrNoInterface` | `Discover` has nowhere to send |
 | `ErrInvalidConfig` | a configuration backup that is not complete, after the download was repeated |

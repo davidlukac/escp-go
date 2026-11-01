@@ -77,24 +77,24 @@ func (c *Client) SetStormControl(ctx context.Context, cfg StormConfig) error {
 	if err := cfg.Port.Validate(); err != nil {
 		return err
 	}
-	any := cfg.UnknownUnicast || cfg.Multicast || cfg.Broadcast
+	limited := cfg.UnknownUnicast || cfg.Multicast || cfg.Broadcast
 	switch {
-	case any && (cfg.RateKbps < RateStepKbps || cfg.RateKbps.Validate() != nil):
+	case limited && (cfg.RateKbps < RateStepKbps || cfg.RateKbps.Validate() != nil):
 		return invalidf("escp: storm control on port %d needs a rate that is a multiple of %d kbps between %d and %d, got %d", cfg.Port, RateStepKbps, RateStepKbps, MaxBandwidthKbps, cfg.RateKbps)
-	case !any && cfg.RateKbps != 0:
+	case !limited && cfg.RateKbps != 0:
 		return invalidf("escp: storm control on port %d has a rate (%d) but no traffic type selected", cfg.Port, cfg.RateKbps)
 	}
 	if err := c.requirePorts(ctx, cfg.Port.set()); err != nil {
 		return err
 	}
-	if any {
+	if limited {
 		if err := c.requireNoIngressLimit(ctx, cfg.Port); err != nil {
 			return err
 		}
 	}
 	v := make([]byte, stormEntryLen)
 	v[stormOffPort] = byte(cfg.Port)
-	v[stormOffEnabled] = boolByte(any)
+	v[stormOffEnabled] = boolByte(limited)
 	v[stormOffUnknownUnicast], v[stormOffMulticast], v[stormOffBroadcast] = boolByte(cfg.UnknownUnicast), boolByte(cfg.Multicast), boolByte(cfg.Broadcast)
 	binary.BigEndian.PutUint32(v[stormOffRate:], uint32(cfg.RateKbps))
 	return c.setTLVs(ctx, Operation{Name: "SetStormControl", Ports: cfg.Port.set(), Impact: ImpactTraffic}, wire.TLV{Type: wire.TLVStormControl, Value: v})

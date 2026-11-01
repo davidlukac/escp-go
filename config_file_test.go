@@ -2,6 +2,8 @@ package escp
 
 import (
 	"bytes"
+	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -42,6 +44,14 @@ func TestConfigFileNeverPrintsItsBytes(t *testing.T) {
 	}
 	if got := f.String(); !strings.Contains(got, "20 bytes") || !strings.Contains(got, f.SHA256()) {
 		t.Errorf("String = %q, want the size and the hash", got)
+	}
+	// An encoder would write the bytes of a []byte type as base64 unless the type says otherwise.
+	type backup struct{ File ConfigFile }
+	for name, encode := range map[string]func(any) ([]byte, error){"json": json.Marshal, "xml": xml.Marshal} {
+		got, err := encode(backup{f})
+		if err != nil || strings.Contains(string(got), marker) || strings.Contains(string(got), f.Base64()) || !strings.Contains(string(got), f.SHA256()) {
+			t.Errorf("%s = %s, %v; want the size and hash, not the bytes", name, got, err)
+		}
 	}
 	var buf bytes.Buffer
 	slog.New(slog.NewJSONHandler(&buf, nil)).Info("backup", "file", f)

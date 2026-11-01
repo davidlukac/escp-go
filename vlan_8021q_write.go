@@ -3,7 +3,9 @@ package escp
 import (
 	"context"
 	"encoding/binary"
+	"maps"
 	"regexp"
+	"slices"
 	"strconv"
 
 	"github.com/davidlukac/escp-go/internal/wire"
@@ -124,7 +126,8 @@ func (c *Client) SetPVIDs(ctx context.Context, pvids map[PortID]VLANID) error {
 		return invalidf("escp: no PVIDs to set")
 	}
 	var named PortSet
-	for p, id := range pvids {
+	for _, p := range slices.Sorted(maps.Keys(pvids)) { // lowest port first: the same input names the same error
+		id := pvids[p]
 		if err := p.Validate(); err != nil {
 			return err
 		}

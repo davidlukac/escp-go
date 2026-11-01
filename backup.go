@@ -20,7 +20,8 @@ var ErrInvalidConfig = errors.New("escp: reply is not a switch configuration fil
 
 // ConfigFile is the switch's binary configuration file, as ConfigBackup returns it. It holds
 // the account block of the switch (obfuscated, not safe), so it prints as its size and hash and
-// never as its bytes, under every fmt verb and in slog; convert it to []byte for the bytes.
+// never as its bytes, under every fmt verb, in slog and in encoders (JSON, XML); convert it to []byte
+// for the bytes.
 type ConfigFile []byte
 
 // Size is the length of the file in bytes.
@@ -42,6 +43,11 @@ func (f ConfigFile) String() string {
 
 // GoString is String, so %#v does not print the bytes either.
 func (f ConfigFile) GoString() string { return f.String() }
+
+// MarshalText makes the encoders that honour encoding.TextMarshaler (encoding/json, encoding/xml)
+// write the size and hash too, as String does, and not the bytes. To store or send the file as text,
+// encode Base64() on purpose.
+func (f ConfigFile) MarshalText() ([]byte, error) { return []byte(f.String()), nil }
 
 // LogValue makes slog log the size and hash instead of the bytes.
 func (f ConfigFile) LogValue() slog.Value { return slog.StringValue(f.String()) }

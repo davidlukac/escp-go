@@ -3,6 +3,8 @@ package escp
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 
 	"github.com/davidlukac/escp-go/internal/wire"
 )
@@ -132,7 +134,8 @@ func (c *Client) SetPortPriorities(ctx context.Context, changes map[PortID]Prior
 	for _, p := range cur.Priorities {
 		prio[p.Port] = p.Priority
 	}
-	for port, v := range changes {
+	for _, port := range slices.Sorted(maps.Keys(changes)) { // lowest port first: the same input names the same error
+		v := changes[port]
 		if _, ok := prio[port]; !ok {
 			return invalidf("escp: port %d does not exist", port)
 		}
