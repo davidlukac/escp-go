@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"net/netip"
+	"strings"
 	"time"
 )
 
@@ -25,8 +26,10 @@ const defaultRetries = 2
 // required. A Config holds the switch's password as a Password, which prints as [redacted], so a
 // Config can be logged or put in an error message; keep the text itself (Reveal) out of both.
 type Config struct {
-	// Host is the switch's IPv4 address or hostname. It is required unless MAC is set, in which
-	// case the address is found by discovery on the first request.
+	// Host is the switch's IPv4 address or hostname (no port: that is SwitchPort; no IPv6). It
+	// is required unless MAC is set, in which case the address is found by discovery on the
+	// first request. An address that reaches no single device (0.0.0.0, a multicast group,
+	// 255.255.255.255) is refused.
 	Host string
 	// MAC, when set, pins the identity of the switch: a device that answers with another MAC
 	// address is never written to (the request fails with ErrWrongSwitch). With no Host, or when
@@ -69,10 +72,16 @@ type Config struct {
 const maxUDPPort = 1<<16 - 1
 
 // Validate checks the configuration the way Dial does, before anything is resolved or sent: a switch
-// to talk to (Host or MAC), no negative Timeout, ports that are UDP ports and an IPv4 BroadcastAddr.
+// to talk to (Host or MAC; a Host that is no IPv6 address, no host:port and no address that reaches
+// more than one device), no negative Timeout, ports that are UDP ports and an IPv4 BroadcastAddr.
 // The zero value of every optional field is valid (it selects the default). The error matches
 // ErrInvalid.
 func (cfg Config) Validate() error {
+	if cfg.Host != "" {
+		if err := validateHost(cfg.Host); err != nil {
+			return err
+		}
+	}
 	switch {
 	case cfg.Host == "" && cfg.MAC.IsZero():
 		return invalidf("escp: Config needs a Host or a MAC to find the switch by")
@@ -84,6 +93,24 @@ func (cfg Config) Validate() error {
 		return invalidf("escp: HostPort %d is not a UDP port (1 to %d, or 0 for %d)", cfg.HostPort, maxUDPPort, defaultHostPort)
 	case cfg.BroadcastAddr.IsValid() && !cfg.BroadcastAddr.Is4():
 		return invalidf("escp: BroadcastAddr %s is not an IPv4 address", cfg.BroadcastAddr)
+	}
+	return nil
+}
+
+// limitedBroadcast is the IPv4 address that every host of the segment answers to.
+var limitedBroadcast = netip.AddrFrom4([4]byte{255, 255, 255, 255})
+
+// validateHost refuses a Host that cannot name one switch: it has a colon (an IPv6 address or a
+// port; the client speaks IPv4 and takes the port from SwitchPort) or a space, or it is an IPv4
+// address that reaches many devices or none (the unspecified address, a multicast group, the
+// limited broadcast). A write to such an address would carry the password to every device that
+// listens. A name is not looked up here; Dial does that.
+func validateHost(host string) error {
+	if strings.ContainsAny(host, ": \t") {
+		return invalidf("escp: Host %q is not an IPv4 address or a host name (no IPv6, no port, no spaces)", host)
+	}
+	if a, err := netip.ParseAddr(host); err == nil && (a.IsUnspecified() || a.IsMulticast() || a == limitedBroadcast) {
+		return invalidf("escp: Host %s does not name one switch (an unspecified, multicast or broadcast address)", host)
 	}
 	return nil
 }

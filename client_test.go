@@ -23,12 +23,23 @@ func TestConfigValidate(t *testing.T) {
 		{"a host", Config{Host: "192.0.2.11"}, ""},
 		{"a MAC and no host", Config{MAC: mac}, ""},
 		{"every optional field set", Config{Host: "192.0.2.11", Timeout: time.Second, Retries: NoRetries, SwitchPort: 1, HostPort: 65535, BroadcastAddr: netip.MustParseAddr("192.0.2.255")}, ""},
+		{"the highest switch port", Config{Host: "192.0.2.11", SwitchPort: 65535}, ""},
+		{"a host name", Config{Host: "switch.example"}, ""},
+		{"a loopback address (a fake switch)", Config{Host: "127.0.0.1"}, ""},
+		{"an IPv6 host", Config{Host: "::1"}, `Host "::1"`},
+		{"a host with a port", Config{Host: "192.0.2.11:29808"}, `Host "192.0.2.11:29808"`},
+		{"a host with a space", Config{Host: "my switch"}, `Host "my switch"`},
+		{"the unspecified address", Config{Host: "0.0.0.0"}, "Host 0.0.0.0"},
+		{"a multicast address", Config{Host: "224.0.0.1"}, "Host 224.0.0.1"},
+		{"the limited broadcast address", Config{Host: "255.255.255.255"}, "Host 255.255.255.255"},
+		{"the subnet-like address next to the broadcast", Config{Host: "255.255.255.254"}, ""},
 		{"neither a host nor a MAC", Config{Username: "admin"}, "needs a Host or a MAC"},
 		{"a negative timeout", Config{Host: "192.0.2.11", Timeout: -time.Second}, "negative Timeout"},
 		{"a negative switch port", Config{Host: "192.0.2.11", SwitchPort: -1}, "SwitchPort -1"},
 		{"a switch port above the range", Config{Host: "192.0.2.11", SwitchPort: 65536}, "SwitchPort 65536"},
 		{"a negative host port", Config{Host: "192.0.2.11", HostPort: -1}, "HostPort -1"},
 		{"a host port above the range", Config{Host: "192.0.2.11", HostPort: 70000}, "HostPort 70000"},
+		{"the first host port above the range", Config{Host: "192.0.2.11", HostPort: 65536}, "HostPort 65536"},
 		{"an IPv6 broadcast address", Config{Host: "192.0.2.11", BroadcastAddr: netip.MustParseAddr("fe80::1")}, "BroadcastAddr fe80::1"},
 	} {
 		err := tc.cfg.Validate()
@@ -123,9 +134,14 @@ func TestNoRetriesSendsEachRequestOnce(t *testing.T) {
 	}
 }
 
-func TestDialRejectsHostThatIsNotIPv4(t *testing.T) {
-	_, err := Dial(Config{Host: "::1"})
-	if err == nil || !strings.Contains(err.Error(), `resolving "::1"`) {
+// An IPv6 literal never reaches the lookup: Validate refuses it. A name that does not resolve (the
+// .invalid top-level domain never does, RFC 6761) is the lookup's own error, naming the host.
+func TestDialRefusesAnIPv6HostAndReportsANameThatDoesNotResolve(t *testing.T) {
+	if _, err := Dial(Config{Host: "::1"}); !errors.Is(err, ErrInvalid) {
+		t.Errorf("an IPv6 host: got %v, want ErrInvalid", err)
+	}
+	_, err := Dial(Config{Host: "no-such-host.invalid"})
+	if err == nil || errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), `resolving "no-such-host.invalid"`) {
 		t.Fatalf("want a resolution error naming the host, got %v", err)
 	}
 }
