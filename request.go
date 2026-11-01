@@ -71,7 +71,7 @@ func (c *Client) getTLVs(ctx context.Context, types ...wire.TLVType) ([]wire.TLV
 			return err
 		}
 		if r.err != 0 {
-			return fmt.Errorf("escp: switch answered error code %d for TLV types %v", r.err, types)
+			return &RejectedError{Code: r.err, Reason: fmt.Sprintf("the read of TLV types %v was refused", types)}
 		}
 		out = r.tlvs
 		return nil

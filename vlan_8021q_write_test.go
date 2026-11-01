@@ -129,6 +129,20 @@ func TestSetPVIDsWire(t *testing.T) {
 	}
 }
 
+// A map has no order, so a request with several faults must still name the same one every time:
+// the lowest port first.
+func TestSetPVIDsNamesTheLowestFaultyPortFirst(t *testing.T) {
+	f := escptest.Start(t)
+	c := dialFake(t, f, "secret")
+	bad := map[PortID]VLANID{3: 0, 4: 4095, 5: 0, 6: 4095, 7: 0, 8: 4095}
+	for range 50 {
+		err := c.SetPVIDs(context.Background(), bad)
+		if !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "VLAN id 0") {
+			t.Fatalf("want the VLAN id 0 of port 3 to be named first, got %v", err)
+		}
+	}
+}
+
 func TestVLANIDValidate(t *testing.T) {
 	for _, id := range []VLANID{MinVLANID, 100, MaxVLANID} {
 		if err := id.Validate(); err != nil {

@@ -13,6 +13,52 @@ import (
 	"github.com/davidlukac/escp-go/escptest"
 )
 
+func TestConfigValidate(t *testing.T) {
+	mac := MAC{2, 0, 0, 0, 0, 1}
+	for _, tc := range []struct {
+		name string
+		cfg  Config
+		want string // the part of the message that names the problem; empty: valid
+	}{
+		{"a host", Config{Host: "192.0.2.11"}, ""},
+		{"a MAC and no host", Config{MAC: mac}, ""},
+		{"every optional field set", Config{Host: "192.0.2.11", Timeout: time.Second, Retries: NoRetries, SwitchPort: 1, HostPort: 65535, BroadcastAddr: netip.MustParseAddr("192.0.2.255")}, ""},
+		{"neither a host nor a MAC", Config{Username: "admin"}, "needs a Host or a MAC"},
+		{"a negative timeout", Config{Host: "192.0.2.11", Timeout: -time.Second}, "negative Timeout"},
+		{"a negative switch port", Config{Host: "192.0.2.11", SwitchPort: -1}, "SwitchPort -1"},
+		{"a switch port above the range", Config{Host: "192.0.2.11", SwitchPort: 65536}, "SwitchPort 65536"},
+		{"a negative host port", Config{Host: "192.0.2.11", HostPort: -1}, "HostPort -1"},
+		{"a host port above the range", Config{Host: "192.0.2.11", HostPort: 70000}, "HostPort 70000"},
+		{"an IPv6 broadcast address", Config{Host: "192.0.2.11", BroadcastAddr: netip.MustParseAddr("fe80::1")}, "BroadcastAddr fe80::1"},
+	} {
+		err := tc.cfg.Validate()
+		if tc.want == "" {
+			if err != nil {
+				t.Errorf("%s: %v", tc.name, err)
+			}
+			continue
+		}
+		if !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), tc.want) {
+			t.Errorf("%s: %v, want ErrInvalid naming %q", tc.name, err, tc.want)
+		}
+	}
+}
+
+// Dial refuses a configuration that cannot work, with the same error Validate gives and before it
+// looks anything up: the host below would not resolve, so a lookup would say something else.
+func TestDialRefusesWhatValidateRefuses(t *testing.T) {
+	for _, cfg := range []Config{
+		{},
+		{Host: "no-such-host.invalid", Timeout: -time.Second},
+		{Host: "no-such-host.invalid", HostPort: 99999},
+	} {
+		c, err := Dial(cfg)
+		if c != nil || !errors.Is(err, ErrInvalid) || err.Error() != cfg.Validate().Error() {
+			t.Errorf("Dial(%+v) = %v, %v; want ErrInvalid from Validate", cfg, c, err)
+		}
+	}
+}
+
 func TestDialAppliesDefaults(t *testing.T) {
 	c, err := Dial(Config{Host: "127.0.0.1"})
 	if err != nil {

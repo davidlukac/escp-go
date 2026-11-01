@@ -20,7 +20,9 @@ var ErrInvalidConfig = errors.New("escp: reply is not a switch configuration fil
 
 // ConfigFile is the switch's binary configuration file, as ConfigBackup returns it. It holds
 // the account block of the switch (obfuscated, not safe), so it prints as its size and hash and
-// never as its bytes, under every fmt verb and in slog; convert it to []byte for the bytes.
+// never as its bytes, under every fmt verb and in slog; convert it to []byte for the bytes. An
+// encoder (encoding/json) writes the bytes of a []byte type as base64: encode Base64() on purpose,
+// and keep the file out of values that are logged.
 type ConfigFile []byte
 
 // Size is the length of the file in bytes.

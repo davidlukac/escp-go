@@ -11,10 +11,11 @@ var (
 	ErrNoReply = errors.New("escp: no reply from switch")
 	// ErrReplyTooLarge means a fragmented reply grew past the sane limit.
 	ErrReplyTooLarge = errors.New("escp: fragmented reply is larger than any switch sends")
-	// ErrRejected means the switch rejected a write. Wrong credentials are one reason, but
-	// any non-zero reply code lands here (a LAG with ports outside its group's range, for
-	// example, is refused with code 4 although the credentials are fine); the
-	// *RejectedError that wraps it carries the code.
+	// ErrRejected means the switch answered a request with a non-zero code: it rejected a write,
+	// or refused to report a setting. Wrong credentials are one reason, but any non-zero reply
+	// code lands here (a LAG with ports outside its group's range, for example, is refused with
+	// code 4 although the credentials are fine); the *RejectedError that wraps it carries the
+	// code.
 	ErrRejected = errors.New("escp: switch rejected the request")
 	// ErrInvalid means the caller's argument was refused before any write was sent: a port or
 	// id out of range, a rate that is not a multiple of the step, a combination the switch
@@ -68,10 +69,12 @@ func invalidf(format string, args ...any) error {
 // (see RejectedError.Reason); the rest are reported as they came.
 type ReplyCode int32
 
-// RejectedError is a write the switch answered with a non-zero code. It matches
-// ErrRejected (errors.Is) for callers that treat every refusal alike, and names the
-// code for those that want to know which one it was. Reason, when set, says why
-// the switch refused (only for codes whose cause has been established).
+// RejectedError is a request the switch answered with a non-zero code: a write it refused, a
+// read it would not answer, or the session key it did not accept. It matches ErrRejected
+// (errors.Is) for callers that treat every refusal alike, and names the code for those that
+// want to know which one it was. Reason, when set, says why the switch refused (only for codes
+// whose cause has been established, and for the refused reads and keys, whose cause is the
+// request itself).
 type RejectedError struct {
 	Code   ReplyCode
 	Reason string
