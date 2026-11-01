@@ -125,25 +125,40 @@ func (c *Client) open() error {
 	return nil
 }
 
+// discardPort is the UDP "discard" port: localMAC only needs the socket to learn which local address a
+// packet to dst would leave from, and sends nothing.
+const discardPort = 9
+
 // localMAC returns the MAC of the interface used to reach dst, or zero.
-func localMAC(dst net.IP) (mac [6]byte) {
-	probe, err := net.DialUDP("udp4", nil, &net.UDPAddr{IP: dst, Port: 9})
+func localMAC(dst net.IP) [6]byte {
+	probe, err := net.DialUDP("udp4", nil, &net.UDPAddr{IP: dst, Port: discardPort})
 	if err != nil {
-		return
+		return [6]byte{}
 	}
 	defer func() { _ = probe.Close() }() // best-effort: the probe socket only reveals the local address
-	local := probe.LocalAddr().(*net.UDPAddr).IP
 	ifs, _ := net.Interfaces()
+	return macHolding(probe.LocalAddr().(*net.UDPAddr).IP, ifs, func(i net.Interface) ([]net.Addr, error) { return i.Addrs() })
+}
+
+// macHolding returns the hardware address of the first interface of ifs that has a six-byte hardware
+// address and holds addr among the addresses addrs lists for it; zero when there is none. An interface
+// whose addresses cannot be listed is skipped.
+func macHolding(addr net.IP, ifs []net.Interface, addrs func(net.Interface) ([]net.Addr, error)) [6]byte {
 	for _, ifc := range ifs {
-		addrs, _ := ifc.Addrs()
-		for _, a := range addrs {
-			if ipn, ok := a.(*net.IPNet); ok && ipn.IP.Equal(local) && len(ifc.HardwareAddr) == 6 {
-				copy(mac[:], ifc.HardwareAddr)
-				return
+		if len(ifc.HardwareAddr) != macLen {
+			continue
+		}
+		list, err := addrs(ifc)
+		if err != nil {
+			continue
+		}
+		for _, a := range list {
+			if ipn, ok := a.(*net.IPNet); ok && ipn.IP.Equal(addr) {
+				return [6]byte(ifc.HardwareAddr)
 			}
 		}
 	}
-	return
+	return [6]byte{}
 }
 
 // hostLocator is the lookup a client uses: Locate on the interfaces of this host, logging to the

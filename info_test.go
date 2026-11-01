@@ -27,6 +27,19 @@ func TestInfoFromReplyToleratesMissingAndMalformedFields(t *testing.T) {
 	}
 }
 
+// An address TLV holds four bytes. A reply that carries sixteen (an IPv6 address) or eight is no
+// IPv4 address, and must not become one.
+func TestInfoFromReplyReadsOnlyFourByteAddresses(t *testing.T) {
+	got := infoFromReply(reply{tlvs: []wire.TLV{
+		{Type: wire.TLVIP, Value: netip.MustParseAddr("2001:db8::1").AsSlice()},
+		{Type: wire.TLVNetmask, Value: make([]byte, 8)},
+		{Type: wire.TLVGateway, Value: []byte{192, 0, 2, 1}},
+	}})
+	if got.IP.IsValid() || got.Netmask.IsValid() || got.Gateway != netip.MustParseAddr("192.0.2.1") {
+		t.Fatalf("got ip %v, mask %v, gateway %v", got.IP, got.Netmask, got.Gateway)
+	}
+}
+
 func TestInfo(t *testing.T) {
 	c := dialFake(t, escptest.Start(t), "secret")
 	info, err := c.Info(context.Background())

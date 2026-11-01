@@ -48,7 +48,8 @@
 //
 // # Stability
 //
-// Version 0, like the escp package it belongs to: names may change without notice until
-// the library is released on its own. VerifiedFirmwareBuilds is read from compatibility.json
-// (the table the README shows) and grows only after a build has been tested on a real switch.
+// Version 0, like the escp package it belongs to: until a 1.0 release, names may change in any
+// minor version, and every change is listed in CHANGELOG.md. VerifiedFirmwareBuilds is read from
+// compatibility.json (the table the README shows) and grows only after a build has been tested on
+// a real switch.
 package safety

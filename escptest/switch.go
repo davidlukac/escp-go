@@ -489,7 +489,7 @@ func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV, viaSe
 		f.mu.Lock()
 		addr, firmware := f.addr, f.firmware
 		mac := f.macAddr()
-		dhcp := byte(0) // a static address, like switch 03
+		dhcp := byte(0) // a static address, like a switch that was set up by hand
 		if f.dhcp {
 			dhcp = 1
 			addr = map[wire.TLVType][]byte{wire.TLVIP: f.lease.IP[:], wire.TLVNetmask: f.lease.Mask[:], wire.TLVGateway: f.lease.Gateway[:]}
@@ -848,10 +848,11 @@ func DefaultLease() Lease {
 	return Lease{IP: [4]byte{127, 0, 0, 1}, Mask: [4]byte{255, 255, 0, 0}, Gateway: [4]byte{127, 0, 0, 2}}
 }
 
-// SetLease changes the lease the fake gives. The fake models the DHCP flag the way switch 03
-// behaves (measured, firmware 20250710) from the start, with DefaultLease: it starts static; a system SET that carries the flag on makes it lease l (discovery
-// reports the lease and DHCP on; a static address in later SETs is ignored); a SET with the flag
-// off gives it the static address of that SET.
+// SetLease changes the lease the fake gives. The fake models the DHCP flag the way a real switch
+// behaves (measured on firmware 20250710) from the start, with DefaultLease: it starts static; a
+// system SET that carries the flag on makes it lease l (discovery reports the lease and DHCP on; a
+// static address in later SETs is ignored); a SET with the flag off gives it the static address of
+// that SET.
 func (f *Switch) SetLease(l Lease) { f.mu.Lock(); f.lease = &l; f.mu.Unlock() }
 
 // DefaultMAC is the address the fake reports unless SetMAC says otherwise (the documentation range, RFC 7042).

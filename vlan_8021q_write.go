@@ -32,7 +32,7 @@ var vlanNamePattern = regexp.MustCompile(`^[A-Za-z0-9_-]*$`)
 
 // VLANID is the id of an 802.1Q VLAN, and the PVID of a port, which is the id of the VLAN its
 // untagged traffic enters. The IEEE range is MinVLANID to MaxVLANID; two bytes carry it on the wire.
-// (Port-based VLAN groups and LAG groups have ids of their own, one byte each, and are plain ints.)
+// (Port-based VLAN groups and LAG groups have ids of their own, PortVLANID and LAGID, one byte each.)
 type VLANID int
 
 // Validate reports whether v is within MinVLANID to MaxVLANID; the error matches ErrInvalid.

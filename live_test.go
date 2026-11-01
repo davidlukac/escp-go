@@ -349,7 +349,7 @@ func TestLiveStormControl(t *testing.T) {
 			t.Fatalf("port %d was affected: %+v", r.Port, r)
 		}
 	}
-	// unknown unicast, which the first live run (switch 01) did not cover
+	// unknown unicast, which the first live run did not cover
 	if err := c.SetStormControl(ctx, StormConfig{Port: PortID(id), UnknownUnicast: true, Multicast: false, Broadcast: false, RateKbps: 2048}); err != nil {
 		t.Fatal(err)
 	}
@@ -385,7 +385,7 @@ func TestLivePortMirror(t *testing.T) {
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("not applied: %+v", got)
 	}
-	// egress and both directions, which the first live run (switch 01) did not cover
+	// egress and both directions, which the first live run did not cover
 	for _, m := range []Mirror{
 		{Enabled: true, MirrorPort: PortID(dest), IngressPorts: 0, EgressPorts: MustPortSet(PortID(source))},
 		{Enabled: true, MirrorPort: PortID(dest), IngressPorts: MustPortSet(PortID(source)), EgressPorts: MustPortSet(PortID(source))},
@@ -505,7 +505,7 @@ func TestLivePortBasedVLAN2(t *testing.T) {
 	t.Logf("with VLAN 2: %+v", now.VLANs)
 }
 
-// Device description (hostname). Approved by the owner on 2026-10-09. The
+// Device description (hostname). The
 // request re-sends the current IP configuration, so these tests verify that
 // the address, mask, gateway and DHCP flag are unchanged afterwards.
 func TestLiveHostnameSameValueWrite(t *testing.T) {
@@ -725,7 +725,7 @@ func pvidByPort(q Dot1Q, port PortID) (VLANID, bool) {
 	return 0, false
 }
 
-// Management IP (owner-approved on 2026-10-19 for switch 03 only). Moves the
+// Management IP. Moves the
 // switch to ESCP_LIVE_NEWIP (same subnet, unused address), checks
 // that it answers there and not at the old address, then moves it back. Only
 // the address changes; the mask and gateway stay. Needs ping monitoring.
@@ -756,7 +756,7 @@ func TestLiveIPChange(t *testing.T) {
 	}
 	// The restore comes first. The switch may be at either address, or have moved while the reply
 	// was lost, so it is found by its MAC address wherever it answers, not at an expected address.
-	// A single probe right after a move can come back empty (seen once on switch 03 while the
+	// A single probe right after a move can come back empty (seen once while the
 	// neighbour caches were still catching up), so the lookup tries a few times.
 	findSwitch := func() (Info, bool) {
 		for attempt := 1; attempt <= 5; attempt++ {

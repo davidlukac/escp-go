@@ -44,7 +44,7 @@ func modelClient(t *testing.T) (*escptest.Switch, *Client) {
 	return f, dialFast(t, f, "secret")
 }
 
-// The switch keeps either an ingress limit or storm control on a port (probed on switch 03): the client
+// The switch keeps either an ingress limit or storm control on a port (probed on firmware 20250710 and 20230218): the client
 // refuses the second one before anything is sent, and says what to do.
 func TestIngressLimitIsRefusedWhileStormControlIsOn(t *testing.T) {
 	f, c := modelClient(t)

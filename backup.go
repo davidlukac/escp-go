@@ -52,14 +52,14 @@ func (f ConfigFile) LogValue() slog.Value { return slog.StringValue(f.String()) 
 // bytes as System Tools > Backup Config in the web UI). The vendor utility
 // requests it with an authenticated SET carrying an empty TLV 768; the file
 // arrives in fragments, which are reassembled. Nothing on the switch changes. Although it is
-// a SET on the wire, it is a read: it never passes the write gate, so it works on any firmware
-// (as the provider promises for reads) even where writes are refused.
+// a SET on the wire, it is a read: it never passes the write gate, so it works on any firmware,
+// like every read, even where writes are refused.
 //
 // The result is complete or there is none. The replies are UDP: one can be lost, and the
 // fragments carry no index, total or checksum (the web UI is different: TCP, with a declared
 // Content-Length). A download is therefore accepted only when it is structurally complete (it
-// starts with the magic, the last fragment arrived, the packets before it are equally long, see
-// assembleConfig) and a second download, requested separately, is byte for byte the same. Anything
+// starts with the magic, the last fragment arrived, the packets before it are equally long) and a
+// second download, requested separately, is byte for byte the same. Anything
 // else is repeated, up to Config.Retries+1 rounds, and then reported as ErrInvalidConfig. A
 // configuration that changes while it is read fails the same way. A rejection, a missing reply
 // and a cancelled context end the call at once.

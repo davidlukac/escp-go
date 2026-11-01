@@ -86,7 +86,7 @@ func TestSpeedNameUnknownCode(t *testing.T) {
 }
 
 // Half duplex on a port that is a LAG member was refused with code 7407 on a real switch
-// (switch 03, firmware 20250710, ports 3 and 4 in LAG1); the error must say why.
+// (firmware 20250710, ports 3 and 4 in LAG1); the error must say why.
 func TestSetPortRefusalNamesTheLAGDuplexRule(t *testing.T) {
 	f := escptest.Start(t)
 	f.Configure(func(f *escptest.Faults) { f.RejectSetsFrom, f.RejectCode = 1, int32(lagRefusedHalfDuplex) })

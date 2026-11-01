@@ -101,6 +101,33 @@ func TestParseSystem(t *testing.T) {
 	}
 }
 
+// A value of the wrong length is not the setting: it must be ignored (the reply is then incomplete),
+// never read past its end.
+func TestParseSystemIgnoresValuesOfTheWrongLength(t *testing.T) {
+	autoSave := []wire.TLV{tlvHex(t, wire.TLVAutoSave, "01")}
+	for _, bad := range []string{"", "0808"} {
+		if s, err := parseSystem([]wire.TLV{tlvHex(t, wire.TLVPortCount, bad)}, autoSave); err == nil {
+			t.Errorf("a port count of %q bytes was accepted: %+v", bad, s)
+		}
+	}
+	portCount := []wire.TLV{tlvHex(t, wire.TLVPortCount, "08")}
+	for _, bad := range []string{"", "0101"} {
+		if s, err := parseSystem(portCount, []wire.TLV{tlvHex(t, wire.TLVAutoSave, bad)}); err == nil {
+			t.Errorf("an auto-save flag of %q bytes was accepted: %+v", bad, s)
+		}
+	}
+}
+
+// The longest name the switch accepts is exactly MaxHostnameLen characters.
+func TestHostnameValidateLengthBoundary(t *testing.T) {
+	if err := Hostname(strings.Repeat("a", MaxHostnameLen)).Validate(); err != nil {
+		t.Errorf("%d characters: %v", MaxHostnameLen, err)
+	}
+	if err := Hostname(strings.Repeat("a", MaxHostnameLen+1)).Validate(); !errors.Is(err, ErrInvalid) {
+		t.Errorf("%d characters: %v, want ErrInvalid", MaxHostnameLen+1, err)
+	}
+}
+
 func TestHostnameValidate(t *testing.T) {
 	for _, ok := range []Hostname{"a", "TL-SG108E-01", "sw1"} {
 		if err := ok.Validate(); err != nil {

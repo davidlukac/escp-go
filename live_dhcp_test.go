@@ -15,14 +15,13 @@ import (
 // Measures what the switch does when its DHCP flag is written: whether it asks for a lease at once,
 // how long that takes, what discovery reports meanwhile and afterwards, whether it still answers at
 // the old static address, and what a write of a static address or of the device description does
-// while DHCP is on. The answers decide how a consumer may manage DHCP (docs/mac-addressing-design.md,
-// section 4.5, in the private workspace). Every observation is a line starting with "OBS|"; what is
+// while DHCP is on. The answers decide how a consumer may manage DHCP. Every observation is a line starting with "OBS|"; what is
 // asserted is the restore: the switch must end at its static address with DHCP off.
 //
 // This changes the management address of the switch: it needs ESCP_LIVE_DHCP=1, the
 // switch's MAC in ESCP_MAC (the switch is found by it wherever the lease puts it), a
 // router whose DHCP server hands out an address, and a switch that is free to lose its address
-// for a minute (switch 03). Take a configuration backup first and watch the pings.
+// for a minute. Take a configuration backup first and watch the pings.
 func TestLiveDHCPProbe(t *testing.T) {
 	if os.Getenv("ESCP_LIVE_DHCP") != "1" {
 		t.Skip("set ESCP_LIVE_DHCP=1 to switch the DHCP flag of the switch on and back off")

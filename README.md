@@ -9,7 +9,7 @@
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
 </p>
 
-`escp` talks the switches' native UDP management protocol (ESCP), as spoken by the vendor's configuration utility. It reads and writes the settings of a TL-SG108E v6, finds switches on the network, validates every value before anything is sent, and ships the safety gates and a fake switch that a front end needs to use it responsibly. It is the library behind the [Terraform provider](https://github.com/davidlukac/terraform-provider-tplinkeasysmart) for these switches, and is written to be reused by a command line client and by other programs.
+`escp` talks the switches' native UDP management protocol (ESCP), as spoken by the vendor's configuration utility. It reads and writes the settings of a TL-SG108E v6, finds switches on the network, validates every value before anything is sent, and ships the safety gates and a fake switch that a front end needs to use it responsibly. It is the library behind the [Terraform provider](https://github.com/davidlukac/terraform-provider-tplinkeasysmart) for these switches, and can be reused by other programs, such as a command line client.
 
 **Status: version 0.** The API may change in any minor version until 1.0; [CHANGELOG.md](CHANGELOG.md) lists every change. Which hardware and firmware it was verified on is in the [compatibility table](#compatibility); the wire format is in [PROTOCOL.md](PROTOCOL.md).
 
