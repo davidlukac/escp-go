@@ -44,13 +44,13 @@ func (e *ImpactError) Error() string {
 	return fmt.Sprintf("%s has impact %s, above the allowed %s", e.Op.Name, e.Op.Impact, e.Max)
 }
 
-// MaxImpact returns a gate that refuses every operation whose Impact is above max. An operation
+// MaxImpact returns a gate that refuses every operation whose Impact is above ceiling. An operation
 // that declares no valid Impact is refused too, so a writer that forgot to classify itself fails
-// closed. A max that is not an impact class refuses everything. The refusal is an *ImpactError.
-func MaxImpact(max escp.Impact) escp.WriteGate {
+// closed. A ceiling that is not an impact class refuses everything. The refusal is an *ImpactError.
+func MaxImpact(ceiling escp.Impact) escp.WriteGate {
 	return func(_ context.Context, _ escp.InfoReader, op escp.Operation) error {
-		if !max.Valid() || !op.Impact.Valid() || op.Impact > max {
-			return &ImpactError{Op: op, Max: max}
+		if !ceiling.Valid() || !op.Impact.Valid() || op.Impact > ceiling {
+			return &ImpactError{Op: op, Max: ceiling}
 		}
 		return nil
 	}
@@ -58,7 +58,7 @@ func MaxImpact(max escp.Impact) escp.WriteGate {
 
 // ErrDryRun is what the gate of a DryRun returns: the write was recorded and not sent. The
 // client method returns it unchanged, so callers treat errors.Is(err, ErrDryRun) as success.
-var ErrDryRun = errors.New("dry run: the write was recorded and not sent")
+var ErrDryRun = errors.New("safety: dry run: the write was recorded and not sent")
 
 // DryRun records the operations a front end would perform without sending any of them. Use its
 // Gate as the last gate of a client; run the commands as usual; read Operations. A method that

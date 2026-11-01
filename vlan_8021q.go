@@ -67,8 +67,9 @@ func parseDot1Q(tlvs []wire.TLV) (Dot1Q, error) {
 }
 
 // CheckRoom reports whether the table can take VLAN id: it holds it already (changing a VLAN needs no
-// room), or it has fewer entries than the most the switch supports. MaxVLAN counts VLAN 1: probed on
-// switch 03, which reports 32, it took 31 more VLANs beside VLAN 1 and refused the next with code 7505.
+// room), or it has fewer entries than the most the switch supports. MaxVLAN counts VLAN 1: a
+// TL-SG108E on firmware 20250710, which reports 32, took 31 more VLANs beside VLAN 1 and refused the
+// next with code 7505.
 // A switch that did not report its maximum is not bounded here. The error matches ErrInvalid.
 func (q Dot1Q) CheckRoom(id VLANID) error {
 	if q.MaxVLAN == 0 {

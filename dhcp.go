@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// leaseWait is how long EnableDHCP waits for the switch to report a lease. Switch 03 took about four
+// leaseWait is how long EnableDHCP waits for the switch to report a lease. A TL-SG108E on firmware 20250710 took about four
 // seconds, two of them silent; a slow DHCP server needs more.
 const leaseWait = 60 * time.Second
 

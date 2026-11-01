@@ -165,6 +165,45 @@ func TestLocalMAC(t *testing.T) {
 	})
 }
 
+// The first interface with a hardware address is not the one that holds the address: the lookup
+// must follow the address, skip what cannot be listed or has no hardware address, and give zero
+// for an address no interface holds. (The test above depends on the host's own interfaces.)
+func TestMacHolding(t *testing.T) {
+	macA, macB := net.HardwareAddr{2, 0, 0, 0, 0, 0xa}, net.HardwareAddr{2, 0, 0, 0, 0, 0xb}
+	ifs := []net.Interface{
+		{Name: "broken", HardwareAddr: macA},
+		{Name: "first", HardwareAddr: macA},
+		{Name: "tunnel"}, // no hardware address
+		{Name: "second", HardwareAddr: macB},
+	}
+	held := map[string][]net.Addr{
+		"first":  {&net.IPNet{IP: net.IPv4(192, 0, 2, 1), Mask: net.CIDRMask(24, 32)}},
+		"tunnel": {&net.IPNet{IP: net.IPv4(192, 0, 2, 7), Mask: net.CIDRMask(24, 32)}},
+		"second": {&net.IPAddr{IP: net.IPv4(192, 0, 2, 3)}, &net.IPNet{IP: net.IPv4(192, 0, 2, 2), Mask: net.CIDRMask(24, 32)}},
+	}
+	addrs := func(i net.Interface) ([]net.Addr, error) {
+		if i.Name == "broken" {
+			return nil, errors.New("cannot list")
+		}
+		return held[i.Name], nil
+	}
+	for _, tc := range []struct {
+		name string
+		addr net.IP
+		want [6]byte
+	}{
+		{"an address of the first interface", net.IPv4(192, 0, 2, 1), [6]byte(macA)},
+		{"an address of a later interface", net.IPv4(192, 0, 2, 2), [6]byte(macB)},
+		{"an address that is not a network address", net.IPv4(192, 0, 2, 3), [6]byte{}},
+		{"an interface without a hardware address", net.IPv4(192, 0, 2, 7), [6]byte{}},
+		{"an address no interface holds", net.IPv4(198, 51, 100, 1), [6]byte{}},
+	} {
+		if got := macHolding(tc.addr, ifs, addrs); got != tc.want {
+			t.Errorf("%s: %x, want %x", tc.name, got, tc.want)
+		}
+	}
+}
+
 // Several clients (several programs or provider instances, one per switch) must be able to
 // hold the reply port at the same time.
 func TestSeveralClientsShareTheReplyPort(t *testing.T) {

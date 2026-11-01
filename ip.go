@@ -106,7 +106,7 @@ func broadcastOf(n net.IPNet) net.IP {
 
 // SetIPConfig gives the switch a static management address, keeping the device description as
 // the switch reports it. It turns DHCP off: a switch that leases its address ignores a static
-// one written next to the flag (measured on switch 03, firmware 20250710), so the flag is
+// one written next to the flag (measured on firmware 20250710), so the flag is
 // written off with the address, and the switch is at that address a fraction of a second later.
 //
 // DANGER: this moves the switch. The request is answered from the old or the
