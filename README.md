@@ -123,4 +123,4 @@ This is an independent project. It is not affiliated with, endorsed by or suppor
 
 ## See also
 
-[Documentation index](docs/README.md) · [PROTOCOL.md](PROTOCOL.md) (wire format and measured behaviour) · [CONTRIBUTING.md](CONTRIBUTING.md) (how to add or change a setting) · [RELEASING.md](RELEASING.md) · [SECURITY.md](SECURITY.md)
+[Documentation index](docs/README.md) · [PROTOCOL.md](PROTOCOL.md) (wire format and measured behaviour) · [CONTRIBUTING.md](CONTRIBUTING.md) (how to add or change a setting) · [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) · [RELEASING.md](RELEASING.md) · [SECURITY.md](SECURITY.md)
