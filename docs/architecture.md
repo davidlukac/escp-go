@@ -42,5 +42,5 @@ Tests that cut across sources have names of their own: `cancel_test` (cancellati
 
 - Protocol numbers are named constants with a doc comment; layout bytes stay in the root package and `internal/wire`.
 - Every writer validates its arguments, asks the write gate, writes through `Client.setTLVs` in `request.go` (the only place that sends a SET with settings), and returns typed errors.
-- Coverage is 100% of reachable statements (`make cover`); `escptest` is exercised by the library's own tests and not measured. Mutation testing (`make mutation`, [CONTRIBUTING.md](../CONTRIBUTING.md)) checks that the tests would notice a wrong operator; the fake, the coverage tool and the example program are left out of it.
+- Coverage is 100% of reachable statements (`make cover`); `escptest` is exercised by the library's own tests and not measured. Mutation testing (`make mutation`, [CONTRIBUTING.md](../CONTRIBUTING.md)) checks that the tests would notice a wrong operator; the fake and the programs (the coverage tool, the report tool, the example) are left out of it.
 - `make pkgdoc` renders the package documentation the way pkg.go.dev does, from the working tree.

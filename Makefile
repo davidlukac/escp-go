@@ -44,14 +44,21 @@ fuzz:
 # EFFICACY=90 fails below that share of caught mutants, WORKERS=n sets the parallelism);
 # `make mutation-diff` only the lines changed since BASE (default origin/main), which is what a pull
 # request runs. The report is build/mutation.json. Left out: the fake switch (escptest, judged by the
-# tests of the code that uses it), the coverage tool and the example program.
+# tests of the code that uses it) and the programs (the coverage tool, the report tool, the example):
+# gremlins reports every mutant in a `package main` as surviving whatever the tests do (a mutant applied
+# by hand to the report tool is caught by its tests), so their numbers would only be noise.
 MUTATE := $(DEVTOOL) gremlins unleash . --workers $(or $(WORKERS),4) --coverpkg ./... --output build/mutation.json \
-	-E '^escptest/' -E '^internal/coverpolicy/' -E '^examples/' $(if $(EFFICACY),--threshold-efficacy $(EFFICACY))
+	-E '^escptest/' -E '^internal/coverpolicy/' -E '^internal/mutationreport/' -E '^examples/' \
+	$(if $(EFFICACY),--threshold-efficacy $(EFFICACY))
 
+# gremlins does not create the directory of its report: without it the run ends with "impossible to
+# write file" and the job summary says there was no report.
 mutation:
+	@mkdir -p build
 	$(MUTATE)
 
 mutation-diff:
+	@mkdir -p build
 	$(MUTATE) --diff $(or $(BASE),origin/main)
 
 # The package documentation as pkg.go.dev renders it, from the working tree: HTML and plain text
