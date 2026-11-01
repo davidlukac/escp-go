@@ -46,9 +46,9 @@ func (g PortVLAN) Validate() error { return g.ID.Validate() }
 // PortBasedVLAN is the port-based VLAN state (VLAN > Port Based VLAN): whether this is the active
 // VLAN mode, how many groups the switch supports, and the groups that exist.
 type PortBasedVLAN struct {
-	Enabled bool       // the port-based mode is the active VLAN mode
-	MaxVLAN int        // the most groups the switch supports (0 when it did not say)
-	VLANs   []PortVLAN // never nil
+	Enabled   bool       // the port-based mode is the active VLAN mode
+	MaxGroups int        // the most groups the switch supports (0 when it did not say)
+	VLANs     []PortVLAN // never nil
 }
 
 // PortVLANLimit is the highest port-based VLAN group id a switch holds: the larger of the number of
@@ -84,7 +84,7 @@ func (l PortVLANLimit) Check(id PortVLANID) error {
 // GroupLimit is the highest group id of the switch whose state v is and which has portCount ports
 // (0 when unknown).
 func (v PortBasedVLAN) GroupLimit(portCount int) PortVLANLimit {
-	return NewPortVLANLimit(v.MaxVLAN, portCount)
+	return NewPortVLANLimit(v.MaxGroups, portCount)
 }
 
 // Group returns the member ports of group id and whether the group exists.
@@ -109,7 +109,7 @@ func parsePortBasedVLAN(tlvs []wire.TLV) (PortBasedVLAN, error) {
 			out.Enabled, seen = t.Value[0] == 1, true
 		case wire.TLVVLANPortBasedMax:
 			if len(t.Value) == 1 {
-				out.MaxVLAN = int(t.Value[0])
+				out.MaxGroups = int(t.Value[0])
 			}
 		case wire.TLVVLANPortBasedVID:
 			if len(t.Value) != pvlanEntryLen {

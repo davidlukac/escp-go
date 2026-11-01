@@ -20,7 +20,7 @@ func TestParsePortBasedVLAN(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := PortBasedVLAN{Enabled: true, MaxVLAN: 8, VLANs: []PortVLAN{{ID: 1, Ports: MustPortSet(1, 2, 3, 4, 5, 6, 7, 8)}}}
+	want := PortBasedVLAN{Enabled: true, MaxGroups: 8, VLANs: []PortVLAN{{ID: 1, Ports: MustPortSet(1, 2, 3, 4, 5, 6, 7, 8)}}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %+v", got)
 	}
@@ -95,7 +95,7 @@ func TestPortVLANLimitCheck(t *testing.T) {
 		{"and still refuses beyond it", 0, 0, MaxPortVLANID + 1, "invalid port-based VLAN id 256"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			err := PortBasedVLAN{MaxVLAN: c.max}.GroupLimit(c.ports).Check(c.id)
+			err := PortBasedVLAN{MaxGroups: c.max}.GroupLimit(c.ports).Check(c.id)
 			if c.wantErr == "" {
 				if err != nil {
 					t.Fatal(err)
@@ -123,7 +123,7 @@ func TestPortVLANLimit(t *testing.T) {
 	if NewPortVLANLimit(8, 24).String() != "24" {
 		t.Error("a limit prints as its number")
 	}
-	if got := (PortBasedVLAN{MaxVLAN: 8}).GroupLimit(24); got != 24 {
+	if got := (PortBasedVLAN{MaxGroups: 8}).GroupLimit(24); got != 24 {
 		t.Errorf("GroupLimit = %d, want 24", got)
 	}
 }

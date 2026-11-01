@@ -9,7 +9,7 @@ Test errors with `errors.Is` and `errors.As`, never by message.
 | `ErrRejected`, `*RejectedError` | the switch answered with a non-zero code: it refused a write, would not report a setting or did not accept the session key; the error carries the code (`ReplyCode`) and, for the known ones, the reason |
 | `ErrMoveUnconfirmed` | `SetIPConfig` lost track of the switch: look at both addresses before believing either |
 | `ErrNoInterface` | `Discover` has nowhere to send |
-| `ErrInvalidConfig` | a configuration backup that is not complete, after the download was repeated |
+| `ErrInvalidConfigFile` | a configuration backup that is not complete, after the download was repeated |
 | `ErrReplyTooLarge` | a fragmented reply bigger than any switch sends |
 | `ErrWrongSwitch`, `*WrongSwitchError` | the device that answered is not the switch `Config.MAC` names; nothing was written to it |
 | `ErrNotFound` | no switch with that MAC answered a discovery probe |

@@ -168,13 +168,13 @@ func TestWrongPasswordIsRejectedForEverySetter(t *testing.T) {
 		},
 		"SetQoSMode": func(c *Client, ctx context.Context) error { return c.SetQoSMode(ctx, 0) },
 		"SetBandwidth": func(c *Client, ctx context.Context) error {
-			return c.SetBandwidth(ctx, PortBandwidth{Port: 7, IngressKbps: 64, EgressKbps: 64})
+			return c.SetBandwidth(ctx, PortBandwidth{Port: 7, Ingress: 64, Egress: 64})
 		},
 		"SetStormControl": func(c *Client, ctx context.Context) error {
-			return c.SetStormControl(ctx, StormConfig{Port: 7, UnknownUnicast: true, Multicast: false, Broadcast: false, RateKbps: 64})
+			return c.SetStormControl(ctx, StormConfig{Port: 7, UnknownUnicast: true, Multicast: false, Broadcast: false, Rate: 64})
 		},
 		"SetPortMirror": func(c *Client, ctx context.Context) error {
-			return c.SetPortMirror(ctx, Mirror{Enabled: true, MirrorPort: 7, IngressPorts: MustPortSet(4)})
+			return c.SetPortMirror(ctx, Mirror{Enabled: true, Destination: 7, IngressPorts: MustPortSet(4)})
 		},
 		"SetLAG": func(c *Client, ctx context.Context) error { return c.SetLAG(ctx, LAG{ID: 2, Ports: MustPortSet(6, 7)}) },
 		"SetPortBasedVLAN": func(c *Client, ctx context.Context) error {

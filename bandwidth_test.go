@@ -18,7 +18,7 @@ func TestParseBandwidth(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []PortBandwidth{{Port: 1}, {Port: 2, IngressKbps: 0x1000, EgressKbps: 0x2000}}
+	want := []PortBandwidth{{Port: 1}, {Port: 2, Ingress: 0x1000, Egress: 0x2000}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %+v", got)
 	}
@@ -31,7 +31,7 @@ func TestSetBandwidthWire(t *testing.T) {
 	f := escptest.Start(t)
 	f.EnableModel(nil) // the pre-write read of the other limiter needs a switch that answers
 	c := dialFake(t, f, "secret")
-	if err := c.SetBandwidth(context.Background(), PortBandwidth{Port: 7, IngressKbps: 1024, EgressKbps: 0}); err != nil {
+	if err := c.SetBandwidth(context.Background(), PortBandwidth{Port: 7, Ingress: 1024, Egress: 0}); err != nil {
 		t.Fatal(err)
 	}
 	h := f.AllSets()
@@ -45,7 +45,7 @@ func TestSetBandwidthWire(t *testing.T) {
 		t.Fatalf("egress wire: %+v", h[1])
 	}
 	for _, bad := range []Kbps{-64, 100, 2000000} {
-		if err := c.SetBandwidth(context.Background(), PortBandwidth{Port: 7, IngressKbps: bad, EgressKbps: 0}); err == nil {
+		if err := c.SetBandwidth(context.Background(), PortBandwidth{Port: 7, Ingress: bad, Egress: 0}); err == nil {
 			t.Errorf("rate %d must be rejected", bad)
 		}
 	}
@@ -59,10 +59,10 @@ func TestBandwidthValidationHappensBeforeAnythingIsSent(t *testing.T) {
 	c := dialFast(t, f, "secret")
 	ctx := context.Background()
 	for name, call := range map[string]func() error{
-		"port 0":                   func() error { return c.SetBandwidth(ctx, PortBandwidth{Port: 0, IngressKbps: 64, EgressKbps: 64}) },
-		"port 33":                  func() error { return c.SetBandwidth(ctx, PortBandwidth{Port: 33, IngressKbps: 64, EgressKbps: 64}) },
-		"bad ingress":              func() error { return c.SetBandwidth(ctx, PortBandwidth{Port: 7, IngressKbps: 100, EgressKbps: 64}) },
-		"bad egress after good in": func() error { return c.SetBandwidth(ctx, PortBandwidth{Port: 7, IngressKbps: 64, EgressKbps: 100}) },
+		"port 0":                   func() error { return c.SetBandwidth(ctx, PortBandwidth{Port: 0, Ingress: 64, Egress: 64}) },
+		"port 33":                  func() error { return c.SetBandwidth(ctx, PortBandwidth{Port: 33, Ingress: 64, Egress: 64}) },
+		"bad ingress":              func() error { return c.SetBandwidth(ctx, PortBandwidth{Port: 7, Ingress: 100, Egress: 64}) },
+		"bad egress after good in": func() error { return c.SetBandwidth(ctx, PortBandwidth{Port: 7, Ingress: 64, Egress: 100}) },
 	} {
 		if err := call(); err == nil {
 			t.Errorf("%s must be rejected", name)
@@ -79,7 +79,7 @@ func TestBandwidthPartialFailureIsReportedAndNotHidden(t *testing.T) {
 		f.EnableModel(nil) // the pre-write read of the other limiter needs a switch that answers
 		f.Configure(func(f *escptest.Faults) { f.RejectSetsFrom = 1 })
 		c := dialFast(t, f, "secret")
-		if err := c.SetBandwidth(context.Background(), PortBandwidth{Port: 7, IngressKbps: 64, EgressKbps: 64}); !errors.Is(err, ErrRejected) {
+		if err := c.SetBandwidth(context.Background(), PortBandwidth{Port: 7, Ingress: 64, Egress: 64}); !errors.Is(err, ErrRejected) {
 			t.Fatalf("got %v", err)
 		}
 		if n := f.WriteCount(); n != 0 {
@@ -91,7 +91,7 @@ func TestBandwidthPartialFailureIsReportedAndNotHidden(t *testing.T) {
 		f.EnableModel(nil) // the pre-write read of the other limiter needs a switch that answers
 		f.Configure(func(f *escptest.Faults) { f.RejectSetsFrom = 2 })
 		c := dialFast(t, f, "secret")
-		if err := c.SetBandwidth(context.Background(), PortBandwidth{Port: 7, IngressKbps: 64, EgressKbps: 64}); !errors.Is(err, ErrRejected) {
+		if err := c.SetBandwidth(context.Background(), PortBandwidth{Port: 7, Ingress: 64, Egress: 64}); !errors.Is(err, ErrRejected) {
 			t.Fatalf("got %v", err)
 		}
 		if h := f.AllSets(); len(h) != 1 || h[0][0].Type != wire.TLVBandwidthIngress {

@@ -3,7 +3,6 @@ package escp
 import (
 	"context"
 	"encoding/binary"
-	"maps"
 	"regexp"
 	"slices"
 	"strconv"
@@ -120,31 +119,40 @@ func (c *Client) DeleteDot1QVLAN(ctx context.Context, id VLANID) error {
 	return c.setTLVs(ctx, Operation{Name: "DeleteDot1QVLAN", Impact: ImpactTraffic, Replaces: Group{Dot1QVLAN: id}}, wire.TLV{Type: wire.TLVVLAN8021QVLAN, Value: vlanEntryBytes(id, empty, empty, "")})
 }
 
-// SetPVIDs sets the default VLAN of the given ports (port -> pvid): one TLV
-// 8706 per port with the port (1 byte) and the pvid (2 bytes). The VLAN must
-// exist and the 802.1Q mode must be on; callers must guard linked ports.
-func (c *Client) SetPVIDs(ctx context.Context, pvids map[PortID]VLANID) error {
+// Validate checks the port and the VLAN id. The error matches ErrInvalid.
+func (p PortPVID) Validate() error {
+	if err := p.Port.Validate(); err != nil {
+		return err
+	}
+	return p.PVID.Validate()
+}
+
+// SetPVIDs sets the default VLAN of the given ports, the same PortPVID entries Dot1Q reads: one TLV
+// 8706 per port, in port order, with the port (1 byte) and the pvid (2 bytes). A port may appear
+// once. The first entry that is not valid (PortPVID.Validate) or repeats a port is reported, in the
+// order given, and nothing is sent. The VLAN must exist and the 802.1Q mode must be on; callers must
+// guard linked ports.
+func (c *Client) SetPVIDs(ctx context.Context, pvids []PortPVID) error {
 	if len(pvids) == 0 {
 		return invalidf("escp: no PVIDs to set")
 	}
 	var named PortSet
-	for _, p := range slices.Sorted(maps.Keys(pvids)) { // lowest port first: the same input names the same error
-		id := pvids[p]
+	for _, p := range pvids {
 		if err := p.Validate(); err != nil {
 			return err
 		}
-		if err := id.Validate(); err != nil {
-			return err
+		if named.Has(p.Port) {
+			return invalidf("escp: port %d appears twice in the PVIDs", p.Port)
 		}
-		named = named.Union(p.set())
+		named = named.Union(p.Port.set())
 	}
 	if err := c.requirePorts(ctx, named); err != nil {
 		return err
 	}
-	ports := named.Ports()
-	tlvs := make([]wire.TLV, 0, len(ports))
-	for _, p := range ports {
-		value := binary.BigEndian.AppendUint16([]byte{byte(p)}, uint16(pvids[p])) //nolint:gosec // bounded by the validation above
+	sorted := slices.SortedFunc(slices.Values(pvids), func(a, b PortPVID) int { return int(a.Port) - int(b.Port) })
+	tlvs := make([]wire.TLV, 0, len(sorted))
+	for _, p := range sorted {
+		value := binary.BigEndian.AppendUint16([]byte{byte(p.Port)}, uint16(p.PVID)) //nolint:gosec // bounded by the validation above
 		tlvs = append(tlvs, wire.TLV{Type: wire.TLVVLAN8021QPVID, Value: value})
 	}
 	return c.setTLVs(ctx, Operation{Name: "SetPVIDs", Ports: named, Impact: ImpactManagement}, tlvs...)

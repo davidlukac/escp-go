@@ -109,7 +109,7 @@ func TestSetPVIDsWire(t *testing.T) {
 	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
 	ctx := context.Background()
-	if err := c.SetPVIDs(ctx, map[PortID]VLANID{5: 300, 4: 2}); err != nil {
+	if err := c.SetPVIDs(ctx, []PortPVID{{Port: 5, PVID: 300}, {Port: 4, PVID: 2}}); err != nil {
 		t.Fatal(err)
 	}
 	got := f.LastSet()
@@ -119,7 +119,14 @@ func TestSetPVIDsWire(t *testing.T) {
 		t.Fatalf("wire %+v, want %+v", got, want)
 	}
 	n := f.WriteCount()
-	for name, bad := range map[string]map[PortID]VLANID{"empty": {}, "port 0": {0: 2}, "port 33": {33: 2}, "pvid 0": {4: 0}, "pvid 4095": {4: 4095}} {
+	for name, bad := range map[string][]PortPVID{
+		"empty":        {},
+		"port 0":       {{Port: 0, PVID: 2}},
+		"port 33":      {{Port: 33, PVID: 2}},
+		"pvid 0":       {{Port: 4, PVID: 0}},
+		"pvid 4095":    {{Port: 4, PVID: 4095}},
+		"a port twice": {{Port: 4, PVID: 2}, {Port: 4, PVID: 3}},
+	} {
 		if c.SetPVIDs(ctx, bad) == nil {
 			t.Fatalf("%s must be rejected", name)
 		}
@@ -129,16 +136,27 @@ func TestSetPVIDsWire(t *testing.T) {
 	}
 }
 
-// A map has no order, so a request with several faults must still name the same one every time:
-// the lowest port first.
-func TestSetPVIDsNamesTheLowestFaultyPortFirst(t *testing.T) {
+// A request with several faults names the first one in the order given, and a port twice is a fault.
+func TestSetPVIDsNamesTheFirstFaultInTheOrderGiven(t *testing.T) {
 	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
-	bad := map[PortID]VLANID{3: 0, 4: 4095, 5: 0, 6: 4095, 7: 0, 8: 4095}
-	for range 50 {
-		err := c.SetPVIDs(context.Background(), bad)
-		if !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "VLAN id 0") {
-			t.Fatalf("want the VLAN id 0 of port 3 to be named first, got %v", err)
+	err := c.SetPVIDs(context.Background(), []PortPVID{{Port: 3, PVID: 7}, {Port: 6, PVID: 4095}, {Port: 5, PVID: 0}})
+	if !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "VLAN id 4095") {
+		t.Fatalf("want the VLAN id 4095 of port 6 to be named first, got %v", err)
+	}
+	err = c.SetPVIDs(context.Background(), []PortPVID{{Port: 3, PVID: 7}, {Port: 3, PVID: 8}})
+	if !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "port 3 appears twice") {
+		t.Fatalf("want the repeated port named, got %v", err)
+	}
+}
+
+func TestPortPVIDValidate(t *testing.T) {
+	if err := (PortPVID{Port: 2, PVID: 100}).Validate(); err != nil {
+		t.Fatal(err)
+	}
+	for _, bad := range []PortPVID{{Port: 0, PVID: 1}, {Port: 2, PVID: 0}} {
+		if err := bad.Validate(); !errors.Is(err, ErrInvalid) {
+			t.Errorf("%+v: %v", bad, err)
 		}
 	}
 }

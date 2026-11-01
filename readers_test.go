@@ -50,10 +50,10 @@ func readCases() []readCase {
 			bad: map[wire.TLVType][]wire.TLV{wire.TLVPorts: {{Type: wire.TLVPorts, Value: []byte{1, 1}}}},
 		},
 		{
-			name:     "PortStatistics",
+			name:     "PortStats",
 			script:   map[wire.TLVType][]wire.TLV{wire.TLVPortStats: {th(wire.TLVPortStats, "0101061434f1b7000000002873fb8a00000000")}},
 			requests: [][]wire.TLVType{{wire.TLVPortStats}},
-			call:     func(c *Client, ctx context.Context) (any, error) { return c.PortStatistics(ctx) },
+			call:     func(c *Client, ctx context.Context) (any, error) { return c.PortStats(ctx) },
 			want:     []PortStats{{ID: 1, Enabled: true, Link: "1000Mbps-full", TxGood: 0x1434f1b7, RxGood: 0x2873fb8a}},
 			bad:      map[wire.TLVType][]wire.TLV{wire.TLVPortStats: {{Type: wire.TLVPortStats, Value: []byte{1}}}},
 		},
@@ -92,7 +92,7 @@ func readCases() []readCase {
 			script:   map[wire.TLVType][]wire.TLV{wire.TLVMirror: {th(wire.TLVMirror, "01080000000300000004")}},
 			requests: [][]wire.TLVType{{wire.TLVMirror}},
 			call:     func(c *Client, ctx context.Context) (any, error) { return c.PortMirror(ctx) },
-			want:     Mirror{Enabled: true, MirrorPort: 8, IngressPorts: MustPortSet(1, 2), EgressPorts: MustPortSet(3)},
+			want:     Mirror{Enabled: true, Destination: 8, IngressPorts: MustPortSet(1, 2), EgressPorts: MustPortSet(3)},
 			bad:      map[wire.TLVType][]wire.TLV{wire.TLVMirror: {{Type: wire.TLVMirror, Value: []byte{1, 2, 3}}}},
 		},
 		{
@@ -109,7 +109,7 @@ func readCases() []readCase {
 				th(wire.TLVVLANPortBased, "01"), th(wire.TLVVLANPortBasedVID, "01000000ff"), th(wire.TLVVLANPortBasedMax, "08")}},
 			requests: [][]wire.TLVType{{wire.TLVVLANPortBased}},
 			call:     func(c *Client, ctx context.Context) (any, error) { return c.PortBasedVLAN(ctx) },
-			want:     PortBasedVLAN{Enabled: true, MaxVLAN: 8, VLANs: []PortVLAN{{ID: 1, Ports: MustPortSet(1, 2, 3, 4, 5, 6, 7, 8)}}},
+			want:     PortBasedVLAN{Enabled: true, MaxGroups: 8, VLANs: []PortVLAN{{ID: 1, Ports: MustPortSet(1, 2, 3, 4, 5, 6, 7, 8)}}},
 			bad: map[wire.TLVType][]wire.TLV{wire.TLVVLANPortBased: {
 				th(wire.TLVVLANPortBased, "01"), {Type: wire.TLVVLANPortBasedVID, Value: []byte{1}}}},
 		},
@@ -121,7 +121,7 @@ func readCases() []readCase {
 			},
 			requests: [][]wire.TLVType{{wire.TLVVLAN8021QVLAN}, {wire.TLVVLAN8021QPVID}},
 			call:     func(c *Client, ctx context.Context) (any, error) { return c.Dot1Q(ctx) },
-			want:     Dot1Q{MaxVLAN: 32, VLANs: []Dot1QVLAN{}, PVIDs: []PortPVID{{Port: 1, PVID: 1}}},
+			want:     Dot1Q{MaxVLANs: 32, VLANs: []Dot1QVLAN{}, PVIDs: []PortPVID{{Port: 1, PVID: 1}}},
 			bad: map[wire.TLVType][]wire.TLV{
 				wire.TLVVLAN8021QVLAN: {th(wire.TLVVLAN8021Q, "01"), {Type: wire.TLVVLAN8021QVLAN, Value: []byte{0, 1}}},
 				wire.TLVVLAN8021QPVID: nil,
@@ -149,7 +149,7 @@ func readCases() []readCase {
 			},
 			requests: [][]wire.TLVType{{wire.TLVBandwidthIngress}, {wire.TLVBandwidthEgress}},
 			call:     func(c *Client, ctx context.Context) (any, error) { return c.Bandwidth(ctx) },
-			want:     []PortBandwidth{{Port: 2, IngressKbps: 0x1000, EgressKbps: 0x2000}},
+			want:     []PortBandwidth{{Port: 2, Ingress: 0x1000, Egress: 0x2000}},
 			bad: map[wire.TLVType][]wire.TLV{
 				wire.TLVBandwidthIngress: {{Type: wire.TLVBandwidthIngress, Value: []byte{1}}},
 				wire.TLVBandwidthEgress:  nil,
@@ -160,7 +160,7 @@ func readCases() []readCase {
 			script:   map[wire.TLVType][]wire.TLV{wire.TLVStormControl: {th(wire.TLVStormControl, "0200010100"+"00001388")}},
 			requests: [][]wire.TLVType{{wire.TLVStormControl}},
 			call:     func(c *Client, ctx context.Context) (any, error) { return c.StormControl(ctx) },
-			want:     []PortStorm{{Port: 2, UnknownUnicast: true, Multicast: true, RateKbps: 0x1388, Enabled: true}},
+			want:     []PortStorm{{Port: 2, UnknownUnicast: true, Multicast: true, Rate: 0x1388, Enabled: true}},
 			bad:      map[wire.TLVType][]wire.TLV{wire.TLVStormControl: {{Type: wire.TLVStormControl, Value: []byte{1}}}},
 		},
 		{

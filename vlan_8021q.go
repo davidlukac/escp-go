@@ -23,10 +23,10 @@ type PortPVID struct {
 
 // Dot1Q is VLAN > 802.1Q VLAN plus PVID settings.
 type Dot1Q struct {
-	Enabled bool
-	MaxVLAN int
-	VLANs   []Dot1QVLAN
-	PVIDs   []PortPVID
+	Enabled  bool
+	MaxVLANs int
+	VLANs    []Dot1QVLAN
+	PVIDs    []PortPVID
 }
 
 func parseDot1Q(tlvs []wire.TLV) (Dot1Q, error) {
@@ -42,7 +42,7 @@ func parseDot1Q(tlvs []wire.TLV) (Dot1Q, error) {
 			out.Enabled, seen = v[0] == 1, true
 		case wire.TLVVLAN8021QMax:
 			if len(v) == 1 {
-				out.MaxVLAN = int(v[0])
+				out.MaxVLANs = int(v[0])
 			}
 		case wire.TLVVLAN8021QVLAN:
 			if len(v) < vlan8021QOffName {
@@ -67,12 +67,12 @@ func parseDot1Q(tlvs []wire.TLV) (Dot1Q, error) {
 }
 
 // CheckRoom reports whether the table can take VLAN id: it holds it already (changing a VLAN needs no
-// room), or it has fewer entries than the most the switch supports. MaxVLAN counts VLAN 1: a
+// room), or it has fewer entries than the most the switch supports. MaxVLANs counts VLAN 1: a
 // TL-SG108E on firmware 20250710, which reports 32, took 31 more VLANs beside VLAN 1 and refused the
 // next with code 7505.
 // A switch that did not report its maximum is not bounded here. The error matches ErrInvalid.
 func (q Dot1Q) CheckRoom(id VLANID) error {
-	if q.MaxVLAN == 0 {
+	if q.MaxVLANs == 0 {
 		return nil
 	}
 	for _, v := range q.VLANs {
@@ -80,8 +80,8 @@ func (q Dot1Q) CheckRoom(id VLANID) error {
 			return nil
 		}
 	}
-	if len(q.VLANs) >= q.MaxVLAN {
-		return invalidf("escp: the 802.1Q VLAN table is full: the switch holds at most %d VLANs (VLAN 1 among them) and has %d, so VLAN %d cannot be added", q.MaxVLAN, len(q.VLANs), id)
+	if len(q.VLANs) >= q.MaxVLANs {
+		return invalidf("escp: the 802.1Q VLAN table is full: the switch holds at most %d VLANs (VLAN 1 among them) and has %d, so VLAN %d cannot be added", q.MaxVLANs, len(q.VLANs), id)
 	}
 	return nil
 }

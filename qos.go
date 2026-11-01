@@ -3,8 +3,6 @@ package escp
 import (
 	"context"
 	"fmt"
-	"maps"
-	"slices"
 
 	"github.com/davidlukac/escp-go/internal/wire"
 )
@@ -119,13 +117,34 @@ func (c *Client) SetQoSMode(ctx context.Context, mode QoSMode) error {
 	return c.setTLVs(ctx, Operation{Name: "SetQoSMode", Impact: ImpactTraffic}, wire.TLV{Type: wire.TLVQoSMode, Value: []byte{byte(mode)}})
 }
 
-// SetPortPriorities changes the priority of the given ports (port -> priority). Every port
-// must exist and every priority be within PriorityLowest..PriorityHighest, or nothing is
-// sent. As in the vendor utility the request carries the priority of every port, so the
-// current values are read first (a QoS read, which the write gate does not see) and the
-// ports not mentioned are re-sent unchanged. The priorities only take effect in
-// QoSPortBased mode.
-func (c *Client) SetPortPriorities(ctx context.Context, changes map[PortID]Priority) error {
+// Validate checks the port and the priority. The error matches ErrInvalid.
+func (p PortPriority) Validate() error {
+	if err := p.Port.Validate(); err != nil {
+		return err
+	}
+	if !p.Priority.Valid() {
+		return invalidf("escp: invalid priority %d for port %d (valid: %d-%d)", p.Priority, p.Port, PriorityLowest, PriorityHighest)
+	}
+	return nil
+}
+
+// SetPortPriorities changes the priority of the given ports, the same PortPriority entries QoS
+// reads. A port may appear once; every port must exist and every entry be valid (PortPriority.Validate),
+// or nothing is sent, and the first fault is reported in the order given. As in the vendor utility the
+// request carries the priority of every port, so the current values are read first (a QoS read, which
+// the write gate does not see) and the ports not mentioned are re-sent unchanged. The priorities only
+// take effect in QoSPortBased mode.
+func (c *Client) SetPortPriorities(ctx context.Context, changes []PortPriority) error {
+	var named PortSet
+	for _, ch := range changes {
+		if err := ch.Validate(); err != nil {
+			return err
+		}
+		if named.Has(ch.Port) {
+			return invalidf("escp: port %d appears twice in the priorities", ch.Port)
+		}
+		named = named.Union(ch.Port.set())
+	}
 	cur, err := c.QoS(ctx)
 	if err != nil {
 		return err
@@ -134,19 +153,11 @@ func (c *Client) SetPortPriorities(ctx context.Context, changes map[PortID]Prior
 	for _, p := range cur.Priorities {
 		prio[p.Port] = p.Priority
 	}
-	for _, port := range slices.Sorted(maps.Keys(changes)) { // lowest port first: the same input names the same error
-		v := changes[port]
-		if _, ok := prio[port]; !ok {
-			return invalidf("escp: port %d does not exist", port)
+	for _, ch := range changes {
+		if _, ok := prio[ch.Port]; !ok {
+			return invalidf("escp: port %d does not exist", ch.Port)
 		}
-		if !v.Valid() {
-			return invalidf("escp: invalid priority %d for port %d (valid: %d-%d)", v, port, PriorityLowest, PriorityHighest)
-		}
-		prio[port] = v
-	}
-	var named PortSet
-	for port := range changes {
-		named = named.Union(port.set())
+		prio[ch.Port] = ch.Priority
 	}
 	tlvs := make([]wire.TLV, 0, len(prio))
 	for _, p := range cur.Priorities { // keep the switch's port order

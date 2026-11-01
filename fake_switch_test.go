@@ -139,7 +139,7 @@ func TestFakeModelVLANModesAndDot1Q(t *testing.T) {
 		}
 	}
 	q, err := c.Dot1Q(ctx)
-	if err != nil || len(q.VLANs) != 3 || q.MaxVLAN == 0 || len(q.PVIDs) != 8 {
+	if err != nil || len(q.VLANs) != 3 || q.MaxVLANs == 0 || len(q.PVIDs) != 8 {
 		t.Fatalf("Dot1Q = %+v, %v; want VLAN 1, 20 and 21, a maximum and eight PVIDs", q, err)
 	}
 	if err := c.DeleteDot1QVLAN(ctx, 20); err != nil {

@@ -11,15 +11,33 @@ import (
 	"github.com/davidlukac/escp-go/internal/wire"
 )
 
-func TestSetPortPrioritiesNamesTheLowestFaultyPortFirst(t *testing.T) {
+// A request with several faults names the first one in the order given, a port twice is a fault, and
+// a request that is wrong in itself is refused before the switch is asked anything.
+func TestSetPortPrioritiesNamesTheFirstFaultInTheOrderGiven(t *testing.T) {
 	f := escptest.Start(t)
 	f.EnableModel(nil)
 	c := dialFake(t, f, "secret")
-	bad := map[PortID]Priority{2: 9, 3: 0, 4: 9, 5: 0, 6: 9, 7: 0}
-	for range 50 {
-		err := c.SetPortPriorities(context.Background(), bad)
-		if !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "invalid priority 9 for port 2") {
-			t.Fatalf("want port 2 to be named first, got %v", err)
+	before := f.Received()
+	err := c.SetPortPriorities(context.Background(), []PortPriority{{Port: 4, Priority: 2}, {Port: 6, Priority: 9}, {Port: 3, Priority: 0}})
+	if !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "invalid priority 9 for port 6") {
+		t.Fatalf("want port 6 to be named first, got %v", err)
+	}
+	err = c.SetPortPriorities(context.Background(), []PortPriority{{Port: 4, Priority: 2}, {Port: 4, Priority: 3}})
+	if !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "port 4 appears twice") {
+		t.Fatalf("want the repeated port named, got %v", err)
+	}
+	if f.Received() != before {
+		t.Fatal("an invalid request must not ask the switch anything")
+	}
+}
+
+func TestPortPriorityValidate(t *testing.T) {
+	if err := (PortPriority{Port: 2, Priority: PriorityHighest}).Validate(); err != nil {
+		t.Fatal(err)
+	}
+	for _, bad := range []PortPriority{{Port: 0, Priority: 1}, {Port: 2, Priority: 0}, {Port: 2, Priority: 5}} {
+		if err := bad.Validate(); !errors.Is(err, ErrInvalid) {
+			t.Errorf("%+v: %v", bad, err)
 		}
 	}
 }
@@ -30,7 +48,7 @@ func TestSetPortPrioritiesStopsWhenTheCurrentStateCannotBeRead(t *testing.T) {
 	f.Configure(func(f *escptest.Faults) {
 		f.GetFn = func([]wire.TLVType) ([]escptest.Setting, int32, bool) { return nil, 0, true }
 	})
-	if err := c.SetPortPriorities(context.Background(), map[PortID]Priority{3: 2}); !errors.Is(err, ErrNoReply) {
+	if err := c.SetPortPriorities(context.Background(), []PortPriority{{Port: 3, Priority: 2}}); !errors.Is(err, ErrNoReply) {
 		t.Fatalf("got %v", err)
 	}
 	if n := f.WriteCount(); n != 0 {
@@ -74,7 +92,7 @@ func TestSetQoSWire(t *testing.T) {
 	if err := c.SetQoSMode(ctx, 7); err == nil {
 		t.Fatal("invalid mode must be rejected")
 	}
-	if err := c.SetPortPriorities(ctx, map[PortID]Priority{3: 4}); err != nil {
+	if err := c.SetPortPriorities(ctx, []PortPriority{{Port: 3, Priority: 4}}); err != nil {
 		t.Fatal(err)
 	}
 	got := f.LastSet()
@@ -90,10 +108,10 @@ func TestSetQoSWire(t *testing.T) {
 			t.Fatalf("entry %d: %+v", i, tl)
 		}
 	}
-	if err := c.SetPortPriorities(ctx, map[PortID]Priority{3: 9}); err == nil {
+	if err := c.SetPortPriorities(ctx, []PortPriority{{Port: 3, Priority: 9}}); err == nil {
 		t.Fatal("priority 9 must be rejected")
 	}
-	if err := c.SetPortPriorities(ctx, map[PortID]Priority{99: 2}); err == nil {
+	if err := c.SetPortPriorities(ctx, []PortPriority{{Port: 99, Priority: 2}}); err == nil {
 		t.Fatal("unknown port must be rejected")
 	}
 }

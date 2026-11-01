@@ -35,7 +35,7 @@ func TestDryRunThroughTheRealClient(t *testing.T) {
 	if err := c.SetPort(ctx, escp.PortConfig{ID: 3, Enabled: true, Speed: escp.SpeedAuto}); !errors.Is(err, safety.ErrDryRun) {
 		t.Fatalf("SetPort: got %v, want ErrDryRun", err)
 	}
-	if err := c.SetBandwidth(ctx, escp.PortBandwidth{Port: 4, IngressKbps: 64}); !errors.Is(err, safety.ErrDryRun) {
+	if err := c.SetBandwidth(ctx, escp.PortBandwidth{Port: 4, Ingress: 64}); !errors.Is(err, safety.ErrDryRun) {
 		t.Fatalf("SetBandwidth: got %v, want ErrDryRun", err)
 	}
 	if err := c.SetLED(ctx, false); !errors.Is(err, safety.ErrDryRun) {
@@ -73,7 +73,7 @@ func TestDryRunOfAWriteThatReadsFirst(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = c.Close() })
-	if err := c.SetPortPriorities(context.Background(), map[escp.PortID]escp.Priority{5: escp.PriorityHighest, 2: escp.PriorityLowest}); !errors.Is(err, safety.ErrDryRun) {
+	if err := c.SetPortPriorities(context.Background(), []escp.PortPriority{{Port: 5, Priority: escp.PriorityHighest}, {Port: 2, Priority: escp.PriorityLowest}}); !errors.Is(err, safety.ErrDryRun) {
 		t.Fatalf("got %v, want ErrDryRun", err)
 	}
 	want := []escp.Operation{{Name: "SetPortPriorities", Ports: escp.MustPortSet(2, 5), Impact: escp.ImpactTraffic}}

@@ -13,10 +13,10 @@ import (
 	"github.com/davidlukac/escp-go/internal/wire"
 )
 
-// ErrInvalidConfig means the reply was not a complete switch configuration file: it did not
+// ErrInvalidConfigFile means the reply was not a complete switch configuration file: it did not
 // start with the configuration magic, a packet was missing, or two downloads of it differed. The
 // message says which. ConfigBackup repeats the download before it returns this.
-var ErrInvalidConfig = errors.New("escp: reply is not a switch configuration file")
+var ErrInvalidConfigFile = errors.New("escp: reply is not a switch configuration file")
 
 // ConfigFile is the switch's binary configuration file, as ConfigBackup returns it. It holds
 // the account block of the switch (obfuscated, not safe), so it prints as its size and hash and
@@ -60,7 +60,7 @@ func (f ConfigFile) LogValue() slog.Value { return slog.StringValue(f.String()) 
 // Content-Length). A download is therefore accepted only when it is structurally complete (it
 // starts with the magic, the last fragment arrived, the packets before it are equally long) and a
 // second download, requested separately, is byte for byte the same. Anything
-// else is repeated, up to Config.Retries+1 rounds, and then reported as ErrInvalidConfig. A
+// else is repeated, up to Config.Retries+1 rounds, and then reported as ErrInvalidConfigFile. A
 // configuration that changes while it is read fails the same way. A rejection, a missing reply
 // and a cancelled context end the call at once.
 func (c *Client) ConfigBackup(ctx context.Context) (ConfigFile, error) {
@@ -89,10 +89,10 @@ func (c *Client) verifiedConfig(ctx context.Context) ([]byte, error) {
 				if bytes.Equal(first, second) {
 					return first, nil
 				}
-				err = fmt.Errorf("%w: two downloads differ (%d and %d bytes)", ErrInvalidConfig, len(first), len(second))
+				err = fmt.Errorf("%w: two downloads differ (%d and %d bytes)", ErrInvalidConfigFile, len(first), len(second))
 			}
 		}
-		if !errors.Is(err, ErrInvalidConfig) {
+		if !errors.Is(err, ErrInvalidConfigFile) {
 			return nil, err
 		}
 		c.log.WarnContext(ctx, "configuration download not usable; repeating", "round", round+1, "rounds", c.cfg.Retries+1, "reason", err.Error())
@@ -127,15 +127,15 @@ func assembleConfig(parts [][]byte) ([]byte, error) {
 		file = append(file, p...)
 	}
 	if len(file) <= len(wire.ConfigMagic) || !bytes.HasPrefix(file, wire.ConfigMagic) {
-		return nil, fmt.Errorf("%w (%d bytes in %d packets, no configuration magic at the start)", ErrInvalidConfig, len(file), len(parts))
+		return nil, fmt.Errorf("%w (%d bytes in %d packets, no configuration magic at the start)", ErrInvalidConfigFile, len(file), len(parts))
 	}
 	for i, p := range parts[:len(parts)-1] {
 		if len(p) != len(parts[0]) {
-			return nil, fmt.Errorf("%w (packet %d has %d bytes, packet 1 has %d)", ErrInvalidConfig, i+1, len(p), len(parts[0]))
+			return nil, fmt.Errorf("%w (packet %d has %d bytes, packet 1 has %d)", ErrInvalidConfigFile, i+1, len(p), len(parts[0]))
 		}
 	}
 	if last := parts[len(parts)-1]; len(last) > len(parts[0]) {
-		return nil, fmt.Errorf("%w (the last packet has %d bytes, more than the first, %d)", ErrInvalidConfig, len(last), len(parts[0]))
+		return nil, fmt.Errorf("%w (the last packet has %d bytes, more than the first, %d)", ErrInvalidConfigFile, len(last), len(parts[0]))
 	}
 	return file, nil
 }
