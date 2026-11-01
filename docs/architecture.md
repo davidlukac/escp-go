@@ -12,6 +12,7 @@ For people who work on the library. Users want the [guides](README.md); the chec
 | `internal/wire` | the packet codec, the session crypto and every TLV type number, which no caller needs |
 | `internal/udp` | sharing the reply port between sockets, per operating system |
 | `internal/coverpolicy` | the coverage policy checker and the badge (a build tool, not part of the API) |
+| `internal/mutationreport` | the job summary of a mutation run (a build tool) |
 | `examples/discover` | a read-only example program |
 
 The module path is the repository's, `github.com/davidlukac/escp-go`, so the import paths are that, `.../escp-go/safety` and `.../escp-go/escptest`; the packages themselves are named `escp`, `safety` and `escptest`, and the documentation calls them that.
@@ -41,5 +42,5 @@ Tests that cut across sources have names of their own: `cancel_test` (cancellati
 
 - Protocol numbers are named constants with a doc comment; layout bytes stay in the root package and `internal/wire`.
 - Every writer validates its arguments, asks the write gate, writes through `Client.setTLVs` in `request.go` (the only place that sends a SET with settings), and returns typed errors.
-- Coverage is 100% of reachable statements (`make cover`); `escptest` is exercised by the library's own tests and not measured.
+- Coverage is 100% of reachable statements (`make cover`); `escptest` is exercised by the library's own tests and not measured. Mutation testing (`make mutation`, [CONTRIBUTING.md](../CONTRIBUTING.md)) checks that the tests would notice a wrong operator; the fake, the coverage tool and the example program are left out of it.
 - `make pkgdoc` renders the package documentation the way pkg.go.dev does, from the working tree.
