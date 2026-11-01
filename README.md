@@ -31,7 +31,11 @@ if err != nil { /* ... */ }
 defer c.Close()
 
 info, err := c.Info(ctx)   // model, firmware, MAC, address: no credentials needed
+if err != nil { /* ... */ }
+fmt.Println(info.Model, info.Firmware, info.MAC)
+
 ports, err := c.Ports(ctx) // reads cannot change the switch
+if err != nil { /* ... */ }
 for _, p := range ports {
 	fmt.Printf("port %d: %s (configured %s)\n", p.ID, p.ActualSpeed, p.ConfiguredSpeed)
 }

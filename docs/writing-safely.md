@@ -47,7 +47,7 @@ A gate is a plain function, `func(ctx, escp.Reader, escp.Operation) error`; writ
 
 - It does not know which ports carry traffic. Deciding whether a write is prudent (is the port in use? in a link aggregation group?) and verifying the result are the caller's job; `PortGate` and `safety.UseOf` answer the common question.
 - Apart from `SetIPConfig`, which waits for the switch to answer at its new address, no write reads back to check that it took effect.
-- A few writes read the current settings first so they can send the rest unchanged (`SetHostname`, `SetPortPriorities`); their comments say so.
+- A few writes read first, so they can send the rest unchanged or refuse a combination the switch would silently break: `SetHostname`, `SetIPConfig` and `EnableDHCP` (the discovery reply), `SetPortPriorities` (the QoS page), `SetBandwidth` and `SetStormControl` (the other one's page: an ingress limit and storm control exclude each other), and every write that names a port (the port count, once). These reads are not gated; their comments say so.
 - **Restoring is explicit.** There is no "reset": to put a setting back, write the value you recorded before.
 
 Deliberately **not** offered: user account and password, config restore, reboot, factory reset and firmware upgrade.

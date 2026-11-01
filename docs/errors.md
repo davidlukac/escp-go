@@ -7,7 +7,7 @@ Test errors with `errors.Is` and `errors.As`, never by message.
 | `ErrInvalid` | an argument was refused before any write was sent; the message names the value and what is allowed |
 | `ErrNoReply` | the switch did not answer in time |
 | `ErrRejected`, `*RejectedError` | the switch answered with a non-zero code: it refused a write, would not report a setting or did not accept the session key; the error carries the code (`ReplyCode`) and, for the known ones, the reason |
-| `ErrMoveUnconfirmed` | `SetIPConfig` lost track of the switch: look at both addresses before believing either |
+| `ErrMoveUnconfirmed` | `SetIPConfig` or `EnableDHCP` lost track of the switch: look at both addresses (or look it up by its MAC) before believing either |
 | `ErrNoInterface` | `Discover` has nowhere to send |
 | `ErrInvalidConfigFile` | a configuration backup that is not complete, after the download was repeated |
 | `ErrReplyTooLarge` | a fragmented reply bigger than any switch sends |

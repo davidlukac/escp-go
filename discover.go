@@ -52,8 +52,11 @@ type DiscoverOptions struct {
 // Switches always reply to UDP port 29809 whatever the sender's port. The port is shared
 // (see Client), so Discover can run while a Client of the same host is working: on macOS it
 // found both switches three times out of three while a Client was reading at the same
-// time. Where the system offers no port sharing, or another program holds the port
-// exclusively (an old Easy Smart utility), binding fails and Discover returns that error.
+// time. Where the system gives a datagram to only one of the sockets that share a port,
+// either could miss a reply (whether the switches address their replies to the broadcast
+// address or to the host was not captured): run Discover on its own when you can. Where the
+// system offers no port sharing, or another program holds the port exclusively (an old Easy
+// Smart utility), binding fails and Discover returns that error.
 func Discover(ctx context.Context, opts DiscoverOptions) ([]Info, error) {
 	return discoverWith(ctx, opts, discoverEnv{interfaces: hostInterfaces, switchPort: defaultSwitchPort, hostPort: defaultHostPort})
 }

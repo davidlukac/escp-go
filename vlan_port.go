@@ -60,8 +60,8 @@ type PortBasedVLAN struct {
 // wire's range (PortVLANID.Validate) applies.
 type PortVLANLimit int
 
-// NewPortVLANLimit is the limit of a switch that supports groups groups and has ports ports; either
-// may be 0 when the switch did not say.
+// NewPortVLANLimit is the limit of a switch that supports the given number of groups and has the
+// given number of ports; either may be 0 when the switch did not say.
 func NewPortVLANLimit(groups, ports int) PortVLANLimit { return PortVLANLimit(max(groups, ports)) }
 
 // Known reports whether the switch said anything that bounds the ids.
