@@ -221,29 +221,28 @@ func TestEscptestWriteRecordsAreCopies(t *testing.T) {
 	}
 }
 
-// What every write method tells its gate: its own name, the ports of its arguments, and its class.
-// Written out by hand, not derived from the implementation: the class is a decision (what kind of
-// change the method is: one that can cut the management path is ImpactManagement), and changing one
-// is a decision to review.
+// What every write method tells its gate: its own name, the ports of its arguments and the group it
+// replaces, written out by hand. The class is not here: it is a decision kept in one place, the
+// settings table (settings.go), and the test below checks the gate is told what that table says.
 var writeOperations = map[string]Operation{
-	"SetLED":            {Name: "SetLED", Impact: ImpactCosmetic},
-	"SetHostname":       {Name: "SetHostname", Impact: ImpactCosmetic},
-	"SetBandwidth":      {Name: "SetBandwidth", Ports: MustPortSet(2), Impact: ImpactTraffic},
-	"SetIGMP":           {Name: "SetIGMP", Impact: ImpactTraffic},
-	"SetPort":           {Name: "SetPort", Ports: MustPortSet(2), Impact: ImpactManagement},
-	"SetPortMirror":     {Name: "SetPortMirror", Ports: MustPortSet(2, 3), Impact: ImpactManagement},
-	"SetQoSMode":        {Name: "SetQoSMode", Impact: ImpactTraffic},
-	"SetPortPriorities": {Name: "SetPortPriorities", Ports: MustPortSet(2), Impact: ImpactTraffic},
-	"SetStormControl":   {Name: "SetStormControl", Ports: MustPortSet(2), Impact: ImpactTraffic},
-	"SetDot1QVLAN":      {Name: "SetDot1QVLAN", Ports: MustPortSet(2), Impact: ImpactManagement, Replaces: Group{Dot1QVLAN: 10}},
-	"DeleteDot1QVLAN":   {Name: "DeleteDot1QVLAN", Impact: ImpactManagement, Replaces: Group{Dot1QVLAN: 10}},
-	"SetPortBasedVLAN":  {Name: "SetPortBasedVLAN", Ports: MustPortSet(3, 4), Impact: ImpactManagement, Replaces: Group{PortVLAN: 2}},
-	"SetLAG":            {Name: "SetLAG", Ports: MustPortSet(2, 3), Impact: ImpactManagement, Replaces: Group{LAG: 1}},
-	"SetLoopPrevention": {Name: "SetLoopPrevention", Impact: ImpactManagement},
-	"SetPVIDs":          {Name: "SetPVIDs", Ports: MustPortSet(2), Impact: ImpactManagement},
-	"SetVLANMode":       {Name: "SetVLANMode", Ports: MustPortSet(8), Impact: ImpactManagement},
-	"SetIPConfig":       {Name: "SetIPConfig", Impact: ImpactManagement},
-	"EnableDHCP":        {Name: "EnableDHCP", Impact: ImpactManagement},
+	"SetLED":            {Name: "SetLED"},
+	"SetHostname":       {Name: "SetHostname"},
+	"SetBandwidth":      {Name: "SetBandwidth", Ports: MustPortSet(2)},
+	"SetIGMP":           {Name: "SetIGMP"},
+	"SetPort":           {Name: "SetPort", Ports: MustPortSet(2)},
+	"SetPortMirror":     {Name: "SetPortMirror", Ports: MustPortSet(2, 3)},
+	"SetQoSMode":        {Name: "SetQoSMode"},
+	"SetPortPriorities": {Name: "SetPortPriorities", Ports: MustPortSet(2)},
+	"SetStormControl":   {Name: "SetStormControl", Ports: MustPortSet(2)},
+	"SetDot1QVLAN":      {Name: "SetDot1QVLAN", Ports: MustPortSet(2), Replaces: Group{Dot1QVLAN: 10}},
+	"DeleteDot1QVLAN":   {Name: "DeleteDot1QVLAN", Replaces: Group{Dot1QVLAN: 10}},
+	"SetPortBasedVLAN":  {Name: "SetPortBasedVLAN", Ports: MustPortSet(3, 4), Replaces: Group{PortVLAN: 2}},
+	"SetLAG":            {Name: "SetLAG", Ports: MustPortSet(2, 3), Replaces: Group{LAG: 1}},
+	"SetLoopPrevention": {Name: "SetLoopPrevention"},
+	"SetPVIDs":          {Name: "SetPVIDs", Ports: MustPortSet(2)},
+	"SetVLANMode":       {Name: "SetVLANMode", Ports: MustPortSet(8)},
+	"SetIPConfig":       {Name: "SetIPConfig"},
+	"EnableDHCP":        {Name: "EnableDHCP"},
 }
 
 // operationsOf runs call against a client whose gate allows and records what the gate was told.
@@ -271,9 +270,10 @@ func TestEveryWriteMethodDeclaresItsOperation(t *testing.T) {
 	for _, name := range names {
 		want, ok := writeOperations[name]
 		if !ok {
-			t.Errorf("%s is not in writeOperations: decide its class and the ports it names", name)
+			t.Errorf("%s is not in writeOperations: decide the ports it names", name)
 			continue
 		}
+		want.Impact = registeredImpact(name) // the class is the settings table's, and nowhere else
 		t.Run(name, func(t *testing.T) {
 			seen := operationsOf(t, writeCalls[name])
 			if len(seen) == 0 {
@@ -376,9 +376,9 @@ func TestARemovedGroupIsStillReportedAsReplaced(t *testing.T) {
 		call func(c *Client) error
 		want Operation
 	}{
-		{"LAG", func(c *Client) error { return c.SetLAG(ctx, LAG{ID: 2, Ports: 0}) }, Operation{Name: "SetLAG", Impact: ImpactManagement, Replaces: Group{LAG: 2}}},
-		{"port-based VLAN", func(c *Client) error { return c.SetPortBasedVLAN(ctx, PortVLAN{ID: 3, Ports: 0}) }, Operation{Name: "SetPortBasedVLAN", Impact: ImpactManagement, Replaces: Group{PortVLAN: 3}}},
-		{"802.1Q VLAN", func(c *Client) error { return c.DeleteDot1QVLAN(ctx, 20) }, Operation{Name: "DeleteDot1QVLAN", Impact: ImpactManagement, Replaces: Group{Dot1QVLAN: 20}}},
+		{"LAG", func(c *Client) error { return c.SetLAG(ctx, LAG{ID: 2, Ports: 0}) }, Operation{Name: "SetLAG", Impact: registeredImpact("SetLAG"), Replaces: Group{LAG: 2}}},
+		{"port-based VLAN", func(c *Client) error { return c.SetPortBasedVLAN(ctx, PortVLAN{ID: 3, Ports: 0}) }, Operation{Name: "SetPortBasedVLAN", Impact: registeredImpact("SetPortBasedVLAN"), Replaces: Group{PortVLAN: 3}}},
+		{"802.1Q VLAN", func(c *Client) error { return c.DeleteDot1QVLAN(ctx, 20) }, Operation{Name: "DeleteDot1QVLAN", Impact: registeredImpact("DeleteDot1QVLAN"), Replaces: Group{Dot1QVLAN: 20}}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

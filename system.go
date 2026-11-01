@@ -80,7 +80,7 @@ func (c *Client) SetHostname(ctx context.Context, name Hostname) error {
 	if err != nil {
 		return err
 	}
-	_, err = c.writeSystem(ctx, Operation{Name: "SetHostname", Impact: ImpactCosmetic}, name, info.DHCP, cur)
+	_, err = c.writeSystem(ctx, Operation{Name: "SetHostname", Impact: impactOf("SetHostname")}, name, info.DHCP, cur)
 	return err
 }
 

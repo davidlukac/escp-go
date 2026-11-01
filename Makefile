@@ -5,7 +5,7 @@
 # Dependabot bumps them there. `go tool` builds the pinned version on first use (cached afterwards).
 DEVTOOL := go tool -modfile=devtools/go.mod
 
-.PHONY: test lint vuln cover cover-html apidiff fuzz mutation mutation-diff pkgdoc pkgdoc-serve compat-table hooks pre-commit
+.PHONY: test lint vuln cover cover-html apidiff fuzz mutation mutation-diff pkgdoc pkgdoc-serve compat-table settings-docs hooks pre-commit
 
 # Unit tests against the fake switch. No hardware is touched.
 test:
@@ -73,6 +73,11 @@ pkgdoc-serve:
 # allow-list reads the same file); a test fails when the README is stale.
 compat-table:
 	go test ./safety -run TestReadmeCompatibilityTable -update-readme
+
+# Rewrites the settings table of the README and the class lists of docs/writing-safely.md from escp.Settings
+# (settings.go); a test fails when they are stale.
+settings-docs:
+	go test . -run TestTheGeneratedTablesAreCurrent -update-docs
 
 # Enable the repository's git hooks (pre-commit runs `make pre-commit`).
 hooks:

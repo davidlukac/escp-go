@@ -76,12 +76,14 @@ The examples in the [package documentation](https://pkg.go.dev/github.com/davidl
 
 ## What it can read and write
 
+<!-- settings-table:begin (generated from escp.Settings: make settings-docs) -->
+
 | Setting (web UI page) | Read | Write | Types | Impact of the write |
 |---|---|---|---|---|
-| Device (System Info) | `Info`, `System` | `SetHostname`, `SetIPConfig` | `Info`, `System`, `IPConfig` | cosmetic, management |
+| Device (System Info) | `Info`, `System` | `SetHostname`, `SetIPConfig`, `EnableDHCP` | `Info`, `System`, `IPConfig`, `Hostname` | cosmetic (SetHostname), management (SetIPConfig, EnableDHCP) |
 | LED | `LED` | `SetLED` | `bool` | cosmetic |
 | Ports (Port Setting) | `Ports` | `SetPort` | `Port`, `PortConfig`, `Speed` | management |
-| Port statistics | `PortStats` | (read only) | `PortStats` | |
+| Port statistics | `PortStats` | (read only) | `PortStats` | (none) |
 | Link aggregation (Port Trunk) | `LAGs` | `SetLAG` | `LAG` | management |
 | Port mirror | `PortMirror` | `SetPortMirror` | `Mirror` | management |
 | Bandwidth control | `Bandwidth` | `SetBandwidth` | `PortBandwidth` | traffic |
@@ -90,10 +92,12 @@ The examples in the [package documentation](https://pkg.go.dev/github.com/davidl
 | IGMP snooping | `IGMP` | `SetIGMP` | `IGMP`, `IGMPConfig`, `IGMPGroup` | traffic |
 | Loop prevention | `LoopPrevention` | `SetLoopPrevention` | `bool` | management |
 | VLAN mode | `VLANMode` | `SetVLANMode` | `VLANMode`, `VLANModeSetting` | management |
-| MTU VLAN | `MTUVLAN` | (through `SetVLANMode`) | `MTUVLAN` | |
+| MTU VLAN | `MTUVLAN` | (through `SetVLANMode`) | `MTUVLAN` | (none) |
 | Port-based VLAN | `PortBasedVLAN` | `SetPortBasedVLAN` | `PortBasedVLAN`, `PortVLAN` | management |
 | 802.1Q VLAN and PVID | `Dot1Q` | `SetDot1QVLAN`, `DeleteDot1QVLAN`, `SetPVIDs` | `Dot1Q`, `Dot1QVLAN`, `PortPVID` | management |
-| Configuration file | `ConfigBackup` | (restore is not offered) | `ConfigFile` | |
+| Configuration file | `ConfigBackup` | (restore is not offered) | `ConfigFile` | (none) |
+
+<!-- settings-table:end -->
 
 Deliberately **not** offered: user account, config restore, reboot, factory reset and firmware upgrade.
 
@@ -103,7 +107,7 @@ Deliberately **not** offered: user account, config restore, reboot, factory rese
 - **Closed sets are types** with a list function and, where the names are text, a `Parse...` function: `Speed` (`ConfigurableSpeeds`, `ParseSpeed`), `QoSMode` (`QoSModes`, `ParseQoSMode`), `VLANMode` (`VLANModes`, `ParseVLANMode`), and `Priority` (1 to 4, as the web UI shows it). Each has `Validate() error`, like every input type. The spellings are the web UI's and the Terraform provider's; consumers keep them in saved state, so they do not change.
 - **Values encode as text and read back.** `MAC`, `PortSet`, `Firmware`, `Speed`, `QoSMode`, `VLANMode` and `Impact` have `MarshalText`/`UnmarshalText` (the names and forms above), so `encoding/json` (and the YAML and TOML libraries) write `"00:00:5e:00:53:01"`, `"2,3,5"` and `"port-based"` and decode them, refusing what is no value; every reading survives a round trip (`TestReadingsSurviveJSON`). `Password` encodes as `[redacted]` on purpose and does not read back; `ConfigFile` encodes as base64.
 - **Readers return values, not pointers.** Counters in `PortStats` are the switch's 32-bit counters and wrap.
-- **Limits and validators are public** so a front end can refuse a bad value before it reaches the client: every input type has a `Validate` method (`Config`, `PortID`, `VLANID`, `Kbps`, `VLANName`, `Hostname`, `Speed`, `QoSMode`, `VLANMode`, `Priority`, `Impact`, `PortConfig`, `StormConfig`, `PortBandwidth`, `Mirror`, `PortPriority`, `PortPVID`, `LAG`, `PortVLAN`, `Dot1QVLAN`, `IPConfig`, `VLANModeSetting`), a writer refuses exactly what the method refuses, and the constants they use are exported (`MaxPort`, `RateStep`, `MaxBandwidth`, `LAGGroupCount`, ...).
+- **Limits and validators are public** so a front end can refuse a bad value before it reaches the client: every input type has a `Validate` method (<!-- validators:begin (generated from escp.Settings: make settings-docs) -->`Config`, `Dot1QVLAN`, `Hostname`, `IPConfig`, `Impact`, `Kbps`, `LAG`, `LAGID`, `Mirror`, `PortBandwidth`, `PortConfig`, `PortID`, `PortPVID`, `PortPriority`, `PortVLAN`, `PortVLANID`, `Priority`, `QoSMode`, `Speed`, `StormConfig`, `VLANID`, `VLANMode`, `VLANModeSetting`, `VLANName`<!-- validators:end -->), a writer refuses exactly what the method refuses, and the constants they use are exported (`MaxPort`, `RateStep`, `MaxBandwidth`, `LAGGroupCount`, ...).
 
 ## Compatibility
 

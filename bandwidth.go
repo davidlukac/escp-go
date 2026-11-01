@@ -111,7 +111,7 @@ func (c *Client) SetBandwidth(ctx context.Context, limit PortBandwidth) error {
 			return err
 		}
 	}
-	op := Operation{Name: "SetBandwidth", Ports: limit.Port.set(), Impact: ImpactTraffic}
+	op := Operation{Name: "SetBandwidth", Ports: limit.Port.set(), Impact: impactOf("SetBandwidth")}
 	if err := c.setTLVs(ctx, op, in); err != nil {
 		return err
 	}

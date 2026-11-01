@@ -145,7 +145,7 @@ func (c *Client) SetQoSMode(ctx context.Context, mode QoSMode) error {
 	if err := mode.Validate(); err != nil {
 		return err
 	}
-	return c.setTLVs(ctx, Operation{Name: "SetQoSMode", Impact: ImpactTraffic}, wire.TLV{Type: wire.TLVQoSMode, Value: []byte{byte(mode)}})
+	return c.setTLVs(ctx, Operation{Name: "SetQoSMode", Impact: impactOf("SetQoSMode")}, wire.TLV{Type: wire.TLVQoSMode, Value: []byte{byte(mode)}})
 }
 
 // Validate checks the port and the priority. The error matches ErrInvalid.
@@ -194,5 +194,5 @@ func (c *Client) SetPortPriorities(ctx context.Context, changes []PortPriority) 
 	for _, p := range cur.Priorities { // keep the switch's port order
 		tlvs = append(tlvs, wire.TLV{Type: wire.TLVQoSPriority, Value: []byte{byte(p.Port), byte(prio[p.Port] - PriorityLowest)}})
 	}
-	return c.setTLVs(ctx, Operation{Name: "SetPortPriorities", Ports: named, Impact: ImpactTraffic}, tlvs...)
+	return c.setTLVs(ctx, Operation{Name: "SetPortPriorities", Ports: named, Impact: impactOf("SetPortPriorities")}, tlvs...)
 }

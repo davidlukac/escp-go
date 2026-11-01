@@ -43,7 +43,7 @@ func (c *Client) EnableDHCP(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	sent, err := c.writeSystem(ctx, Operation{Name: "EnableDHCP", Impact: ImpactManagement}, info.Hostname, true, before)
+	sent, err := c.writeSystem(ctx, Operation{Name: "EnableDHCP", Impact: impactOf("EnableDHCP")}, info.Hostname, true, before)
 	var refused *RejectedError
 	if err != nil && (!sent || errors.As(err, &refused)) {
 		return err // nothing was applied: the gate or the switch refused, or the request was not sent

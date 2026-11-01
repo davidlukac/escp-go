@@ -64,7 +64,7 @@ func (c *Client) SetPortMirror(ctx context.Context, m Mirror) error {
 	if err := m.Validate(); err != nil {
 		return err
 	}
-	op := Operation{Name: "SetPortMirror", Impact: ImpactManagement}
+	op := Operation{Name: "SetPortMirror", Impact: impactOf("SetPortMirror")}
 	v := make([]byte, mirrorEntryLen)
 	if m.Enabled {
 		op.Ports = m.named()
