@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/netip"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -227,6 +228,13 @@ func TestLoggerWarnsAboutALostPacketAndTheRetry(t *testing.T) {
 	if _, err := c.LED(context.Background()); err != nil {
 		t.Fatal(err)
 	}
+	var sent []any
+	for _, l := range rec.named("request sent") {
+		sent = append(sent, l.attrs["attempt"])
+	}
+	if len(sent) < 2 || sent[0] != int64(1) || sent[1] != int64(2) {
+		t.Errorf("request lines carry the attempts %v, want 1 then 2", sent)
+	}
 	lost := rec.named("no reply")
 	if len(lost) != 1 || lost[0].level != slog.LevelWarn || lost[0].attrs["attempt"] != int64(1) || lost[0].attrs["attempts"] != int64(2) {
 		t.Errorf("no-reply lines = %+v, want one Warn for attempt 1 of 2", lost)
@@ -262,8 +270,18 @@ func TestLoggerFollowsAConfigurationDownload(t *testing.T) {
 			t.Fatal(err)
 		}
 		missing := rec.named("final fragment missing; asking again")
-		if len(missing) != 1 || missing[0].level != slog.LevelWarn || missing[0].attrs["packets"] != int64(1) {
-			t.Errorf("missing-fragment lines = %+v, want one Warn after the first packet", missing)
+		if len(missing) != 1 || missing[0].level != slog.LevelWarn || missing[0].attrs["packets"] != int64(1) ||
+			missing[0].attrs["attempt"] != int64(1) || missing[0].attrs["attempts"] != int64(2) || missing[0].attrs["bytes"] != int64(1400) {
+			t.Errorf("missing-fragment lines = %+v, want one Warn after the first packet (1400 bytes), attempt 1 of 2", missing)
+		}
+		var asked []any // the attempts of the requests for the file (the ones that carry TLV 768)
+		for _, l := range rec.named("request sent") {
+			if types, _ := l.attrs["tlvs"].([]int); slices.Contains(types, int(wire.TLVConfigFile)) {
+				asked = append(asked, l.attrs["attempt"])
+			}
+		}
+		if len(asked) != 3 || asked[0] != int64(1) || asked[1] != int64(2) { // attempt 1 lost its end, attempt 2 is the first download's, then the second download
+			t.Errorf("the file was asked for with the attempts %v, want 1, 2 and then the second download's 1", asked)
 		}
 		frags := rec.named("fragment received")
 		if len(frags) < 3 || frags[0].attrs["packet"] != int64(1) || frags[0].attrs["more"] != true {
@@ -279,7 +297,7 @@ func TestLoggerFollowsAConfigurationDownload(t *testing.T) {
 			t.Fatal(err)
 		}
 		again := rec.named("configuration download not usable; repeating")
-		if len(again) != 1 || again[0].level != slog.LevelWarn || again[0].attrs["round"] != int64(1) || !strings.Contains(again[0].attrs["reason"].(string), "differ") {
+		if len(again) != 1 || again[0].level != slog.LevelWarn || again[0].attrs["round"] != int64(1) || again[0].attrs["rounds"] != int64(2) || !strings.Contains(again[0].attrs["reason"].(string), "differ") {
 			t.Errorf("repeat lines = %+v, want one Warn for round 1 saying the downloads differ", again)
 		}
 	})
