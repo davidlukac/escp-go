@@ -7,7 +7,7 @@ How a version of the library is cut and published. Maintainers only.
 - All changes go through a pull request: branch, commit, push, wait for green CI, **squash merge**. Nothing is pushed to `main` directly.
 - Commit messages and PR titles follow [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `ci:`, `build:`, `chore:`; `!` or a `BREAKING CHANGE:` footer marks an API break.
 - **Versions** ([SemVer](https://semver.org/)): while the module is 0.x, a change that breaks the exported API, and a change that adds to it (a new setting, an exported name), is a **minor** version, and a fix is a patch; the CHANGELOG entry names each break. From 1.0.0 a feature is a minor version, a fix a patch, and a break needs a new major version, and a major version 2 or later changes the import path (`.../escp-go/v2`). `make apidiff` shows what changed since the latest release.
-- **What counts as API:** every exported name, the error values and their meaning, the `Speed`/`QoSMode`/`VLANMode` spellings, the log attribute names and the levels of existing messages ([docs/logging.md](docs/logging.md)), and the behaviour of `escptest`.
+- **What counts as API:** every exported name, the error values and their meaning, the `Speed`/`QoSMode`/`VLANMode` spellings, the log attribute names and the levels of existing messages ([docs/logging.md](docs/logging.md)), and the behavior of `escptest`.
 - A tag is **immutable**. The Go module proxy caches a version for good; a bad release is fixed by a new patch version and, if it must not be used, a `retract` directive in `go.mod`. Never move or delete a pushed tag.
 
 ## Cutting a version

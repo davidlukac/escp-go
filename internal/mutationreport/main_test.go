@@ -32,7 +32,7 @@ func writeReport(t *testing.T, text string) string {
 func TestTheSummaryCountsEachOutcomeAndListsTheSurvivors(t *testing.T) {
 	code, out, errOut := runWith(t, writeReport(t, sample))
 	want := "### Mutation testing\n\nKILLED: 2, LIVED: 2, NOT COVERED: 1\n\n" +
-		"Surviving mutants (a behaviour no test pins; an equivalent mutant is not a reason to bend a test):\n\n" +
+		"Surviving mutants (a behavior no test pins; an equivalent mutant is not a reason to bend a test):\n\n" +
 		"- `a.go:9:2` ARITHMETIC_BASE\n- `b.go:1:1` CONDITIONALS_BOUNDARY\n"
 	if code != exitOK || errOut != "" || out != want {
 		t.Fatalf("code %d, stderr %q, stdout:\n%s\nwant:\n%s", code, errOut, out, want)

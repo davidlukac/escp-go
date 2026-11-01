@@ -40,6 +40,9 @@ linters:
     - perfsprint
     - usestdlibvars
   settings:
+    misspell:
+      # American spelling, as the Go standard library and godoc use it.
+      locale: US
     gocyclo:
       min-complexity: 15
     gocognit:
@@ -48,7 +51,7 @@ linters:
       min-complexity: 5
     exhaustive:
       default-signifies-exhaustive: true
-      # The TLV catalogue is an open list of protocol numbers; a switch on it names the ones it reads.
+      # The TLV catalog is an open list of protocol numbers; a switch on it names the ones it reads.
       ignore-types: 'internal/wire\.TLVType'
     nolintlint:
       require-explanation: true

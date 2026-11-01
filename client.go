@@ -50,7 +50,7 @@ type Client struct {
 }
 
 // Dial prepares a client for the switch at cfg.Host, which must be an IPv4 address or a
-// name that resolves to one (a name is looked up now, and the lookup cannot be cancelled), or,
+// name that resolves to one (a name is looked up now, and the lookup cannot be canceled), or,
 // when cfg.MAC is set, may be left empty to find the switch by its MAC address on the first
 // request. A configuration that Config.Validate refuses is refused here, with an error that
 // matches ErrInvalid, and not on the first call. It sends nothing to the switch and

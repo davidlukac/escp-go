@@ -30,7 +30,7 @@ for _, p := range ports {
 ```
 
 - `Dial` sends nothing and binds no socket; the first call does the key exchange.
-- Every method that talks to the switch takes a `context.Context`. Cancelling it stops the call, and nothing is written once it is done.
+- Every method that talks to the switch takes a `context.Context`. Canceling it stops the call, and nothing is written once it is done.
 - **One `Client` per switch.** A `Client` is safe for concurrent use but sends one request at a time, because the switch answers one at a time. Clients for different switches work side by side, in one process or on one host. Two clients for the same switch do not work: the switch keeps one session, so each key exchange invalidates the other client's.
 - Switches always reply to UDP port 29809 whoever asked, so every client on a host shares that port and each keeps only the replies from its own switch. The library sets up the sharing on Linux, macOS, FreeBSD and Windows (observed with real switches on macOS; the tests show a broadcast reaching every sharing socket on Linux); on any other system the second bind fails, so only one client per host works.
 - The reads are named for what they return (`Ports`, `QoS`, `LED`, `Dot1Q`); the writes are `Set...` and `Delete...`. The table in the [README](../README.md#what-it-can-read-and-write) lists them all.
