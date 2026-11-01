@@ -5,7 +5,7 @@
 # proves that a fresh module can install it and build against all three packages.
 #
 # Procedure (RELEASING.md): the release PR is merged, `scripts/release.sh --tag X.Y.Z` tags the merge
-# commit, the owner pushes that tag (the owner's go-ahead is what publishes). To re-run for a tag
+# commit, a maintainer pushes that tag (the push is what publishes). To re-run for a tag
 # that exists (a failed step, a version released before this workflow did all of it):
 #   gh workflow run release.yml -f tag=vX.Y.Z      (every step is safe to repeat)
 name: Release

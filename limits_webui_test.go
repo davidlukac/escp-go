@@ -9,7 +9,7 @@ import (
 )
 
 // webUILimits is testdata/webui-limits.json: the limits the switch's own web UI enforces (field
-// lengths, table sizes), read from its pages by the workspace's `scripts/webui-map.sh limits` over
+// lengths, table sizes), read from its pages by a crawler of the web UI over
 // every mapped firmware build (a limit that differs between builds stops the generator, so each
 // value here holds for all of them). The file is regenerated when a build is mapped.
 type webUILimits struct {
@@ -58,7 +58,7 @@ func TestLibraryLimitsMatchTheWebUI(t *testing.T) {
 		library int
 		why     string
 	}{
-		"port_based_vlan_id_max_digits": {digits(MaxPortVLANID), "the web UI takes port-based VLAN ids 2 to the port count (page text and pvlan.js); the type allows the wire's 1 to 255, because it does not know the switch, and SetPortBasedVLAN and the provider refuse an id above the number of groups the switch reports (TLV 8450, 8 on a TL-SG108E), as the web UI does. Whether the switch itself would accept a higher id is not probed"},
+		"port_based_vlan_id_max_digits": {digits(MaxPortVLANID), "the web UI takes port-based VLAN ids 2 to the port count (page text and pvlan.js); the type allows the wire's 1 to 255, because it does not know the switch, and SetPortBasedVLAN and the front ends refuse an id above the number of groups the switch reports (TLV 8450, 8 on a TL-SG108E), as the web UI does. Whether the switch itself would accept a higher id is not probed"},
 	}
 	// Limits the library does not model as constants: it does not write them (user account, CLI only; the
 	// switch's own rule for those is not probed) or reads them from the switch (the table size, enforced by

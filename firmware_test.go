@@ -12,8 +12,8 @@ func TestParseFirmware(t *testing.T) {
 		want    BuildDate
 		ok      bool
 	}{
-		{"1.0.0 Build 20230218 Rel.50633", "20230218", true}, // switch 01, as reported by discovery
-		{"1.0.0 Build 20250710 Rel.71093", "20250710", true}, // switch 03
+		{"1.0.0 Build 20230218 Rel.50633", "20230218", true}, // as reported by discovery
+		{"1.0.0 Build 20250710 Rel.71093", "20250710", true},
 		{"1.0.0 Build 20230218", "20230218", true},
 		{"1.0.0", "", false},
 		{"", "", false},

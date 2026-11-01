@@ -16,8 +16,8 @@ import (
 
 // Measures what the switch does with values of a feature that is not active: whether a write is
 // accepted, whether it reads back, whether it survives a switch of the VLAN or QoS mode. The
-// answers decide, per setting, whether a consumer may let a configuration stage such a value
-// (docs/inactive-settings-design.md in the private workspace). Nothing is asserted about the
+// answers decide, per setting, whether a consumer may let a configuration stage such a value.
+// Nothing is asserted about the
 // answers: every observation is logged as a line starting with "OBS|" for the run record. What is
 // asserted is the restore: the switch must end exactly as it began.
 //

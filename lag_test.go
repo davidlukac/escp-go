@@ -94,7 +94,7 @@ func TestLAGValidate(t *testing.T) {
 }
 
 // Every code below was provoked on a real TL-SG108E (firmware 20250710), the member rules
-// (7405 to 7418) on free ports 3 and 4 of switch 03; the error must name the conflict instead
+// (7405 to 7418) on free ports 3 and 4; the error must name the conflict instead
 // of blaming the credentials.
 func TestSetLAGRefusalNamesTheConflict(t *testing.T) {
 	for _, tc := range []struct {
