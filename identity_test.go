@@ -241,6 +241,19 @@ func TestADeadAddressGetsAShortBudgetBeforeTheLookup(t *testing.T) {
 	}
 }
 
+// A deadline that has passed ends the call like a cancellation does: the lookup by MAC is not
+// started for a caller that has no time left.
+func TestAnExpiredDeadlineDoesNotStartTheLookup(t *testing.T) {
+	f := escptest.Start(t)
+	f.DropFirst(2)
+	c, calls := dialMAC(t, f, "127.0.0.1", wantMAC, nil)
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+	defer cancel()
+	if _, err := c.Info(ctx); !errors.Is(err, context.DeadlineExceeded) || *calls != 0 {
+		t.Fatalf("an expired call must not look the switch up: %v after %d lookups", err, *calls)
+	}
+}
+
 func TestWrongSwitchErrorWithoutAnAddress(t *testing.T) {
 	err := &WrongSwitchError{Want: MAC{1, 2, 3, 4, 5, 6}, Got: MAC{6, 5, 4, 3, 2, 1}}
 	if got := err.Error(); strings.Contains(got, " at ") || !errors.Is(err, ErrWrongSwitch) {

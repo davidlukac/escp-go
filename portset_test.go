@@ -93,6 +93,11 @@ func TestPortSetOperations(t *testing.T) {
 	if !a.Has(2) || a.Has(4) || a.Has(0) || a.Has(33) || a.Has(-1) {
 		t.Error("Has must be true only for members and false, not a panic, for ports outside the mask")
 	}
+	// the first and the last port of the mask are members like any other
+	ends := MustPortSet(1, MaxPort)
+	if !ends.Has(1) || !ends.Has(MaxPort) || ends.Has(2) || ends.Has(MaxPort-1) {
+		t.Error("Has must see port 1 and port MaxPort")
+	}
 	if a.Len() != 3 || a.IsEmpty() || !PortSet(0).IsEmpty() {
 		t.Error("Len and IsEmpty")
 	}

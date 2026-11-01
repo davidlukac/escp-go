@@ -50,6 +50,18 @@ func TestParseDot1QVLANs(t *testing.T) {
 	}
 }
 
+// The shortest entry is id, member mask and tagged mask: the name is empty. One byte fewer is cut off.
+func TestParseDot1QVLANEntryLengthBoundary(t *testing.T) {
+	state := tlvHex(t, wire.TLVVLAN8021Q, "01")
+	got, err := parseDot1Q([]wire.TLV{state, tlvHex(t, wire.TLVVLAN8021QVLAN, "0014"+"00000003"+"00000000")})
+	if err != nil || len(got.VLANs) != 1 || got.VLANs[0].ID != 20 || got.VLANs[0].Name != "" || got.VLANs[0].Untagged != MustPortSet(1, 2) {
+		t.Fatalf("an entry of 10 bytes: %+v, %v", got, err)
+	}
+	if _, err := parseDot1Q([]wire.TLV{state, tlvHex(t, wire.TLVVLAN8021QVLAN, "0014"+"00000003"+"000000")}); err == nil {
+		t.Fatal("an entry of 9 bytes was accepted")
+	}
+}
+
 func TestDot1QCheckRoom(t *testing.T) {
 	table := func(n int) []Dot1QVLAN {
 		out := make([]Dot1QVLAN, 0, n)

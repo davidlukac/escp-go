@@ -45,6 +45,28 @@ func TestParseStorm(t *testing.T) {
 	}
 }
 
+// A port is limited when a rate is set and any one traffic type is selected; each type counts by itself.
+func TestParseStormEnabledNeedsARateAndAnyOneType(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		flags string // unknown unicast, multicast, broadcast
+		rate  string
+		want  bool
+	}{
+		{"unknown unicast only", "010000", "00000400", true},
+		{"multicast only", "000100", "00000400", true},
+		{"broadcast only", "000001", "00000400", true},
+		{"all three", "010101", "00000400", true},
+		{"no type", "000000", "00000400", false},
+		{"no rate", "010101", "00000000", false},
+	} {
+		got, err := parseStorm([]wire.TLV{tlvHex(t, wire.TLVStormControl, "0400"+tc.flags+tc.rate)})
+		if err != nil || len(got) != 1 || got[0].Enabled != tc.want {
+			t.Errorf("%s: %+v, %v; Enabled should be %v", tc.name, got, err, tc.want)
+		}
+	}
+}
+
 func TestSetStormWire(t *testing.T) {
 	f := escptest.Start(t)
 	f.EnableModel(nil) // the pre-write read of the other limiter needs a switch that answers
