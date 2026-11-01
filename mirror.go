@@ -2,6 +2,7 @@ package escp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/davidlukac/escp-go/internal/wire"
@@ -43,7 +44,7 @@ func parseMirror(tlvs []wire.TLV) (Mirror, error) {
 		}
 		return m, nil
 	}
-	return Mirror{}, fmt.Errorf("escp: no port mirror TLV in reply")
+	return Mirror{}, errors.New("escp: no port mirror TLV in reply")
 }
 
 // PortMirror reads the port mirroring configuration: whether it is on, the monitoring port and the

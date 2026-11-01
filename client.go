@@ -112,12 +112,12 @@ func (c *Client) Close() error {
 	return err
 }
 
-func (c *Client) open() error {
+func (c *Client) open(ctx context.Context) error {
 	if c.conn != nil {
 		return nil
 	}
 	lc := net.ListenConfig{Control: udp.Share}
-	pc, err := lc.ListenPacket(context.Background(), "udp4", net.JoinHostPort("", strconv.Itoa(c.cfg.HostPort)))
+	pc, err := lc.ListenPacket(ctx, "udp4", net.JoinHostPort("", strconv.Itoa(c.cfg.HostPort)))
 	if err != nil {
 		return fmt.Errorf("escp: binding UDP port %d (is a client that does not share the port running, such as an old Easy Smart utility?): %w", c.cfg.HostPort, err)
 	}

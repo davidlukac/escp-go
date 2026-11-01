@@ -31,7 +31,7 @@ Coverage must stay at 100% of reachable statements (`make cover`; the only exclu
 - [ ] The gate sees the right operation, ports and impact (`write_gate_test.go`); a cancelled context sends nothing.
 - [ ] **The fake** (`escptest/model.go`): the stateful fake stores and answers the new setting and enforces any rule the switch has (refusals, exclusivity, derived values) **as measured on hardware**. Rules that are only assumed are marked as such in a comment. `escptest` is public API: consumers test against it.
 - [ ] **Live checks** on a switch you own (`go test -tags live -run Live .`, variables `ESCP_HOST`, `ESCP_USERNAME`, `ESCP_PASSWORD`; the others are named in each test): unused port, deferred restore before the first write, restore verified. Take a configuration backup first, watch pings, and keep the uplink and ports with devices out of it. Not possible for a change? Say so in the pull request.
-- [ ] `gofmt`, `go vet` (also `-tags live`), `make lint`, `make vuln` and `make cover` pass. `make fuzz` (30 s per target) when a parser changed.
+- [ ] `gofmt`, `go vet` (also `-tags live`), `make lint`, `make vuln` and `make cover` pass. `make lint` is strict (`.golangci.yml`): besides the usual checks it limits the cyclomatic complexity of a function to 15 and the cognitive complexity to 20 (production code; tests are exempt), nesting, functions of more than five arguments, shadowed builtins and unused `//nolint` directives. A function over the limit is split, not exempted. `make fuzz` (30 s per target) when a parser changed.
 
 ## 3. Documentation
 

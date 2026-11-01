@@ -2,7 +2,7 @@ package escp
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	"github.com/davidlukac/escp-go/internal/wire"
 )
@@ -22,7 +22,7 @@ func parseLoopPrevention(tlvs []wire.TLV) (bool, error) {
 			return t.Value[0] == 1, nil
 		}
 	}
-	return false, fmt.Errorf("escp: no loop prevention TLV in reply")
+	return false, errors.New("escp: no loop prevention TLV in reply")
 }
 
 // SetLoopPrevention enables or disables loop prevention. With it off the switch no longer

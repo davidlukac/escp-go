@@ -90,7 +90,7 @@ func TestAcceptFiltersForeignAndStaleDatagrams(t *testing.T) {
 func TestSendFailureIsReported(t *testing.T) {
 	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
-	if err := c.open(); err != nil {
+	if err := c.open(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	c.conn.Close() // sabotage the socket behind the client's back
@@ -235,7 +235,7 @@ func TestBindFailureIsReported(t *testing.T) {
 func TestRecvWithACancelledContextReturnsImmediately(t *testing.T) {
 	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
-	if err := c.open(); err != nil {
+	if err := c.open(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -252,7 +252,7 @@ func TestRecvWithACancelledContextReturnsImmediately(t *testing.T) {
 func TestRecvWithExpiredDeadlineReturnsImmediately(t *testing.T) {
 	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
-	if err := c.open(); err != nil {
+	if err := c.open(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	start := time.Now()

@@ -1,6 +1,7 @@
 package escp
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -14,14 +15,14 @@ import (
 func newBoundClient(t testing.TB, cfg Config) *Client {
 	t.Helper()
 	var lastErr error
-	for attempt := 0; attempt < 20; attempt++ {
+	for range 20 {
 		cfg.HostPort = escptest.FreeUDPPort(t)
 		c, err := Dial(cfg)
 		if err != nil {
 			t.Fatal(err)
 		}
 		c.mu.Lock()
-		lastErr = c.open()
+		lastErr = c.open(context.Background())
 		c.mu.Unlock()
 		if lastErr == nil {
 			return c

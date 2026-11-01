@@ -2,7 +2,7 @@ package escp
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	"github.com/davidlukac/escp-go/internal/wire"
 )
@@ -26,7 +26,7 @@ func parseMTUVLAN(tlvs []wire.TLV) (MTUVLAN, error) {
 			return m, nil
 		}
 	}
-	return MTUVLAN{}, fmt.Errorf("escp: no valid MTU VLAN TLV in reply")
+	return MTUVLAN{}, errors.New("escp: no valid MTU VLAN TLV in reply")
 }
 
 // MTUVLAN reads whether the MTU VLAN mode is on and which port is its uplink.

@@ -35,6 +35,18 @@ func (r reply) tlv(t wire.TLVType) ([]byte, bool) {
 	return nil, false
 }
 
+// joined is the values of every TLV of the given type in the packet, one after the other.
+func (r reply) joined(t wire.TLVType) ([]byte, bool) {
+	var out []byte
+	found := false
+	for _, x := range r.tlvs {
+		if x.Type == t {
+			out, found = append(out, x.Value...), true
+		}
+	}
+	return out, found
+}
+
 func (c *Client) encrypt(b []byte, static bool) []byte {
 	if static || c.session == nil {
 		return wire.RC4Static(b)
@@ -181,7 +193,7 @@ func (c *Client) send(op byte, tlvs []wire.TLV, static bool, to []*net.UDPAddr) 
 // exchange sends one packet and waits for the reply with the same sequence
 // number from the switch, retrying on silence. Callers hold c.mu.
 func (c *Client) exchange(ctx context.Context, op byte, tlvs []wire.TLV, static bool, to []*net.UDPAddr) (reply, error) {
-	if err := c.open(); err != nil {
+	if err := c.open(ctx); err != nil {
 		return reply{}, err
 	}
 	defer c.interruptOnDone(ctx)()
@@ -225,41 +237,54 @@ func (c *Client) exchangeFragments(ctx context.Context, op byte, tlvs []wire.TLV
 			return nil, err
 		}
 		c.log.DebugContext(ctx, "request sent", "op", wire.OpName(op), "seq", c.seq, "attempt", attempt+1, "tlvs", tlvTypes(tlvs), "bytes", tlvBytes(tlvs))
-		var parts [][]byte
-		total := 0
-		for {
-			rep, ok := c.recv(ctx, c.attemptDeadline(ctx))
-			if !ok {
-				break
-			}
-			if rep.err != 0 {
-				return nil, &RejectedError{Code: rep.err}
-			}
-			var part []byte
-			found := false
-			for _, x := range rep.tlvs {
-				if x.Type == typ {
-					part, found = append(part, x.Value...), true
-				}
-			}
-			if found {
-				parts = append(parts, part)
-				total += len(part)
-				c.log.DebugContext(ctx, "fragment received", "seq", c.seq, "packet", len(parts), "bytes", len(part), "more", rep.fragment != 0)
-			}
-			if total > maxFragmentedReply {
-				return nil, ErrReplyTooLarge
-			}
-			if rep.fragment == 0 {
-				return parts, nil
-			}
+		got, err := c.collectFragments(ctx, typ)
+		if err != nil {
+			return nil, err
+		}
+		if got.complete {
+			return got.parts, nil
 		}
 		if err := expired(ctx); err != nil {
 			return nil, err
 		}
-		c.log.WarnContext(ctx, "final fragment missing; asking again", "seq", c.seq, "attempt", attempt+1, "attempts", c.cfg.Retries+1, "packets", len(parts), "bytes", total)
+		c.log.WarnContext(ctx, "final fragment missing; asking again", "seq", c.seq, "attempt", attempt+1, "attempts", c.cfg.Retries+1, "packets", len(got.parts), "bytes", got.bytes)
 	}
 	return nil, ErrNoReply
+}
+
+// fragments is what one attempt of exchangeFragments collected.
+type fragments struct {
+	parts    [][]byte // the values of the wanted TLV, one per packet
+	bytes    int      // their total length
+	complete bool     // a packet without the fragment flag arrived
+}
+
+// collectFragments reads the packets of one reply until the last one arrives or the switch goes
+// silent (then the result is incomplete). A refusal by the switch and a reply larger than any real
+// one are errors.
+func (c *Client) collectFragments(ctx context.Context, typ wire.TLVType) (fragments, error) {
+	var got fragments
+	for {
+		rep, ok := c.recv(ctx, c.attemptDeadline(ctx))
+		if !ok {
+			return got, nil
+		}
+		if rep.err != 0 {
+			return got, &RejectedError{Code: rep.err}
+		}
+		if part, found := rep.joined(typ); found {
+			got.parts = append(got.parts, part)
+			got.bytes += len(part)
+			c.log.DebugContext(ctx, "fragment received", "seq", c.seq, "packet", len(got.parts), "bytes", len(part), "more", rep.fragment != 0)
+		}
+		if got.bytes > maxFragmentedReply {
+			return got, ErrReplyTooLarge
+		}
+		if rep.fragment == 0 {
+			got.complete = true
+			return got, nil
+		}
+	}
 }
 
 func (c *Client) discoverTargets() []*net.UDPAddr {

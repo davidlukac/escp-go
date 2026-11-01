@@ -86,7 +86,7 @@ func TestEnableDHCPNeedsTheMACAndSendsNothingWithout(t *testing.T) {
 func TestEnableDHCPOnASwitchThatLeasesWritesNothing(t *testing.T) {
 	f := escptest.Start(t)
 	c, _ := dialLeasing(t, f)
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		if err := c.EnableDHCP(context.Background()); err != nil {
 			t.Fatal(err)
 		}

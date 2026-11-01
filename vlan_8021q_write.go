@@ -88,7 +88,7 @@ func (v Dot1QVLAN) encode() []byte {
 
 // vlanEntryBytes lays out a TLV 8705 value: id, member mask, tagged mask, name, NUL.
 func vlanEntryBytes(id VLANID, member, tagged []byte, name VLANName) []byte {
-	out := binary.BigEndian.AppendUint16(nil, uint16(id)) //nolint:gosec // callers validate the id (at most 4094)
+	out := binary.BigEndian.AppendUint16(nil, uint16(id))
 	out = append(out, member...)
 	out = append(out, tagged...)
 	out = append(out, name...)
@@ -152,7 +152,7 @@ func (c *Client) SetPVIDs(ctx context.Context, pvids []PortPVID) error {
 	sorted := slices.SortedFunc(slices.Values(pvids), func(a, b PortPVID) int { return int(a.Port) - int(b.Port) })
 	tlvs := make([]wire.TLV, 0, len(sorted))
 	for _, p := range sorted {
-		value := binary.BigEndian.AppendUint16([]byte{byte(p.Port)}, uint16(p.PVID)) //nolint:gosec // bounded by the validation above
+		value := binary.BigEndian.AppendUint16([]byte{byte(p.Port)}, uint16(p.PVID))
 		tlvs = append(tlvs, wire.TLV{Type: wire.TLVVLAN8021QPVID, Value: value})
 	}
 	return c.setTLVs(ctx, Operation{Name: "SetPVIDs", Ports: named, Impact: ImpactManagement}, tlvs...)

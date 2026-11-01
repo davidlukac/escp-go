@@ -2,6 +2,7 @@ package escp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 
@@ -121,5 +122,5 @@ func (c *Client) portCount(ctx context.Context) (int, error) {
 			return int(t.Value[0]), nil
 		}
 	}
-	return 0, fmt.Errorf("escp: the switch did not report its number of ports")
+	return 0, errors.New("escp: the switch did not report its number of ports")
 }
