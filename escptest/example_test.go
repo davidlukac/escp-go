@@ -18,7 +18,7 @@ func dial(sw *escptest.Switch) *escp.Client {
 		panic(err)
 	}
 	c, err := escp.Dial(escp.Config{
-		Host: "127.0.0.1", SwitchPort: sw.Port(), HostPort: hostPort, BroadcastAddr: escptest.Loopback(),
+		Host: "127.0.0.1", SwitchPort: sw.UDPPort(), HostPort: hostPort, BroadcastAddr: escptest.Loopback(),
 		Username: escptest.Username, Password: escptest.Password,
 	})
 	if err != nil {

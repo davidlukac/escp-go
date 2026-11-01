@@ -31,7 +31,7 @@ func (p program) run(t *testing.T, args ...string) (code int, stdout, stderr str
 		discover: func(context.Context, escp.DiscoverOptions) ([]escp.Info, error) { return p.found, p.discover },
 		dial: func(cfg escp.Config) (*escp.Client, error) {
 			cfg.Host, cfg.Timeout, cfg.Retries = "127.0.0.1", 200*time.Millisecond, escp.NoRetries
-			cfg.SwitchPort, cfg.HostPort, cfg.BroadcastAddr = p.sw.Port(), escptest.FreeUDPPort(t), escptest.Loopback()
+			cfg.SwitchPort, cfg.HostPort, cfg.BroadcastAddr = p.sw.UDPPort(), escptest.FreeUDPPort(t), escptest.Loopback()
 			return escp.Dial(cfg)
 		},
 	}

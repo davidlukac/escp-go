@@ -26,7 +26,7 @@ var (
 func dialMAC(t *testing.T, f *escptest.Switch, host string, mac MAC, locator func(MAC) (Info, error)) (*Client, *int) {
 	t.Helper()
 	c := newBoundClient(t, Config{Host: host, MAC: mac, Username: "admin", Password: "secret", Timeout: 150 * time.Millisecond, Retries: NoRetries,
-		SwitchPort: f.Port(), BroadcastAddr: escptest.Loopback()})
+		SwitchPort: f.UDPPort(), BroadcastAddr: escptest.Loopback()})
 	c.allowLoopback = true
 	calls := new(int)
 	c.locator = func(_ context.Context, m MAC) (Info, error) {

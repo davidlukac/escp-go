@@ -28,7 +28,7 @@ func ExampleClient_Info() {
 	}
 
 	c, err := escp.Dial(escp.Config{
-		Host: "127.0.0.1", SwitchPort: sw.Port(), HostPort: hostPort, BroadcastAddr: escptest.Loopback(),
+		Host: "127.0.0.1", SwitchPort: sw.UDPPort(), HostPort: hostPort, BroadcastAddr: escptest.Loopback(),
 		Username: escptest.Username, Password: escptest.Password,
 	})
 	if err != nil {
@@ -58,7 +58,7 @@ func ExampleClient_Ports() {
 	}
 
 	c, err := escp.Dial(escp.Config{
-		Host: "127.0.0.1", SwitchPort: sw.Port(), HostPort: hostPort, BroadcastAddr: escptest.Loopback(),
+		Host: "127.0.0.1", SwitchPort: sw.UDPPort(), HostPort: hostPort, BroadcastAddr: escptest.Loopback(),
 		Username: escptest.Username, Password: escptest.Password,
 	})
 	if err != nil {
@@ -96,7 +96,7 @@ func ExampleConfig_writeGate() {
 	}
 
 	c, err := escp.Dial(escp.Config{
-		Host: "127.0.0.1", SwitchPort: sw.Port(), HostPort: hostPort, BroadcastAddr: escptest.Loopback(),
+		Host: "127.0.0.1", SwitchPort: sw.UDPPort(), HostPort: hostPort, BroadcastAddr: escptest.Loopback(),
 		Username: escptest.Username, Password: escptest.Password,
 		WriteGate: safety.Chain(
 			safety.FirmwareGate(),

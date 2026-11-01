@@ -107,7 +107,7 @@ func TestWriteGateRefusalSendsNothingForAnyWriteMethod(t *testing.T) {
 			f.EnableModel(nil) // the pre-write read of the other limiter needs a switch that answers
 			var consulted int
 			c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 300 * time.Millisecond,
-				SwitchPort: f.Port(), BroadcastAddr: escptest.Loopback(),
+				SwitchPort: f.UDPPort(), BroadcastAddr: escptest.Loopback(),
 				WriteGate: func(context.Context, Reader, Operation) error { consulted++; return errGateRefused }})
 			c.allowLoopback = true
 			t.Cleanup(func() { c.Close() })
@@ -136,7 +136,7 @@ func TestWriteGateThatAllowsLetsEveryWriteMethodThrough(t *testing.T) {
 			f := escptest.Start(t)
 			f.EnableModel(nil) // the pre-write read of the other limiter needs a switch that answers
 			c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 300 * time.Millisecond,
-				SwitchPort: f.Port(), BroadcastAddr: escptest.Loopback(),
+				SwitchPort: f.UDPPort(), BroadcastAddr: escptest.Loopback(),
 				WriteGate: func(context.Context, Reader, Operation) error { return nil }})
 			c.allowLoopback = true
 			t.Cleanup(func() { c.Close() })
@@ -154,7 +154,7 @@ func TestWriteGateThatAllowsLetsEveryWriteMethodThrough(t *testing.T) {
 func TestWriteGateDoesNotAffectReads(t *testing.T) {
 	f := escptest.Start(t)
 	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 300 * time.Millisecond,
-		SwitchPort: f.Port(), BroadcastAddr: escptest.Loopback(),
+		SwitchPort: f.UDPPort(), BroadcastAddr: escptest.Loopback(),
 		WriteGate: func(context.Context, Reader, Operation) error { return errGateRefused }})
 	t.Cleanup(func() { c.Close() })
 	ctx := context.Background()
@@ -175,7 +175,7 @@ func TestWriteGateMayReadThroughTheClient(t *testing.T) {
 	f := escptest.Start(t)
 	var firmware Firmware
 	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 300 * time.Millisecond,
-		SwitchPort: f.Port(), BroadcastAddr: escptest.Loopback(),
+		SwitchPort: f.UDPPort(), BroadcastAddr: escptest.Loopback(),
 		WriteGate: func(ctx context.Context, sw Reader, _ Operation) error {
 			info, err := sw.Info(ctx)
 			firmware = info.Firmware
@@ -253,7 +253,7 @@ func operationsOf(t *testing.T, call func(context.Context, *Client) error) []Ope
 	f.EnableModel(nil) // the pre-write read of the other limiter needs a switch that answers
 	var seen []Operation
 	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 300 * time.Millisecond,
-		SwitchPort: f.Port(), BroadcastAddr: escptest.Loopback(),
+		SwitchPort: f.UDPPort(), BroadcastAddr: escptest.Loopback(),
 		WriteGate: func(_ context.Context, _ Reader, op Operation) error { seen = append(seen, op); return nil }})
 	c.allowLoopback = true
 	t.Cleanup(func() { c.Close() })
@@ -334,7 +334,7 @@ func TestOperationPortsFollowTheArguments(t *testing.T) {
 func TestGateChangingItsOperationChangesNothingThatIsSent(t *testing.T) {
 	f := escptest.Start(t)
 	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 300 * time.Millisecond,
-		SwitchPort: f.Port(), BroadcastAddr: escptest.Loopback(),
+		SwitchPort: f.UDPPort(), BroadcastAddr: escptest.Loopback(),
 		WriteGate: func(_ context.Context, _ Reader, op Operation) error {
 			op.Ports = MustPortSet(8)
 			return nil

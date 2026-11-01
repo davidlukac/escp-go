@@ -8,7 +8,7 @@ func TestMyCode(t *testing.T) {
 	sw.EnableModel(map[int]escptest.LinkSpeed{1: escptest.Link1000Full}) // port 1 has a link
 
 	c, err := escp.Dial(escp.Config{
-		Host: "127.0.0.1", SwitchPort: sw.Port(), HostPort: escptest.FreeUDPPort(t),
+		Host: "127.0.0.1", SwitchPort: sw.UDPPort(), HostPort: escptest.FreeUDPPort(t),
 		BroadcastAddr: escptest.Loopback(),
 		Username: escptest.Username, Password: escptest.Password,
 	})
