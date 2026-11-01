@@ -152,10 +152,7 @@ func TestTheFakeSwitchClearsTheOtherLimiterLikeTheRealOne(t *testing.T) {
 	_, c := modelClient(t)
 	ctx := context.Background()
 	storm := wire.TLV{Type: wire.TLVStormControl, Value: []byte{3, 1, 0, 0, 1, 0, 0, 4, 0}}
-	ingress, err := bandwidthTLV(wire.TLVBandwidthIngress, 3, 10240)
-	if err != nil {
-		t.Fatal(err)
-	}
+	ingress := bandwidthTLV(wire.TLVBandwidthIngress, 3, 10240)
 	op := Operation{Name: "test", Ports: PortID(3).set(), Impact: ImpactTraffic}
 	if err := c.setTLVs(ctx, op, storm); err != nil {
 		t.Fatal(err)

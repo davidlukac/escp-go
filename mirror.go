@@ -60,30 +60,48 @@ func (c *Client) PortMirror(ctx context.Context) (Mirror, error) {
 // disable, pass the zero Mirror. The destination port stops carrying normal
 // traffic; callers must guard against choosing a port that is in use.
 func (c *Client) SetPortMirror(ctx context.Context, m Mirror) error {
+	if err := m.Validate(); err != nil {
+		return err
+	}
+	op := Operation{Name: "SetPortMirror", Impact: ImpactTraffic}
 	v := make([]byte, mirrorEntryLen)
 	if m.Enabled {
-		if err := m.MirrorPort.Validate(); err != nil {
-			return err
-		}
-		sources := m.IngressPorts.Union(m.EgressPorts)
-		if sources.IsEmpty() {
-			return invalidf("escp: port mirroring needs at least one ingress or egress source port")
-		}
-		if sources.Has(m.MirrorPort) {
-			return invalidf("escp: port %d cannot mirror itself", m.MirrorPort)
-		}
-		if err := c.requirePorts(ctx, sources.Union(m.MirrorPort.set())); err != nil {
+		op.Ports = m.named()
+		if err := c.requirePorts(ctx, op.Ports); err != nil {
 			return err
 		}
 		v[mirrorOffEnabled], v[mirrorOffPort] = 1, byte(m.MirrorPort)
 		copy(v[mirrorOffIngress:], m.IngressPorts.Mask())
 		copy(v[mirrorOffEgress:], m.EgressPorts.Mask())
-	} else if m.MirrorPort != 0 || !m.IngressPorts.IsEmpty() || !m.EgressPorts.IsEmpty() {
-		return invalidf("escp: a disabled mirror must have no destination or source ports")
-	}
-	op := Operation{Name: "SetPortMirror", Impact: ImpactTraffic}
-	if m.Enabled {
-		op.Ports = m.IngressPorts.Union(m.EgressPorts).Union(m.MirrorPort.set())
 	}
 	return c.setTLVs(ctx, op, wire.TLV{Type: wire.TLVMirror, Value: v})
+}
+
+// named is every port the configuration mentions: the sources and the destination.
+func (m Mirror) named() PortSet {
+	return m.IngressPorts.Union(m.EgressPorts).Union(m.MirrorPort.set())
+}
+
+// Validate checks the configuration before it is written. An enabled mirror has a valid
+// destination, at least one source port in either direction, and does not mirror the destination
+// to itself; a disabled one is the zero Mirror (what SetPortMirror takes to switch mirroring
+// off). The error matches ErrInvalid.
+func (m Mirror) Validate() error {
+	if !m.Enabled {
+		if m.MirrorPort != 0 || !m.IngressPorts.IsEmpty() || !m.EgressPorts.IsEmpty() {
+			return invalidf("escp: a disabled mirror must have no destination or source ports")
+		}
+		return nil
+	}
+	if err := m.MirrorPort.Validate(); err != nil {
+		return err
+	}
+	sources := m.IngressPorts.Union(m.EgressPorts)
+	if sources.IsEmpty() {
+		return invalidf("escp: port mirroring needs at least one ingress or egress source port")
+	}
+	if sources.Has(m.MirrorPort) {
+		return invalidf("escp: port %d cannot mirror itself", m.MirrorPort)
+	}
+	return nil
 }

@@ -23,6 +23,17 @@ const (
 // VLANModes lists the modes SetVLANMode accepts.
 func VLANModes() []VLANMode { return []VLANMode{VLANModeMTU, VLANModePortBased, VLANModeDot1Q} }
 
+// ParseVLANMode converts a mode name as the constants spell it; VLANModeNone, which cannot be
+// written, and unknown names are errors that match ErrInvalid.
+func ParseVLANMode(name string) (VLANMode, error) {
+	for _, m := range VLANModes() {
+		if string(m) == name {
+			return m, nil
+		}
+	}
+	return "", invalidf("escp: unknown VLAN mode %q (valid: %v)", name, VLANModes())
+}
+
 // VLANModeSetting is the active VLAN mode and, for the MTU VLAN, its uplink port (zero for
 // every other mode).
 type VLANModeSetting struct {
