@@ -18,7 +18,7 @@ func TestConfigBackupReassemblesFragments(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := escptest.ConfigFile(); !bytes.Equal(got, want) {
+	if want := escptest.BackupFile(); !bytes.Equal(got, want) {
 		t.Fatalf("reassembled %d bytes, want %d identical bytes", len(got), len(want))
 	}
 }
@@ -87,7 +87,7 @@ func TestConfigBackupHonoursContext(t *testing.T) {
 	f := escptest.Start(t)
 	f.SetBackupMode(escptest.BackupSilent)
 	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 30 * time.Second,
-		SwitchPort: f.Port(), BroadcastAddr: escptest.Loopback()})
+		SwitchPort: f.UDPPort(), BroadcastAddr: escptest.Loopback()})
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	start := time.Now()
@@ -143,7 +143,7 @@ func TestConfigBackupRepeatsAfterALossAndReturnsTheWholeFile(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if want := escptest.ConfigFile(); !bytes.Equal(got, want) {
+			if want := escptest.BackupFile(); !bytes.Equal(got, want) {
 				t.Fatalf("got %d bytes that differ from the %d-byte file", len(got), len(want))
 			}
 		})

@@ -40,14 +40,14 @@ const (
 	BackupDuplicate  BackupMode = "duplicate"  // the first fragment arrives twice
 )
 
-// SystemSetBehaviour is what the switch does after it applies a system SET, the write that
+// SystemSetBehavior is what the switch does after it applies a system SET, the write that
 // carries the hostname and the management address.
-type SystemSetBehaviour int
+type SystemSetBehavior int
 
 // The behaviors after a system SET. SystemSetReplies is the well-behaved switch.
 const (
 	// SystemSetReplies answers the SET and carries on.
-	SystemSetReplies SystemSetBehaviour = iota
+	SystemSetReplies SystemSetBehavior = iota
 	// SystemSetLeaves applies the SET without answering it, then ignores every packet except
 	// discovery, which it still answers: a switch that has moved to its new address, seen from
 	// the old one. The fake cannot change its source address, so discovery still reports the
@@ -102,8 +102,8 @@ type Switch struct {
 // Faults is the programmable misbehavior of a Switch. Set it inside Configure, which holds the
 // switch's lock; the zero value is a well-behaved switch.
 type Faults struct {
-	// GetFn scripts the reply to GETs: the settings, the error code, and whether to stay silent.
-	GetFn func(types []TLVType) (settings []Setting, code int32, drop bool)
+	// OnGet scripts the reply to GETs: the settings, the error code, and whether to stay silent.
+	OnGet func(types []TLVType) (settings []Setting, code int32, drop bool)
 	// RSADrop makes the switch ignore the key exchange.
 	RSADrop bool
 	// RSACode answers the key exchange with this code instead of the success code.
@@ -119,7 +119,7 @@ type Faults struct {
 	// StaleAfterSet makes the next n discoveries after a system SET still report the old address.
 	StaleAfterSet int
 	// OnSystemSet is what the switch does after applying a system SET; the default replies.
-	OnSystemSet SystemSetBehaviour
+	OnSystemSet SystemSetBehavior
 	// AfterSystemSet, when set, is called (without the lock) once a system SET has been applied
 	// and before the switch replies or leaves, so a test can act at exactly that moment.
 	AfterSystemSet func()
@@ -140,11 +140,11 @@ func Loopback() netip.Addr { return netip.MustParseAddr("127.0.0.1") }
 // several goroutines bind at once), which would let a fake switch take the port a test was told to
 // use and fail the client's bind with "address already in use". A port taken by something outside
 // this package can still collide; a client that binds late cannot rule that out.
-func FreeUDPPort(t testing.TB) int {
-	t.Helper()
+func FreeUDPPort(tb testing.TB) int {
+	tb.Helper()
 	port, err := FreePort()
 	if err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
 	return port
 }
@@ -202,13 +202,13 @@ func listenUnreserved(listen func() (*net.UDPConn, error)) (*net.UDPConn, int, e
 }
 
 // Start runs a fake switch on a free loopback UDP port until the test ends. The LED starts on.
-func Start(t testing.TB) *Switch {
-	t.Helper()
+func Start(tb testing.TB) *Switch {
+	tb.Helper()
 	f, err := Listen()
 	if err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
-	t.Cleanup(func() { _ = f.Close() }) // best effort at the end of the test
+	tb.Cleanup(func() { _ = f.Close() }) // best effort at the end of the test
 	return f
 }
 
@@ -228,8 +228,8 @@ func Listen() (*Switch, error) {
 // Close stops the switch. Requests that arrive afterwards get no answer.
 func (f *Switch) Close() error { return f.conn.Close() }
 
-// Port is the UDP port the switch listens on; give it to the client as its switch port.
-func (f *Switch) Port() int { return f.port }
+// UDPPort is the UDP port the switch listens on; give it to the client as its switch port.
+func (f *Switch) UDPPort() int { return f.port }
 
 // DropPacket makes the switch ignore the nth packet it receives (1-based), to test retries.
 func (f *Switch) DropPacket(n int) { f.mu.Lock(); f.dropNth = n; f.mu.Unlock() }
@@ -247,7 +247,7 @@ func (f *Switch) Received() int { f.mu.Lock(); defer f.mu.Unlock(); return f.rec
 // EnableState makes the switch remember settings: every accepted SET stores the value of each
 // TLV it carries, and a GET for a type it holds (seeded here or written since) answers with that
 // value, so a write can be read back the way the real switch does it. Types it holds nothing
-// for fall through to the scripted replies (LED, QoS, port count), and GetFn still wins. The
+// for fall through to the scripted replies (LED, QoS, port count), and OnGet still wins. The
 // seeds are the settings the switch starts with.
 func (f *Switch) EnableState(seed ...Setting) {
 	f.mu.Lock()
@@ -294,7 +294,7 @@ func (f *Switch) SetBackupScript(modes ...BackupMode) {
 }
 
 // TLVType is the type number of a Setting: the numbers of PROTOCOL.md. It is named here so that a
-// test outside the escp module can write the func literals the fake takes (Faults.GetFn) without
+// test outside the escp module can write the func literals the fake takes (Faults.OnGet) without
 // importing the client's internals; a plain number is a valid TLVType wherever a constant is
 // expected.
 type TLVType = wire.TLVType
@@ -439,8 +439,8 @@ func (f *Switch) serve() {
 	}
 }
 
-// ConfigFile is a 2258-byte stand-in for the switch's configuration file.
-func ConfigFile() []byte {
+// BackupFile is a 2258-byte stand-in for the switch's configuration file.
+func BackupFile() []byte {
 	b := make([]byte, 2258)
 	copy(b, wire.ConfigMagic)
 	for i := 4; i < len(b); i++ {
@@ -613,7 +613,7 @@ func (f *Switch) handleConfigRead(r request) {
 		}
 		return
 	}
-	cfg := ConfigFile()
+	cfg := BackupFile()
 	switch mode {
 	case BackupBadMagic:
 		cfg[0] = 0
@@ -787,7 +787,7 @@ func (f *Switch) leavesAfter(r request) bool {
 // replies of a fresh switch.
 func (f *Switch) handleGet(r request) {
 	f.mu.Lock()
-	scripted := f.faults.GetFn
+	scripted := f.faults.OnGet
 	f.mu.Unlock()
 	if scripted != nil {
 		types := make([]wire.TLVType, len(r.tlvs))

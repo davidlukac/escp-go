@@ -41,7 +41,7 @@ func TestAPortHandedOutIsNotGivenAgain(t *testing.T) {
 func TestStartTakesAPortNobodyWasGiven(t *testing.T) {
 	given := FreeUDPPort(t)
 	sw := Start(t)
-	if sw.Port() == given {
+	if sw.UDPPort() == given {
 		t.Errorf("the fake switch took port %d, which FreeUDPPort had handed out", given)
 	}
 }

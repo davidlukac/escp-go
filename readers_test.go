@@ -197,7 +197,7 @@ func (s *scriptedGETs) snapshot() [][]wire.TLVType {
 // failOn is answered with failCode instead, or not at all when drop is set.
 func (s *scriptedGETs) install(f *escptest.Switch, script map[wire.TLVType][]wire.TLV, failOn []wire.TLVType, failCode int32, drop bool) {
 	f.Configure(func(f *escptest.Faults) {
-		f.GetFn = func(types []wire.TLVType) ([]escptest.Setting, int32, bool) {
+		f.OnGet = func(types []wire.TLVType) ([]escptest.Setting, int32, bool) {
 			s.mu.Lock()
 			s.requests = append(s.requests, append([]wire.TLVType(nil), types...))
 			s.mu.Unlock()

@@ -124,7 +124,7 @@ func TestAuthenticatedRequestFailures(t *testing.T) {
 		f := escptest.Start(t)
 		c := dialFast(t, f, "secret")
 		f.Configure(func(f *escptest.Faults) {
-			f.GetFn = func([]wire.TLVType) ([]escptest.Setting, int32, bool) { return nil, 0, true }
+			f.OnGet = func([]wire.TLVType) ([]escptest.Setting, int32, bool) { return nil, 0, true }
 		})
 		if _, err := c.LED(context.Background()); !errors.Is(err, ErrNoReply) {
 			t.Fatalf("want ErrNoReply, got %v", err)
@@ -134,7 +134,7 @@ func TestAuthenticatedRequestFailures(t *testing.T) {
 		f := escptest.Start(t)
 		c := dialFast(t, f, "secret")
 		f.Configure(func(f *escptest.Faults) {
-			f.GetFn = func([]wire.TLVType) ([]escptest.Setting, int32, bool) {
+			f.OnGet = func([]wire.TLVType) ([]escptest.Setting, int32, bool) {
 				return []escptest.Setting{{Type: 99, Value: []byte{1}}}, 0, false
 			}
 		})
@@ -146,7 +146,7 @@ func TestAuthenticatedRequestFailures(t *testing.T) {
 		f := escptest.Start(t)
 		c := dialFast(t, f, "secret")
 		f.Configure(func(f *escptest.Faults) {
-			f.GetFn = func([]wire.TLVType) ([]escptest.Setting, int32, bool) {
+			f.OnGet = func([]wire.TLVType) ([]escptest.Setting, int32, bool) {
 				return []escptest.Setting{{Type: wire.TLVLED, Value: []byte{1, 1}}}, 0, false
 			}
 		})

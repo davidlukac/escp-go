@@ -121,7 +121,7 @@ func (r *logRecorder) text() string {
 func dialLogged(t *testing.T, f *escptest.Switch, pass Password, log *slog.Logger, mutate ...func(*Config)) *Client {
 	t.Helper()
 	cfg := Config{Host: "127.0.0.1", Username: "admin", Password: pass, Timeout: 150 * time.Millisecond, Retries: 1,
-		SwitchPort: f.Port(), BroadcastAddr: escptest.Loopback(), Logger: log}
+		SwitchPort: f.UDPPort(), BroadcastAddr: escptest.Loopback(), Logger: log}
 	for _, m := range mutate {
 		m(&cfg)
 	}
