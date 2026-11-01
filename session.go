@@ -40,11 +40,11 @@ func (c *Client) ensureSession(ctx context.Context) error {
 	r, err := c.exchange(ctx, wire.OpSet, []wire.TLV{{Type: wire.TLVRSAKey, Value: wire.RSASessionTLV(key)}}, true, []*net.UDPAddr{c.dest})
 	if err != nil {
 		c.session = nil
-		return fmt.Errorf("session key exchange: %w", err)
+		return fmt.Errorf("escp: session key exchange: %w", err)
 	}
 	if r.err != wire.ErrCodeKeyAccepted {
 		c.session = nil
-		return fmt.Errorf("session key exchange: %w", &RejectedError{Code: r.err, Reason: "the switch did not accept the session key"})
+		return fmt.Errorf("escp: session key exchange: %w", &RejectedError{Code: r.err, Reason: "the switch did not accept the session key"})
 	}
 	c.log.InfoContext(ctx, "session established")
 	return nil

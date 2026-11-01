@@ -26,9 +26,29 @@ The levels are slog's four.
 - **Warn** is a recoverable anomaly: no reply and a retry, a session reopened, a final fragment missing, a download repeated.
 - **Error** is not used: failures are returned, not logged.
 
+## Attributes
+
+| Attribute | Value | Where |
+|---|---|---|
+| `component` | always `escp` | every line |
+| `host`, `mac` | the client's `Config.Host` and `Config.MAC`, when set (a client attaches them) | every line of a client |
+| `op` | the protocol operation of a packet: `get`, `set`, `reply`, `set-reply` or `discovery` | requests, replies, retries |
+| `seq` | the request's sequence number | requests, replies, fragments |
+| `attempt`, `attempts` | this attempt (from 1) and how many there are (`Retries+1`) | requests, retries, a missing final fragment |
+| `tlvs` | the TLV type numbers of the packet | requests and replies |
+| `bytes` | the size of the TLV values of the packet, or of the reply collected so far | requests, replies, fragments |
+| `error_code` | the reply's result code | replies |
+| `packet`, `packets`, `more` | the index of a fragment, how many arrived, whether more follow | fragmented replies |
+| `round`, `rounds`, `reason` | this download of the configuration, how many there may be, why it was not usable | configuration backup |
+| `operation`, `impact`, `ports` | the write as a gate sees it: the method, its impact class, the ports it names | writes |
+| `lookup_by_mac` | whether the client will look the switch up by its MAC (a bool) | a session reopened |
+| `ip` | the address found for the switch, or the lease it was given | lookups, DHCP |
+| `want`, `poll`, `error` | the address awaited after a move, the pause between probes, the error of the write that got no reply | `SetIPConfig`, `EnableDHCP` |
+| `interfaces`, `probes`, `window`, `switches` | how many interfaces and probes a discovery used, how long it listens, how many switches answered | `Discover`, `Locate` |
+
 ## Contract
 
-- **Attribute names are the contract**: lower case, snake_case, one meaning each (`host`, `mac`, `op`, `seq`, `attempt`, `attempts`, `tlvs`, `bytes`, `error_code`, `operation`, `impact`, `ports`, `round`). New names may be added in any release (a setting the hardware of a later model has, such as PoE, brings its own); an existing name is not renamed, repurposed or removed before a major version, and a level change of an existing message counts as a change. Message texts may change.
+- **Attribute names are the contract**: lower case, snake_case, one meaning each (the table below lists every one; a test fails when the code logs one that is not listed). New names may be added in any release (a setting the hardware of a later model has, such as PoE, brings its own); an existing name is not renamed, repurposed or removed before a major version, and a level change of an existing message counts as a change. Message texts may change.
 - **No secrets.** TLV *values* are never logged, only their types and sizes, so no message carries the password, the user name or the session key. `Config` is never logged as a whole. MAC and IP addresses are logged: they identify the switch for the person who owns the log.
 - **No printing.** No `fmt.Print*` or `log.*` in library code; a lint rule enforces it.
 

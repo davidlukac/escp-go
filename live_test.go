@@ -126,10 +126,9 @@ func TestLiveLoopPreventionToggle(t *testing.T) {
 	}
 }
 
-// The unused ports the live tests may write to. Switch 01 uses ports 6 and 7
-// (and mirrors port 4); another switch has other free ports, so they can be
-// chosen with ESCP_LIVE_PORTS="a,b" and ESCP_LIVE_SOURCE
-// (the port whose traffic the mirror test copies). Every test still aborts
+// The unused ports the live tests may write to. They default to ports 6 and 7 (and mirror
+// port 4); another switch has other free ports, so they can be chosen with
+// ESCP_LIVE_PORTS="a,b" and ESCP_LIVE_SOURCE (the port whose traffic the mirror test copies). Every test still aborts
 // unless its ports are link-down and in no LAG.
 func liveTestPorts(t *testing.T) (first, second, source PortID) {
 	t.Helper()
