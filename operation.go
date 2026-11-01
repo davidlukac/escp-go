@@ -2,11 +2,13 @@ package escp
 
 import "fmt"
 
-// Impact classes what a write can do to the switch's users, as the worst the method can do
-// with any arguments. It is an upper bound for a gate or a front end deciding how much
-// confirmation a write needs; it cannot say whether a particular write is harmless (a speed
-// change on a free port is not, to the library, different from one on the uplink). That
-// needs the ports: see Operation.Ports and the safety package.
+// Impact classes what kind of change a write is, by what it can do to the way the switch is
+// reached: a method that can cut the management path or the uplink with the right arguments
+// (a port that is turned off or retuned, a mirror destination, a VLAN or LAG membership, an
+// address) is ImpactManagement, whichever port it is aimed at. It is a bound for a gate or a front
+// end deciding how much confirmation a write needs; it cannot say whether a particular write is
+// harmless (a speed change on a free port is not, to the library, different from one on the
+// uplink). That needs the ports: see Operation.Ports and the safety package.
 type Impact int
 
 // The impact classes, from harmless to able to cut the management path. The zero value is
@@ -16,12 +18,14 @@ const (
 	// ImpactCosmetic cannot affect traffic or the way the switch is reached (LED, device
 	// description).
 	ImpactCosmetic Impact = iota + 1
-	// ImpactTraffic can affect the traffic of the ports it names or of the whole switch:
-	// port settings, rate limits, storm control, QoS, IGMP, port mirroring and the VLAN
-	// groups.
+	// ImpactTraffic can slow or drop some of the traffic of the ports it names or of the whole
+	// switch, but takes no port, address or VLAN away: rate limits, storm control, QoS and
+	// IGMP snooping.
 	ImpactTraffic
 	// ImpactManagement can cut the management path or the uplink, or leave the switch
-	// unreachable: its IP settings, the VLAN mode, PVIDs, link aggregation, loop prevention.
+	// unreachable: its IP settings and DHCP, the VLAN mode, port-based and 802.1Q VLAN
+	// membership and PVIDs, port state and speed, link aggregation, port mirroring and loop
+	// prevention.
 	ImpactManagement
 )
 
@@ -67,8 +71,8 @@ type Operation struct {
 	// named now, and removing a group names none. A gate that has to protect those ports
 	// reads the group's members itself (safety.PortGate does).
 	Ports PortSet
-	// Impact is the class of the method; see Impact. It is an upper bound for the method,
-	// not a verdict on these arguments: it does not know which port is the uplink.
+	// Impact is the class of the method; see Impact. It is a bound for the method, not a
+	// verdict on these arguments: it does not know which port is the uplink.
 	Impact Impact
 	// Replaces is the group the write replaces or removes, when it does: its current members lose
 	// their membership unless the write names them again.

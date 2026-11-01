@@ -32,8 +32,8 @@ func TestDryRunThroughTheRealClient(t *testing.T) {
 	ctx := context.Background()
 
 	// writes within the ceiling are recorded and refused with ErrDryRun, which means success here
-	if err := c.SetPort(ctx, escp.PortConfig{ID: 3, Enabled: true, Speed: escp.SpeedAuto}); !errors.Is(err, safety.ErrDryRun) {
-		t.Fatalf("SetPort: got %v, want ErrDryRun", err)
+	if err := c.SetStormControl(ctx, escp.StormConfig{Port: 3, Broadcast: true, Rate: 64}); !errors.Is(err, safety.ErrDryRun) {
+		t.Fatalf("SetStormControl: got %v, want ErrDryRun", err)
 	}
 	if err := c.SetBandwidth(ctx, escp.PortBandwidth{Port: 4, Ingress: 64}); !errors.Is(err, safety.ErrDryRun) {
 		t.Fatalf("SetBandwidth: got %v, want ErrDryRun", err)
@@ -41,14 +41,18 @@ func TestDryRunThroughTheRealClient(t *testing.T) {
 	if err := c.SetLED(ctx, false); !errors.Is(err, safety.ErrDryRun) {
 		t.Fatalf("SetLED: got %v, want ErrDryRun", err)
 	}
-	// a write above the ceiling is refused before the dry run sees it
+	// a write above the ceiling is refused before the dry run sees it: a link aggregation group, and
+	// a port setting, which can turn a port off whichever it is aimed at
 	var tooMuch *safety.ImpactError
 	if err := c.SetLAG(ctx, escp.LAG{ID: 1, Ports: escp.MustPortSet(2, 3)}); !errors.As(err, &tooMuch) || tooMuch.Op.Name != "SetLAG" {
 		t.Fatalf("SetLAG: got %v, want an *ImpactError for SetLAG", err)
 	}
+	if err := c.SetPort(ctx, escp.PortConfig{ID: 3, Enabled: false, Speed: escp.SpeedAuto}); !errors.As(err, &tooMuch) || tooMuch.Op.Name != "SetPort" {
+		t.Fatalf("SetPort: got %v, want an *ImpactError for SetPort", err)
+	}
 
 	want := []escp.Operation{
-		{Name: "SetPort", Ports: escp.MustPortSet(3), Impact: escp.ImpactTraffic},
+		{Name: "SetStormControl", Ports: escp.MustPortSet(3), Impact: escp.ImpactTraffic},
 		{Name: "SetBandwidth", Ports: escp.MustPortSet(4), Impact: escp.ImpactTraffic}, // two SETs, one operation: the first refusal ends it
 		{Name: "SetLED", Impact: escp.ImpactCosmetic},
 	}

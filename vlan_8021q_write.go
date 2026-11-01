@@ -106,7 +106,7 @@ func (c *Client) SetDot1QVLAN(ctx context.Context, v Dot1QVLAN) error {
 	if err := c.requirePorts(ctx, members); err != nil {
 		return err
 	}
-	return c.setTLVs(ctx, Operation{Name: "SetDot1QVLAN", Ports: members, Impact: ImpactTraffic, Replaces: Group{Dot1QVLAN: v.ID}}, wire.TLV{Type: wire.TLVVLAN8021QVLAN, Value: v.encode()})
+	return c.setTLVs(ctx, Operation{Name: "SetDot1QVLAN", Ports: members, Impact: ImpactManagement, Replaces: Group{Dot1QVLAN: v.ID}}, wire.TLV{Type: wire.TLVVLAN8021QVLAN, Value: v.encode()})
 }
 
 // DeleteDot1QVLAN removes an 802.1Q VLAN: TLV 8705 with both masks empty and an
@@ -116,7 +116,7 @@ func (c *Client) DeleteDot1QVLAN(ctx context.Context, id VLANID) error {
 		return err
 	}
 	empty := make([]byte, maskLen)
-	return c.setTLVs(ctx, Operation{Name: "DeleteDot1QVLAN", Impact: ImpactTraffic, Replaces: Group{Dot1QVLAN: id}}, wire.TLV{Type: wire.TLVVLAN8021QVLAN, Value: vlanEntryBytes(id, empty, empty, "")})
+	return c.setTLVs(ctx, Operation{Name: "DeleteDot1QVLAN", Impact: ImpactManagement, Replaces: Group{Dot1QVLAN: id}}, wire.TLV{Type: wire.TLVVLAN8021QVLAN, Value: vlanEntryBytes(id, empty, empty, "")})
 }
 
 // Validate checks the port and the VLAN id. The error matches ErrInvalid.

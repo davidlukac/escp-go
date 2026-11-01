@@ -48,8 +48,10 @@ c, err := escp.Dial(escp.Config{
 	Host: host, Username: user, Password: escp.Password(pw),
 	WriteGate: safety.Chain(safety.FirmwareGate(), safety.MaxImpact(escp.ImpactTraffic), safety.PortGate()),
 })
-err = c.SetPort(ctx, escp.PortConfig{ID: 3, Enabled: true, Speed: escp.SpeedAuto})
+err = c.SetBandwidth(ctx, escp.PortBandwidth{Port: 3, Ingress: 10240}) // traffic: allowed, if port 3 is free
 ```
+
+The ceiling `ImpactTraffic` keeps out everything that can cut the management path (the address, VLANs, port settings, link aggregation, mirroring, loop prevention); a front end that does write those allows `ImpactManagement` and relies on `PortGate` and its own confirmation ([Writing safely](docs/writing-safely.md#impact)).
 
 The examples in the [package documentation](https://pkg.go.dev/github.com/davidlukac/escp-go) run against the fake switch and show their output; [`examples/discover`](examples/discover/main.go) is a small read-only program for a real network.
 
@@ -78,10 +80,10 @@ The examples in the [package documentation](https://pkg.go.dev/github.com/davidl
 |---|---|---|---|---|
 | Device (System Info) | `Info`, `System` | `SetHostname`, `SetIPConfig` | `Info`, `System`, `IPConfig` | cosmetic, management |
 | LED | `LED` | `SetLED` | `bool` | cosmetic |
-| Ports (Port Setting) | `Ports` | `SetPort` | `Port`, `PortConfig`, `Speed` | traffic |
+| Ports (Port Setting) | `Ports` | `SetPort` | `Port`, `PortConfig`, `Speed` | management |
 | Port statistics | `PortStats` | (read only) | `PortStats` | |
 | Link aggregation (Port Trunk) | `LAGs` | `SetLAG` | `LAG` | management |
-| Port mirror | `PortMirror` | `SetPortMirror` | `Mirror` | traffic |
+| Port mirror | `PortMirror` | `SetPortMirror` | `Mirror` | management |
 | Bandwidth control | `Bandwidth` | `SetBandwidth` | `PortBandwidth` | traffic |
 | Storm control | `StormControl` | `SetStormControl` | `PortStorm`, `StormConfig` | traffic |
 | QoS Basic | `QoS` | `SetQoSMode`, `SetPortPriorities` | `QoS`, `QoSMode`, `Priority` | traffic |
@@ -89,8 +91,8 @@ The examples in the [package documentation](https://pkg.go.dev/github.com/davidl
 | Loop prevention | `LoopPrevention` | `SetLoopPrevention` | `bool` | management |
 | VLAN mode | `VLANMode` | `SetVLANMode` | `VLANMode`, `VLANModeSetting` | management |
 | MTU VLAN | `MTUVLAN` | (through `SetVLANMode`) | `MTUVLAN` | |
-| Port-based VLAN | `PortBasedVLAN` | `SetPortBasedVLAN` | `PortBasedVLAN`, `PortVLAN` | traffic |
-| 802.1Q VLAN and PVID | `Dot1Q` | `SetDot1QVLAN`, `DeleteDot1QVLAN`, `SetPVIDs` | `Dot1Q`, `Dot1QVLAN`, `PortPVID` | traffic, management |
+| Port-based VLAN | `PortBasedVLAN` | `SetPortBasedVLAN` | `PortBasedVLAN`, `PortVLAN` | management |
+| 802.1Q VLAN and PVID | `Dot1Q` | `SetDot1QVLAN`, `DeleteDot1QVLAN`, `SetPVIDs` | `Dot1Q`, `Dot1QVLAN`, `PortPVID` | management |
 | Configuration file | `ConfigBackup` | (restore is not offered) | `ConfigFile` | |
 
 Deliberately **not** offered: user account, config restore, reboot, factory reset and firmware upgrade.
