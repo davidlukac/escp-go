@@ -44,7 +44,7 @@ func (c *Client) ensureSession(ctx context.Context) error {
 	}
 	if r.err != wire.ErrCodeKeyAccepted {
 		c.session = nil
-		return fmt.Errorf("session key exchange: unexpected error code %d", r.err)
+		return fmt.Errorf("session key exchange: %w", &RejectedError{Code: r.err, Reason: "the switch did not accept the session key"})
 	}
 	c.log.InfoContext(ctx, "session established")
 	return nil

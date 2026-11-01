@@ -255,8 +255,9 @@ func TestReadMethodsReportEachFailingRequestStage(t *testing.T) {
 				var log scriptedGETs
 				log.install(f, tc.script, failOn, 7, false)
 				_, err := tc.call(c, context.Background())
-				if err == nil || !strings.Contains(err.Error(), "error code 7") {
-					t.Fatalf("want an error naming code 7, got %v", err)
+				var rejected *RejectedError
+				if !errors.Is(err, ErrRejected) || !errors.As(err, &rejected) || rejected.Code != 7 || !strings.Contains(err.Error(), "error code 7") {
+					t.Fatalf("want a *RejectedError with code 7 (it matches ErrRejected), got %v", err)
 				}
 				if errors.Is(err, ErrNoReply) {
 					t.Fatal("an answered request must not be reported as silence")

@@ -73,8 +73,9 @@ func TestSessionSetupFailures(t *testing.T) {
 		f.Configure(func(f *escptest.Faults) { f.RSACode = 77 })
 		c := dialFast(t, f, "secret")
 		err := c.SetLED(context.Background(), true)
-		if err == nil || !strings.Contains(err.Error(), "unexpected error code 77") {
-			t.Fatalf("want the refusal code in the error, got %v", err)
+		var rejected *RejectedError
+		if !errors.Is(err, ErrRejected) || !errors.As(err, &rejected) || rejected.Code != 77 || !strings.Contains(err.Error(), "session key exchange") {
+			t.Fatalf("want the key exchange refused with code 77 as a *RejectedError, got %v", err)
 		}
 		if c.session != nil {
 			t.Fatal("a refused key must not leave a session behind")

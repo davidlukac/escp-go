@@ -135,6 +135,22 @@ type PortConfig struct {
 	FlowControl bool
 }
 
+// Validate checks the entry before it is written: a valid port, a configurable speed (SpeedLinkDown
+// is only ever reported) and flow control only where the speed keeps it. The error matches
+// ErrInvalid.
+func (cfg PortConfig) Validate() error {
+	if err := cfg.ID.Validate(); err != nil {
+		return err
+	}
+	if _, err := cfg.Speed.code(); err != nil {
+		return err
+	}
+	if cfg.FlowControl && !cfg.Speed.AllowsFlowControl() {
+		return invalidf("escp: port %d: flow control needs speed %s or %s, not %s (the switch keeps it off at a fixed 10 or 100 Mbps speed)", cfg.ID, SpeedAuto, Speed1000Full, cfg.Speed)
+	}
+	return nil
+}
+
 // SetPort writes the configuration of one port: admin state, speed and flow
 // control (7-byte TLV 4096 as sent by the vendor utility). Flow control can only be
 // on with speed auto or 1000Mbps-full (see Speed.AllowsFlowControl): any other
@@ -146,16 +162,10 @@ type PortConfig struct {
 // that), but it accepts a different speed, flow control or admin state and so lets
 // the members drift apart: keep them alike, or change the whole group.
 func (c *Client) SetPort(ctx context.Context, cfg PortConfig) error {
-	code, err := cfg.Speed.code()
-	if err != nil {
+	if err := cfg.Validate(); err != nil {
 		return err
 	}
-	if err := cfg.ID.Validate(); err != nil {
-		return err
-	}
-	if cfg.FlowControl && !cfg.Speed.AllowsFlowControl() {
-		return invalidf("escp: port %d: flow control needs speed %s or %s, not %s (the switch keeps it off at a fixed 10 or 100 Mbps speed)", cfg.ID, SpeedAuto, Speed1000Full, cfg.Speed)
-	}
+	code, _ := cfg.Speed.code() // Validate accepted the speed
 	if err := c.requirePorts(ctx, cfg.ID.set()); err != nil {
 		return err
 	}

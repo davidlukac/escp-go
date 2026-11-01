@@ -94,9 +94,9 @@ Deliberately **not** offered: user account, config restore, reboot, factory rese
 ## Data you get back
 
 - **Ports are numbers from 1**: a `PortID` for one, a `PortSet` for a set (a comparable value held as the wire bitmap: no duplicates, ascending, `Union`/`Minus`/`Intersect`; `escp.NewPortSet(2, 3)` refuses a port outside 1 to `MaxPort`).
-- **Closed sets are types** with `String`, `Parse...`, `Valid` and a list function: `Speed` (`ConfigurableSpeeds`), `QoSMode` (`QoSModes`), `Priority` (1 to 4, as the web UI shows it), `VLANMode` (`VLANModes`). The spellings are the web UI's and the Terraform provider's; consumers keep them in saved state, so they do not change.
+- **Closed sets are types** with a list function and, where the names are text, a `Parse...` function: `Speed` (`ConfigurableSpeeds`, `ParseSpeed`), `QoSMode` (`QoSModes`, `ParseQoSMode`), `VLANMode` (`VLANModes`, `ParseVLANMode`), and `Priority` (1 to 4, as the web UI shows it, with `Valid`). The spellings are the web UI's and the Terraform provider's; consumers keep them in saved state, so they do not change.
 - **Readers return values, not pointers.** Counters in `PortStats` are the switch's 32-bit counters and wrap.
-- **Limits and validators are public** so a front end can refuse a bad value before it reaches the client: every input type has a `Validate` method (`PortID`, `VLANID`, `Kbps`, `VLANName`, `Hostname`, `LAG`, `PortVLAN`, `IPConfig`, `VLANModeSetting`), and the constants they use are exported (`MaxPort`, `RateStepKbps`, `MaxBandwidthKbps`, `LAGGroupCount`, ...).
+- **Limits and validators are public** so a front end can refuse a bad value before it reaches the client: every input type has a `Validate` method (`Config`, `PortID`, `VLANID`, `Kbps`, `VLANName`, `Hostname`, `PortConfig`, `StormConfig`, `PortBandwidth`, `Mirror`, `LAG`, `PortVLAN`, `Dot1QVLAN`, `IPConfig`, `VLANModeSetting`), a writer refuses exactly what the method refuses, and the constants they use are exported (`MaxPort`, `RateStepKbps`, `MaxBandwidthKbps`, `LAGGroupCount`, ...).
 
 ## Compatibility
 

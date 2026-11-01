@@ -3,7 +3,9 @@ package escp
 import (
 	"context"
 	"encoding/binary"
+	"maps"
 	"regexp"
+	"slices"
 	"strconv"
 
 	"github.com/davidlukac/escp-go/internal/wire"
@@ -59,9 +61,11 @@ func (n VLANName) Validate() error {
 // String is the name.
 func (n VLANName) String() string { return string(n) }
 
-// validate checks a VLAN before it is encoded: id, name, ports, no port both
-// tagged and untagged, and at least one member (use DeleteDot1QVLAN to remove).
-func (v Dot1QVLAN) validate() error {
+// Validate checks a VLAN before it is written: the id, the name, no port both tagged and untagged,
+// and at least one member (use DeleteDot1QVLAN to remove a VLAN). The ports are valid by
+// construction; whether the switch has them is checked when the VLAN is written. The error matches
+// ErrInvalid.
+func (v Dot1QVLAN) Validate() error {
 	if err := v.ID.Validate(); err != nil {
 		return err
 	}
@@ -96,7 +100,7 @@ func vlanEntryBytes(id VLANID, member, tagged []byte, name VLANName) []byte {
 // member and tagged port masks and the name. Changing a VLAN whose ports carry
 // traffic can cut connectivity; callers must guard. The 802.1Q mode must be on.
 func (c *Client) SetDot1QVLAN(ctx context.Context, v Dot1QVLAN) error {
-	if err := v.validate(); err != nil {
+	if err := v.Validate(); err != nil {
 		return err
 	}
 	members := v.Tagged.Union(v.Untagged)
@@ -124,7 +128,8 @@ func (c *Client) SetPVIDs(ctx context.Context, pvids map[PortID]VLANID) error {
 		return invalidf("escp: no PVIDs to set")
 	}
 	var named PortSet
-	for p, id := range pvids {
+	for _, p := range slices.Sorted(maps.Keys(pvids)) { // lowest port first: the same input names the same error
+		id := pvids[p]
 		if err := p.Validate(); err != nil {
 			return err
 		}

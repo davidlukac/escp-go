@@ -4,11 +4,25 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/davidlukac/escp-go/escptest"
 	"github.com/davidlukac/escp-go/internal/wire"
 )
+
+func TestSetPortPrioritiesNamesTheLowestFaultyPortFirst(t *testing.T) {
+	f := escptest.Start(t)
+	f.EnableModel(nil)
+	c := dialFake(t, f, "secret")
+	bad := map[PortID]Priority{2: 9, 3: 0, 4: 9, 5: 0, 6: 9, 7: 0}
+	for range 50 {
+		err := c.SetPortPriorities(context.Background(), bad)
+		if !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "invalid priority 9 for port 2") {
+			t.Fatalf("want port 2 to be named first, got %v", err)
+		}
+	}
+}
 
 func TestSetPortPrioritiesStopsWhenTheCurrentStateCannotBeRead(t *testing.T) {
 	f := escptest.Start(t)

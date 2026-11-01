@@ -50,12 +50,17 @@ type Client struct {
 }
 
 // Dial prepares a client for the switch at cfg.Host, which must be an IPv4 address or a
-// name that resolves to one (a name is looked up now), or, when cfg.MAC is set, may be left
-// empty to find the switch by its MAC address on the first request. It sends nothing to the switch and
+// name that resolves to one (a name is looked up now, and the lookup cannot be cancelled), or,
+// when cfg.MAC is set, may be left empty to find the switch by its MAC address on the first
+// request. A configuration that Config.Validate refuses is refused here, with an error that
+// matches ErrInvalid, and not on the first call. It sends nothing to the switch and
 // binds no socket: the local UDP port is bound on first use, so merely configuring a client
 // (a program that builds one and validates its input) has no side effects on the switch. Close the client
 // when done.
 func Dial(cfg Config) (*Client, error) {
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
 	if cfg.Timeout == 0 {
 		cfg.Timeout = 3 * time.Second
 	}
@@ -73,9 +78,6 @@ func Dial(cfg Config) (*Client, error) {
 	}
 	if !cfg.BroadcastAddr.IsValid() {
 		cfg.BroadcastAddr = netip.AddrFrom4([net.IPv4len]byte{255, 255, 255, 255})
-	}
-	if !cfg.BroadcastAddr.Is4() {
-		return nil, invalidf("escp: BroadcastAddr %s is not an IPv4 address", cfg.BroadcastAddr)
 	}
 	base := clientLogger(cfg)
 	c := &Client{cfg: cfg, log: identified(base)}
