@@ -138,9 +138,9 @@ func TestPortBasedVLANGroup(t *testing.T) {
 	}
 }
 
-// scriptedPortBased answers the port-based VLAN state with a maximum of max (none when nil) and
+// scriptedPortBased answers the port-based VLAN state with a maximum of groups (none when nil) and
 // the given port count, and counts the reads of the state.
-func scriptedPortBased(max []byte, ports byte, reads *atomic.Int32) func([]wire.TLVType) ([]escptest.Setting, int32, bool) {
+func scriptedPortBased(groups []byte, ports byte, reads *atomic.Int32) func([]wire.TLVType) ([]escptest.Setting, int32, bool) {
 	return func(types []wire.TLVType) ([]escptest.Setting, int32, bool) {
 		for _, ty := range types {
 			switch ty {
@@ -149,8 +149,8 @@ func scriptedPortBased(max []byte, ports byte, reads *atomic.Int32) func([]wire.
 			case wire.TLVVLANPortBased:
 				reads.Add(1)
 				out := []escptest.Setting{{Type: wire.TLVVLANPortBased, Value: []byte{1}}, {Type: wire.TLVVLANPortBasedVID, Value: []byte{1, 0, 0, 0, 0xff}}}
-				if max != nil {
-					out = append(out, escptest.Setting{Type: wire.TLVVLANPortBasedMax, Value: max})
+				if groups != nil {
+					out = append(out, escptest.Setting{Type: wire.TLVVLANPortBasedMax, Value: groups})
 				}
 				return out, 0, false
 			}

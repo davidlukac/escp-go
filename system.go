@@ -2,7 +2,7 @@ package escp
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"regexp"
 
 	"github.com/davidlukac/escp-go/internal/wire"
@@ -28,7 +28,7 @@ func parseSystem(ports, auto []wire.TLV) (System, error) {
 		}
 	}
 	if found != 2 {
-		return s, fmt.Errorf("escp: incomplete system reply")
+		return s, errors.New("escp: incomplete system reply")
 	}
 	return s, nil
 }

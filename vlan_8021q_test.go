@@ -65,7 +65,7 @@ func TestParseDot1QVLANEntryLengthBoundary(t *testing.T) {
 func TestDot1QCheckRoom(t *testing.T) {
 	table := func(n int) []Dot1QVLAN {
 		out := make([]Dot1QVLAN, 0, n)
-		for i := 0; i < n; i++ {
+		for i := range n {
 			out = append(out, Dot1QVLAN{ID: VLANID(i + 1), Untagged: MustPortSet(1)})
 		}
 		return out

@@ -16,7 +16,43 @@ linters:
     - unused
     - gosec
     - forbidigo
+    # Stricter set (added after the second review): readability, naming and misuse of the language.
+    - gocritic
+    - predeclared
+    - errname
+    - nilerr
+    - nolintlint
+    - gocyclo
+    - gocognit
+    - nestif
+    - unparam
+    - prealloc
+    - intrange
+    - copyloopvar
+    - nakedret
+    - unconvert
+    - wastedassign
+    - whitespace
+    - recvcheck
+    - contextcheck
+    - noctx
+    - exhaustive
+    - perfsprint
+    - usestdlibvars
   settings:
+    gocyclo:
+      min-complexity: 15
+    gocognit:
+      min-complexity: 20
+    nestif:
+      min-complexity: 5
+    exhaustive:
+      default-signifies-exhaustive: true
+      # The TLV catalogue is an open list of protocol numbers; a switch on it names the ones it reads.
+      ignore-types: 'internal/wire\.TLVType'
+    nolintlint:
+      require-explanation: true
+      require-specific: true
     forbidigo:
       # The library writes nowhere on its own: every message goes through the
       # *slog.Logger the caller passes in (Config.Logger, DiscoverOptions.Logger).
@@ -33,6 +69,14 @@ linters:
         - name: error-naming
         - name: if-return
         - name: var-naming
+        - name: receiver-naming
+        - name: indent-error-flow
+        - name: superfluous-else
+        - name: unexported-return
+        - name: redefines-builtin-id
+        - name: bare-return
+        - name: argument-limit
+          arguments: [5]
         - name: package-comments
           disabled: true
         - name: unused-parameter
@@ -63,6 +107,15 @@ linters:
           - errcheck
           - revive
           - forbidigo
+          # Tests are long on purpose (tables, scripted switches) and read top to bottom.
+          - gocyclo
+          - gocognit
+          - nestif
+          - unparam
+          - prealloc
+          - contextcheck
+          - noctx
+          - perfsprint
 
 formatters:
   enable:

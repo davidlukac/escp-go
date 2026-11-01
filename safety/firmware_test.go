@@ -82,7 +82,7 @@ func TestFirmwareGateAllowsVerifiedBuildsAndReadsTheFirmwareOnce(t *testing.T) {
 	for _, version := range []string{"1.0.0 Build 20230218 Rel.50633", "1.0.0 Build 20250710 Rel.71093"} {
 		sw := &infoSource{firmware: version}
 		gate := FirmwareGate()
-		for i := 0; i < 3; i++ {
+		for range 3 {
 			if err := gate(context.Background(), sw, escp.Operation{}); err != nil {
 				t.Fatalf("%s: %v", version, err)
 			}

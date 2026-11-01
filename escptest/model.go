@@ -108,7 +108,7 @@ func (f *Switch) EnableModel(links map[int]LinkSpeed) {
 func portsOf(mask []byte) []int {
 	var out []int
 	m := binary.BigEndian.Uint32(mask)
-	for i := 0; i < modelPortCount; i++ {
+	for i := range modelPortCount {
 		if m&(1<<uint(i)) != 0 {
 			out = append(out, i+1)
 		}
@@ -150,6 +150,9 @@ func (f *Switch) refuse(tlvs []wire.TLV) int32 {
 
 func isHalf(speed byte) bool { return speed == speedHalf10 || speed == speedHalf100 }
 
+// refuseLAG returns the refusal code for a LAG write the switch would not accept, or 0. The rules and
+// their order were measured on hardware: how many ports and which range, then half duplex, then for
+// each member in turn whether it agrees with the first member and whether anything else holds it.
 func (f *Switch) refuseLAG(v []byte) int32 {
 	group, members := int(v[0]), portsOf(v[1:])
 	if len(members) == 0 {
@@ -166,44 +169,59 @@ func (f *Switch) refuseLAG(v []byte) int32 {
 		}
 		rows = append(rows, f.row(wire.TLVPorts, p))
 	}
-	mirror := f.store[wire.TLVMirror]
 	for _, r := range rows {
 		if isHalf(r[3]) {
 			return refusedHalfDuplex
 		}
 	}
+	mirror := f.store[wire.TLVMirror]
 	for _, r := range rows {
-		p := int(r[0])
-		if (r[3] == speedAuto) != (rows[0][3] == speedAuto) {
-			return refusedNegotiation
+		if code := lagDisagreement(r, rows[0]); code != 0 {
+			return code
 		}
-		if r[3] != rows[0][3] {
-			return refusedSpeed
+		if code := f.lagConflict(int(r[0]), mirror); code != 0 {
+			return code
 		}
-		if r[5] != rows[0][5] {
-			return refusedFlowControl
+	}
+	return 0
+}
+
+// lagDisagreement is the refusal when a member differs from the first member in the way a LAG does not
+// allow: auto-negotiation against a fixed speed, the speed, flow control, the enabled state.
+func lagDisagreement(r, first []byte) int32 {
+	switch {
+	case (r[3] == speedAuto) != (first[3] == speedAuto):
+		return refusedNegotiation
+	case r[3] != first[3]:
+		return refusedSpeed
+	case r[5] != first[5]:
+		return refusedFlowControl
+	case r[1] != first[1]:
+		return refusedEnabled
+	}
+	return 0
+}
+
+// lagConflict is the refusal when something else holds the port: a rate limit, storm control, a port-based
+// VLAN other than the default, or the port mirror (mirror is the stored mirror entry).
+func (f *Switch) lagConflict(p int, mirror []byte) int32 {
+	if f.row(wire.TLVBandwidthIngress, p)[1] == 1 || f.row(wire.TLVBandwidthEgress, p)[1] == 1 {
+		return refusedBandwidth
+	}
+	if f.row(wire.TLVStormControl, p)[1] == 1 {
+		return refusedStorm
+	}
+	for _, vl := range f.rows[wire.TLVVLANPortBasedVID] {
+		if vl[0] != defaultVLAN && contains(portsOf(vl[1:]), p) {
+			return refusedPortVLAN
 		}
-		if r[1] != rows[0][1] {
-			return refusedEnabled
+	}
+	if mirror[0] == 1 {
+		if int(mirror[1]) == p {
+			return refusedMirrorDest
 		}
-		if f.row(wire.TLVBandwidthIngress, p)[1] == 1 || f.row(wire.TLVBandwidthEgress, p)[1] == 1 {
-			return refusedBandwidth
-		}
-		if f.row(wire.TLVStormControl, p)[1] == 1 {
-			return refusedStorm
-		}
-		for _, vl := range f.rows[wire.TLVVLANPortBasedVID] {
-			if vl[0] != defaultVLAN && contains(portsOf(vl[1:]), p) {
-				return refusedPortVLAN
-			}
-		}
-		if mirror[0] == 1 {
-			if int(mirror[1]) == p {
-				return refusedMirrorDest
-			}
-			if contains(portsOf(mirror[2:6]), p) || contains(portsOf(mirror[6:10]), p) {
-				return refusedMirrorSrc
-			}
+		if contains(portsOf(mirror[2:6]), p) || contains(portsOf(mirror[6:10]), p) {
+			return refusedMirrorSrc
 		}
 	}
 	return 0
@@ -225,17 +243,9 @@ func (f *Switch) applied(t wire.TLV) {
 	}
 	switch t.Type {
 	case wire.TLVVLANMTU, wire.TLVVLANPortBased, wire.TLVVLAN8021Q:
-		// The VLAN modes exclude each other: turning one on turns the others off.
-		if t.Value[0] != 1 {
-			return
-		}
-		for _, other := range []wire.TLVType{wire.TLVVLANMTU, wire.TLVVLANPortBased, wire.TLVVLAN8021Q} {
-			if other != t.Type {
-				f.store[other] = append([]byte{0}, f.store[other][1:]...)
-			}
-		}
+		f.exclusiveVLANMode(t)
 	case wire.TLVBandwidthIngress:
-		// One limiter per port for incoming traffic (firmware 20250710 and 20230218, probed on switches 03 and 01): an ingress limit
+		// One limiter per port for incoming traffic (firmware 20250710 and 20230218): an ingress limit
 		// turns storm control on that port off, without a refusal.
 		if t.Value[1] == 1 {
 			clear(f.row(wire.TLVStormControl, int(t.Value[0]))[1:])
@@ -246,45 +256,70 @@ func (f *Switch) applied(t wire.TLV) {
 			clear(f.row(wire.TLVBandwidthIngress, int(t.Value[0]))[1:])
 		}
 	case wire.TLVVLAN8021QVLAN:
-		// A VLAN written with no member ports is deleted.
-		var kept [][]byte
-		for _, r := range f.rows[wire.TLVVLAN8021QVLAN] {
-			if binary.BigEndian.Uint32(r[2:6]) != 0 {
-				kept = append(kept, r)
-			}
-		}
-		f.rows[wire.TLVVLAN8021QVLAN] = kept
+		f.dropEmptyDot1QVLANs()
 	case wire.TLVLAG:
-		group, members := t.Value[0], portsOf(t.Value[1:])
-		for _, r := range f.rows[wire.TLVPorts] {
-			switch {
-			case contains(members, int(r[0])):
-				r[portRowLAG] = group
-			case r[portRowLAG] == group:
-				r[portRowLAG] = 0
-			}
-		}
+		f.assignLAGMembers(t.Value[0], portsOf(t.Value[1:]))
 	case wire.TLVVLANPortBasedVID:
-		id, mine := t.Value[0], binary.BigEndian.Uint32(t.Value[1:])
-		var kept [][]byte
-		var covered uint32
-		for _, r := range f.rows[wire.TLVVLANPortBasedVID] {
-			m := binary.BigEndian.Uint32(r[1:])
-			if r[0] != id {
-				m &^= mine // membership is exclusive
-			}
-			if m == 0 && r[0] != defaultVLAN {
-				continue // an empty group is deleted
-			}
-			binary.BigEndian.PutUint32(r[1:], m)
-			covered |= m
+		f.reshufflePortGroups(t.Value[0], binary.BigEndian.Uint32(t.Value[1:]))
+	}
+}
+
+// exclusiveVLANMode: the VLAN modes exclude each other, so turning one on turns the others off.
+func (f *Switch) exclusiveVLANMode(t wire.TLV) {
+	if t.Value[0] != 1 {
+		return
+	}
+	for _, other := range []wire.TLVType{wire.TLVVLANMTU, wire.TLVVLANPortBased, wire.TLVVLAN8021Q} {
+		if other != t.Type {
+			f.store[other] = append([]byte{0}, f.store[other][1:]...)
+		}
+	}
+}
+
+// dropEmptyDot1QVLANs: a VLAN written with no member ports is deleted.
+func (f *Switch) dropEmptyDot1QVLANs() {
+	var kept [][]byte
+	for _, r := range f.rows[wire.TLVVLAN8021QVLAN] {
+		if binary.BigEndian.Uint32(r[2:6]) != 0 {
 			kept = append(kept, r)
 		}
-		f.rows[wire.TLVVLANPortBasedVID] = kept
-		for _, r := range kept {
-			if r[0] == defaultVLAN { // ports left in no VLAN return to VLAN 1
-				binary.BigEndian.PutUint32(r[1:], binary.BigEndian.Uint32(r[1:])|(1<<modelPortCount-1)&^covered)
-			}
+	}
+	f.rows[wire.TLVVLAN8021QVLAN] = kept
+}
+
+// assignLAGMembers records which ports belong to the LAG group now, and frees the ones that left it.
+func (f *Switch) assignLAGMembers(group byte, members []int) {
+	for _, r := range f.rows[wire.TLVPorts] {
+		switch {
+		case contains(members, int(r[0])):
+			r[portRowLAG] = group
+		case r[portRowLAG] == group:
+			r[portRowLAG] = 0
+		}
+	}
+}
+
+// reshufflePortGroups applies a write of port-based group id with the member mask mine: membership is
+// exclusive, an emptied group is deleted, and ports left in no group return to VLAN 1.
+func (f *Switch) reshufflePortGroups(id byte, mine uint32) {
+	var kept [][]byte
+	var covered uint32
+	for _, r := range f.rows[wire.TLVVLANPortBasedVID] {
+		m := binary.BigEndian.Uint32(r[1:])
+		if r[0] != id {
+			m &^= mine // membership is exclusive
+		}
+		if m == 0 && r[0] != defaultVLAN {
+			continue // an empty group is deleted
+		}
+		binary.BigEndian.PutUint32(r[1:], m)
+		covered |= m
+		kept = append(kept, r)
+	}
+	f.rows[wire.TLVVLANPortBasedVID] = kept
+	for _, r := range kept {
+		if r[0] == defaultVLAN { // ports left in no VLAN return to VLAN 1
+			binary.BigEndian.PutUint32(r[1:], binary.BigEndian.Uint32(r[1:])|(1<<modelPortCount-1)&^covered)
 		}
 	}
 }

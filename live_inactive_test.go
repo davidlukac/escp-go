@@ -159,7 +159,7 @@ func TestLiveInactiveSettings(t *testing.T) {
 
 	// A. 802.1Q VLAN and PVID staged while the switch is in port-based mode.
 	obs("A0 port-based mode, raw 802.1Q reads: %s", raw(wire.TLVVLAN8021Q, wire.TLVVLAN8021QVLAN, wire.TLVVLAN8021QPVID))
-	err = c.SetDot1QVLAN(ctx, Dot1QVLAN{ID: 20, Name: "staged", Untagged: MustPortSet(PortID(a)), Tagged: MustPortSet(PortID(b))})
+	err = c.SetDot1QVLAN(ctx, Dot1QVLAN{ID: 20, Name: "staged", Untagged: MustPortSet(a), Tagged: MustPortSet(b)})
 	obs("A1 SetDot1QVLAN(20) while 802.1Q is off: %s", result(err))
 	obs("A1 read right after: %s | raw %s", dot1q(), raw(wire.TLVVLAN8021Q, wire.TLVVLAN8021QVLAN, wire.TLVVLAN8021QPVID))
 	err = c.SetPVIDs(ctx, []PortPVID{{Port: a, PVID: 20}})
@@ -198,7 +198,7 @@ func TestLiveInactiveSettings(t *testing.T) {
 	obs("C1 back in port-based mode (trip through 802.1Q): %s", portBased())
 	_ = c.SetPortBasedVLAN(ctx, PortVLAN{ID: 2, Ports: 0})
 	setMode(VLANModeDot1Q)
-	if err := c.SetDot1QVLAN(ctx, Dot1QVLAN{ID: 20, Name: "trip", Untagged: MustPortSet(PortID(a)), Tagged: MustPortSet(PortID(b))}); err != nil {
+	if err := c.SetDot1QVLAN(ctx, Dot1QVLAN{ID: 20, Name: "trip", Untagged: MustPortSet(a), Tagged: MustPortSet(b)}); err != nil {
 		t.Fatalf("creating the test VLAN in 802.1Q mode: %v", err)
 	}
 	obs("C2 VLAN 20 created in 802.1Q mode: %s", dot1q())

@@ -142,7 +142,7 @@ func TestDiscoverProbesEveryInterfaceTwice(t *testing.T) {
 	}
 	macs := map[[6]byte]int{}
 	var seq uint16
-	for i := 0; i < 4; i++ { // two interfaces, two rounds; blocks until the responder has seen them
+	for i := range 4 { // two interfaces, two rounds; blocks until the responder has seen them
 		h := r.next(t)
 		macs[h.HostMAC]++
 		if i == 0 {
@@ -171,7 +171,7 @@ func TestDiscoverCanBeLimitedToOneInterface(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		if h := r.next(t); MAC(h.HostMAC) != macTwo {
 			t.Fatalf("probe %d came from %x, want only en1 (%x)", i, h.HostMAC, macTwo)
 		}

@@ -11,7 +11,7 @@ import (
 func TestSequenceRangesAreDisjoint(t *testing.T) {
 	client := map[uint16]bool{}
 	discovery := map[uint16]bool{}
-	for v := 0; v <= 0xffff; v++ {
+	for v := range 0xffff {
 		n := [2]byte{byte(v >> 8), byte(v)}
 		client[startSeq(n)] = true
 		discovery[discoverySeq(n)] = true
@@ -33,7 +33,7 @@ func TestSequenceRangesAreDisjoint(t *testing.T) {
 // the numbers discovery uses.
 func TestClientSequenceStaysInItsRange(t *testing.T) {
 	seq := startSeq([2]byte{0x03, 0xe7}) // 999
-	for i := 0; i < 3*clientSeqSpace; i++ {
+	for i := range 3 * clientSeqSpace {
 		if seq >= clientSeqSpace {
 			t.Fatalf("after %d requests the client's sequence number is %d", i, seq)
 		}

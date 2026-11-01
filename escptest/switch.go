@@ -176,7 +176,7 @@ func listenLoopback() (*net.UDPConn, error) {
 // out before, and reserves it.
 func listenUnreserved(listen func() (*net.UDPConn, error)) (*net.UDPConn, error) {
 	var lastPort int
-	for i := 0; i < maxReservedTries; i++ {
+	for range maxReservedTries {
 		c, err := listen()
 		if err != nil {
 			return nil, err
@@ -442,23 +442,6 @@ func ConfigFile() []byte {
 	return b
 }
 
-func (f *Switch) send(to *net.UDPAddr, op byte, req wire.Header, errCode int32, tlvs []wire.TLV, useSession bool) {
-	req.Op, req.ErrCode = op, errCode
-	f.mu.Lock()
-	req.SwitchMAC = f.macAddr()
-	f.mu.Unlock()
-	b := wire.Marshal(req, tlvs)
-	f.mu.Lock()
-	s := f.session
-	f.mu.Unlock()
-	if useSession && s != nil {
-		b = wire.RC4Session(b, s)
-	} else {
-		b = wire.RC4Static(b)
-	}
-	_, _ = f.conn.WriteToUDP(b, to)
-}
-
 // request is a packet the switch received, decoded, with where it came from and how it was
 // encrypted.
 type request struct {
@@ -488,7 +471,19 @@ func (r request) has(t wire.TLVType) bool {
 // reply answers the request with the given operation, code and TLVs; useSession says whether the
 // reply travels under the session key (the replies to discovery do not).
 func (f *Switch) reply(r request, op byte, code int32, tlvs []wire.TLV, useSession bool) {
-	f.send(r.from, op, r.h, code, tlvs, useSession)
+	h := r.h
+	h.Op, h.ErrCode = op, code
+	f.mu.Lock()
+	h.SwitchMAC = f.macAddr()
+	s := f.session
+	f.mu.Unlock()
+	b := wire.Marshal(h, tlvs)
+	if useSession && s != nil {
+		b = wire.RC4Session(b, s)
+	} else {
+		b = wire.RC4Static(b)
+	}
+	_, _ = f.conn.WriteToUDP(b, r.from)
 }
 
 // handle answers one packet.
@@ -595,7 +590,9 @@ func (f *Switch) handleConfigRead(r request) {
 	}
 	f.mu.Unlock()
 	file := func(h wire.Header, part []byte) {
-		f.send(r.from, wire.OpSetReply, h, 0, []wire.TLV{{Type: wire.TLVConfigFile, Value: part}}, true)
+		answer := r
+		answer.h = h
+		f.reply(answer, wire.OpSetReply, 0, []wire.TLV{{Type: wire.TLVConfigFile, Value: part}}, true)
 	}
 	if mode == BackupSilent {
 		return
@@ -617,6 +614,7 @@ func (f *Switch) handleConfigRead(r request) {
 		cfg = cfg[:4]
 	case BackupCorrupt:
 		cfg[configChunk+100] ^= 0xff // in the second fragment
+	default: // the file arrives whole, or the fragments are dropped or doubled below
 	}
 	first, second := cfg, []byte(nil)
 	if len(cfg) > configChunk {

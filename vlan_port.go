@@ -2,6 +2,7 @@ package escp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 
@@ -119,7 +120,7 @@ func parsePortBasedVLAN(tlvs []wire.TLV) (PortBasedVLAN, error) {
 		}
 	}
 	if !seen {
-		return out, fmt.Errorf("escp: no port-based VLAN state in reply")
+		return out, errors.New("escp: no port-based VLAN state in reply")
 	}
 	return out, nil
 }

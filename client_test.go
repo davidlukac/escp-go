@@ -264,13 +264,13 @@ func TestMacHolding(t *testing.T) {
 func TestSeveralClientsShareTheReplyPort(t *testing.T) {
 	port := escptest.FreeUDPPort(t)
 	var clients []*Client
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		c, err := Dial(Config{Host: "127.0.0.1", HostPort: port})
 		if err != nil {
 			t.Fatal(err)
 		}
 		c.mu.Lock()
-		err = c.open()
+		err = c.open(context.Background())
 		c.mu.Unlock()
 		if err != nil {
 			t.Fatalf("client %d could not share port %d: %v", i+1, port, err)

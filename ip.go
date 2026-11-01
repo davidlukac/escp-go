@@ -69,21 +69,34 @@ func validateIPConfig(cfg IPConfig, allowLoopback bool) error {
 	}
 	ip, mask, gw := net.IP(cfg.IP.AsSlice()), net.IP(cfg.Netmask.AsSlice()), net.IP(cfg.Gateway.AsSlice())
 	m := net.IPMask(mask)
-	ones, bits := m.Size()
-	if bits == 0 || ones < 8 || ones > 30 {
+	if ones, bits := m.Size(); bits == 0 || ones < 8 || ones > 30 {
 		return invalidf("escp: subnet mask %s is not a contiguous prefix between /8 and /30", mask)
 	}
 	subnet := net.IPNet{IP: ip.Mask(m), Mask: m}
-	if ip.IsUnspecified() || (ip.IsLoopback() && !allowLoopback) || ip.IsMulticast() || ip.Equal(subnet.IP) || ip.Equal(broadcastOf(subnet)) {
+	if !isUsableHost(ip, subnet, allowLoopback) {
 		return invalidf("escp: %s is not a usable host address in %s", ip, subnet.String())
 	}
 	if gw.IsUnspecified() {
-		return nil
+		return nil // no gateway
 	}
-	if !subnet.Contains(gw) || gw.Equal(subnet.IP) || gw.Equal(broadcastOf(subnet)) || gw.Equal(ip) {
+	if !subnet.Contains(gw) || !isHostAddress(gw, subnet) || gw.Equal(ip) {
 		return invalidf("escp: gateway %s must be another host address in %s", gw, subnet.String())
 	}
 	return nil
+}
+
+// isUsableHost reports whether ip can be a switch's own address in subnet: a host address (neither the
+// network nor the broadcast address), not unspecified, not multicast, and not loopback unless allowed.
+func isUsableHost(ip net.IP, subnet net.IPNet, allowLoopback bool) bool {
+	if ip.IsUnspecified() || ip.IsMulticast() || (ip.IsLoopback() && !allowLoopback) {
+		return false
+	}
+	return isHostAddress(ip, subnet)
+}
+
+// isHostAddress reports whether ip is neither the network address nor the broadcast address of subnet.
+func isHostAddress(ip net.IP, subnet net.IPNet) bool {
+	return !ip.Equal(subnet.IP) && !ip.Equal(broadcastOf(subnet))
 }
 
 // addrOf converts an address of the net package; nil and anything that is no address give the

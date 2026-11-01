@@ -234,12 +234,13 @@ func collectReplies(ctx context.Context, env discoverEnv, probes []probe, window
 	seq := discoverySeq(n)
 
 	found := map[string]Info{}
+	replies := &discoveryReplies{conn: conn, seq: seq, found: found, done: done}
 	start := time.Now()
 	for _, until := range []time.Time{start.Add(window / 2), start.Add(window)} {
 		if err := sendProbes(conn, env, probes, seq); err != nil {
 			return nil, err
 		}
-		listen(ctx, conn, until, seq, found, done)
+		replies.listen(ctx, until)
 		if err := ctx.Err(); err != nil {
 			return sortedInfos(found), err
 		}
@@ -275,23 +276,33 @@ func sendProbes(conn *net.UDPConn, env discoverEnv, probes []probe, seq uint16) 
 	return nil
 }
 
-// listen reads datagrams until the deadline and records the discovery replies to seq. Anything
-// else (undecodable data, other sequence numbers, echoes of our own probe) is ignored.
-func listen(ctx context.Context, conn *net.UDPConn, until time.Time, seq uint16, found map[string]Info, done func(map[string]Info) bool) {
+// discoveryReplies collects the replies to one discovery: the socket they arrive on, the sequence
+// number of the probes, what was found so far (by MAC address, or by IP address when a reply carries
+// no MAC) and the optional condition that ends the search early.
+type discoveryReplies struct {
+	conn  *net.UDPConn
+	seq   uint16
+	found map[string]Info
+	done  func(map[string]Info) bool
+}
+
+// listen reads datagrams until the deadline and records the discovery replies to the sequence number.
+// Anything else (undecodable data, other sequence numbers, echoes of our own probe) is ignored.
+func (r *discoveryReplies) listen(ctx context.Context, until time.Time) {
 	buf := make([]byte, maxDatagram)
-	_ = conn.SetReadDeadline(until)
+	_ = r.conn.SetReadDeadline(until)
 	// The wake-up that a cancelled context sends to the socket may have fired before the line
 	// above and been overwritten by it; looking again afterwards closes that gap.
 	if ctx.Err() != nil {
 		return
 	}
 	for {
-		n, from, err := conn.ReadFromUDP(buf)
+		n, from, err := r.conn.ReadFromUDP(buf)
 		if err != nil {
 			return // deadline reached, or the context cancelled it
 		}
 		h, tlvs, err := wire.Unmarshal(wire.RC4Static(buf[:n]))
-		if err != nil || h.Op != wire.OpReply || h.Seq != seq {
+		if err != nil || h.Op != wire.OpReply || h.Seq != r.seq {
 			continue
 		}
 		info := infoFromTLVs(tlvs)
@@ -299,9 +310,9 @@ func listen(ctx context.Context, conn *net.UDPConn, until time.Time, seq uint16,
 		if key == "" {
 			key = from.IP.String()
 		}
-		if _, dup := found[key]; !dup {
-			found[key] = info
-			if done != nil && done(found) {
+		if _, dup := r.found[key]; !dup {
+			r.found[key] = info
+			if r.done != nil && r.done(r.found) {
 				return
 			}
 		}

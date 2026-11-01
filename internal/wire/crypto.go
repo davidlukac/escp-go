@@ -16,7 +16,7 @@ func teaDecryptBlock(b []byte) []byte {
 	v0 := binary.BigEndian.Uint32(b[:4])
 	v1 := binary.BigEndian.Uint32(b[4:])
 	sum := uint32(0xC6EF3720)
-	for i := 0; i < teaRounds; i++ {
+	for range teaRounds {
 		v1 -= ((v0 << 4) + teaKey[2]) ^ (v0 + sum) ^ (uint32(int32(v0)>>5) + teaKey[3])
 		v0 -= ((v1 << 4) + teaKey[0]) ^ (v1 + sum) ^ (uint32(int32(v1)>>5) + teaKey[1])
 		sum += 0x61C88647
@@ -49,7 +49,7 @@ func rc4State(key []byte, n int) []int {
 		s[i] = i
 	}
 	j := 0
-	for i := 0; i < n; i++ {
+	for i := range n {
 		j = ((j+s[i]+int(int8(key[i%len(key)])))%n + n) % n
 		s[i], s[j] = s[j], s[i]
 	}

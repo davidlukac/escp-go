@@ -2,6 +2,7 @@ package escp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/davidlukac/escp-go/internal/wire"
@@ -61,7 +62,7 @@ func parseDot1Q(tlvs []wire.TLV) (Dot1Q, error) {
 		}
 	}
 	if !seen {
-		return out, fmt.Errorf("escp: no 802.1Q state in reply")
+		return out, errors.New("escp: no 802.1Q state in reply")
 	}
 	return out, nil
 }

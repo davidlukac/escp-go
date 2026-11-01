@@ -71,7 +71,7 @@ var writeCalls = map[string]func(context.Context, *Client) error{
 func writeMethodNames() []string {
 	var names []string
 	typ := reflect.TypeOf(&Client{})
-	for i := 0; i < typ.NumMethod(); i++ {
+	for i := range typ.NumMethod() {
 		if n := typ.Method(i).Name; strings.HasPrefix(n, "Set") || strings.HasPrefix(n, "Delete") || strings.HasPrefix(n, "Enable") {
 			names = append(names, n)
 		}

@@ -76,7 +76,7 @@ func TestAFloodOfStaleDatagramsDoesNotHoldARequestBack(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < 2*maxDiscarded; i++ { // none carries the number of the next request
+	for i := range 2 * maxDiscarded { // none carries the number of the next request
 		leaveInTheSocket(t, c, discoveryShapedReply(c, discoverySeqBase+uint16(i)))
 	}
 	got, err := c.LED(ctx)

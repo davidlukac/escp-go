@@ -2,6 +2,7 @@ package escp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/davidlukac/escp-go/internal/wire"
@@ -88,7 +89,7 @@ func parseQoS(tlvs []wire.TLV) (QoS, error) {
 		}
 	}
 	if !seen {
-		return out, fmt.Errorf("escp: no QoS mode in reply")
+		return out, errors.New("escp: no QoS mode in reply")
 	}
 	return out, nil
 }

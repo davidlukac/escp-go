@@ -172,7 +172,7 @@ func TestLivePortWrites(t *testing.T) {
 	c, ctx := liveClient(t), context.Background()
 	orig := livePort(t, c, id)
 	defer func() {
-		if err := c.SetPort(ctx, PortConfig{ID: PortID(id), Enabled: orig.Enabled, Speed: orig.ConfiguredSpeed, FlowControl: orig.ConfiguredFlowControl}); err != nil {
+		if err := c.SetPort(ctx, PortConfig{ID: id, Enabled: orig.Enabled, Speed: orig.ConfiguredSpeed, FlowControl: orig.ConfiguredFlowControl}); err != nil {
 			t.Errorf("RESTORE FAILED: %v", err)
 		}
 		if now := livePort(t, c, id); now != orig {
@@ -192,7 +192,7 @@ func TestLivePortWrites(t *testing.T) {
 		steps = append([]portStep{{orig.Enabled, orig.ConfiguredSpeed, flow}}, steps...)
 	}
 	for _, step := range steps {
-		if err := c.SetPort(ctx, PortConfig{ID: PortID(id), Enabled: step.enabled, Speed: step.speed, FlowControl: step.flow}); err != nil {
+		if err := c.SetPort(ctx, PortConfig{ID: id, Enabled: step.enabled, Speed: step.speed, FlowControl: step.flow}); err != nil {
 			t.Fatalf("%+v: %v", step, err)
 		}
 		got := livePort(t, c, id)
@@ -280,14 +280,14 @@ func TestLiveBandwidth(t *testing.T) {
 	livePort(t, c, id) // abort unless port 7 is unused
 	orig := bandwidthOf(t, c, id)
 	defer func() {
-		if err := c.SetBandwidth(ctx, PortBandwidth{Port: PortID(id), Ingress: orig.Ingress, Egress: orig.Egress}); err != nil {
+		if err := c.SetBandwidth(ctx, PortBandwidth{Port: id, Ingress: orig.Ingress, Egress: orig.Egress}); err != nil {
 			t.Errorf("RESTORE FAILED: %v", err)
 		}
 		if now := bandwidthOf(t, c, id); now != orig {
 			t.Errorf("not restored: %+v vs %+v", now, orig)
 		}
 	}()
-	if err := c.SetBandwidth(ctx, PortBandwidth{Port: PortID(id), Ingress: 1024, Egress: 2048}); err != nil {
+	if err := c.SetBandwidth(ctx, PortBandwidth{Port: id, Ingress: 1024, Egress: 2048}); err != nil {
 		t.Fatal(err)
 	}
 	if got := bandwidthOf(t, c, id); got.Ingress != 1024 || got.Egress != 2048 {
@@ -329,14 +329,14 @@ func TestLiveStormControl(t *testing.T) {
 	livePort(t, c, id) // abort unless port 7 is unused
 	orig := stormOf(t, c, id)
 	defer func() {
-		if err := c.SetStormControl(ctx, StormConfig{Port: PortID(id), UnknownUnicast: orig.UnknownUnicast, Multicast: orig.Multicast, Broadcast: orig.Broadcast, Rate: orig.Rate}); err != nil {
+		if err := c.SetStormControl(ctx, StormConfig{Port: id, UnknownUnicast: orig.UnknownUnicast, Multicast: orig.Multicast, Broadcast: orig.Broadcast, Rate: orig.Rate}); err != nil {
 			t.Errorf("RESTORE FAILED: %v", err)
 		}
 		if now := stormOf(t, c, id); now != orig {
 			t.Errorf("not restored: %+v vs %+v", now, orig)
 		}
 	}()
-	if err := c.SetStormControl(ctx, StormConfig{Port: PortID(id), UnknownUnicast: false, Multicast: true, Broadcast: true, Rate: 1024}); err != nil {
+	if err := c.SetStormControl(ctx, StormConfig{Port: id, UnknownUnicast: false, Multicast: true, Broadcast: true, Rate: 1024}); err != nil {
 		t.Fatal(err)
 	}
 	got := stormOf(t, c, id)
@@ -350,7 +350,7 @@ func TestLiveStormControl(t *testing.T) {
 		}
 	}
 	// unknown unicast, which the first live run did not cover
-	if err := c.SetStormControl(ctx, StormConfig{Port: PortID(id), UnknownUnicast: true, Multicast: false, Broadcast: false, Rate: 2048}); err != nil {
+	if err := c.SetStormControl(ctx, StormConfig{Port: id, UnknownUnicast: true, Multicast: false, Broadcast: false, Rate: 2048}); err != nil {
 		t.Fatal(err)
 	}
 	if got := stormOf(t, c, id); !got.Enabled || !got.UnknownUnicast || got.Multicast || got.Broadcast || got.Rate != 2048 {
@@ -377,7 +377,7 @@ func TestLivePortMirror(t *testing.T) {
 			t.Errorf("not restored: %+v vs %+v", now, orig)
 		}
 	}()
-	want := Mirror{Enabled: true, Destination: PortID(dest), IngressPorts: MustPortSet(PortID(source)), EgressPorts: 0}
+	want := Mirror{Enabled: true, Destination: dest, IngressPorts: MustPortSet(source), EgressPorts: 0}
 	if err := c.SetPortMirror(ctx, want); err != nil {
 		t.Fatal(err)
 	}
@@ -387,8 +387,8 @@ func TestLivePortMirror(t *testing.T) {
 	}
 	// egress and both directions, which the first live run did not cover
 	for _, m := range []Mirror{
-		{Enabled: true, Destination: PortID(dest), IngressPorts: 0, EgressPorts: MustPortSet(PortID(source))},
-		{Enabled: true, Destination: PortID(dest), IngressPorts: MustPortSet(PortID(source)), EgressPorts: MustPortSet(PortID(source))},
+		{Enabled: true, Destination: dest, IngressPorts: 0, EgressPorts: MustPortSet(source)},
+		{Enabled: true, Destination: dest, IngressPorts: MustPortSet(source), EgressPorts: MustPortSet(source)},
 	} {
 		if err := c.SetPortMirror(ctx, m); err != nil {
 			t.Fatal(err)
@@ -575,7 +575,7 @@ func TestLiveTwoClientsShareThePort(t *testing.T) {
 	go func() { i, e := a.Info(context.Background()); ch <- result{i, e} }()
 	go func() { i, e := b.Info(context.Background()); ch <- result{i, e} }()
 	macs := map[string]bool{}
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		r := <-ch
 		if r.err != nil {
 			t.Fatalf("a client failed while sharing the port: %v", r.err)
@@ -671,7 +671,7 @@ func TestLiveDot1QVLANOnUnusedPorts(t *testing.T) {
 		t.Fatalf("the mode write had no effect: %+v", q)
 	}
 
-	want := Dot1QVLAN{ID: testVLAN, Name: "livetest", Untagged: MustPortSet(PortID(a)), Tagged: MustPortSet(PortID(b))}
+	want := Dot1QVLAN{ID: testVLAN, Name: "livetest", Untagged: MustPortSet(a), Tagged: MustPortSet(b)}
 	if err := c.SetDot1QVLAN(ctx, want); err != nil {
 		t.Fatal(err)
 	}

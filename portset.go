@@ -100,7 +100,7 @@ func (s PortSet) Minus(o PortSet) PortSet { return s &^ o }
 // Ports lists the ports in ascending order; the empty set gives a non-nil empty slice.
 func (s PortSet) Ports() []PortID {
 	out := make([]PortID, 0, s.Len())
-	for i := 0; i < MaxPort; i++ {
+	for i := range MaxPort {
 		if s&(1<<uint(i)) != 0 {
 			out = append(out, PortID(i+1))
 		}
