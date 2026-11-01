@@ -63,7 +63,7 @@ func TestLibraryLimitsMatchTheWebUI(t *testing.T) {
 	// Limits the library does not model as constants: it does not write them (user account, CLI only; the
 	// switch's own rule for those is not probed) or reads them from the switch (the table size, enforced by
 	// the switch and checked through Dot1Q.CheckRoom; the port count).
-	notModelled := map[string]bool{"user_name_max_length": true, "password_max_length": true, "dot1q_vlan_table_size": true, "port_count": true}
+	notModeled := map[string]bool{"user_name_max_length": true, "password_max_length": true, "dot1q_vlan_table_size": true, "port_count": true}
 
 	for name, want := range matches {
 		t.Run(name, func(t *testing.T) {
@@ -96,17 +96,17 @@ func TestLibraryLimitsMatchTheWebUI(t *testing.T) {
 		if _, ok := diverges[name]; ok {
 			continue
 		}
-		if !notModelled[name] {
+		if !notModeled[name] {
 			unclassified = append(unclassified, name)
 		}
 	}
 	sort.Strings(unclassified)
 	if len(unclassified) > 0 {
-		t.Errorf("limits in webui-limits.json that are not classified: %v; add each to matches, diverges or notModelled", unclassified)
+		t.Errorf("limits in webui-limits.json that are not classified: %v; add each to matches, diverges or notModeled", unclassified)
 	}
-	for name := range notModelled {
+	for name := range notModeled {
 		if _, ok := web.Limits[name]; !ok {
-			t.Errorf("notModelled lists %s, which webui-limits.json no longer has", name)
+			t.Errorf("notModeled lists %s, which webui-limits.json no longer has", name)
 		}
 	}
 }

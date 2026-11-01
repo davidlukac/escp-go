@@ -228,7 +228,7 @@ func collectReplies(ctx context.Context, env discoverEnv, probes []probe, window
 	}
 	conn := pc.(*net.UDPConn) // a "udp4" listener is always a *net.UDPConn
 	defer func() { _ = conn.Close() }()
-	// A cancelled context must end a read that is waiting for its deadline.
+	// A canceled context must end a read that is waiting for its deadline.
 	stop := context.AfterFunc(ctx, func() { _ = conn.SetReadDeadline(time.Now()) })
 	defer stop()
 
@@ -294,7 +294,7 @@ type discoveryReplies struct {
 func (r *discoveryReplies) listen(ctx context.Context, until time.Time) {
 	buf := make([]byte, maxDatagram)
 	_ = r.conn.SetReadDeadline(until)
-	// The wake-up that a cancelled context sends to the socket may have fired before the line
+	// The wake-up that a canceled context sends to the socket may have fired before the line
 	// above and been overwritten by it; looking again afterwards closes that gap.
 	if ctx.Err() != nil {
 		return
@@ -302,7 +302,7 @@ func (r *discoveryReplies) listen(ctx context.Context, until time.Time) {
 	for {
 		n, from, err := r.conn.ReadFromUDP(buf)
 		if err != nil {
-			return // deadline reached, or the context cancelled it
+			return // deadline reached, or the context canceled it
 		}
 		h, tlvs, err := wire.Unmarshal(wire.RC4Static(buf[:n]))
 		if err != nil || h.Op != wire.OpReply || h.Seq != r.seq {

@@ -20,7 +20,7 @@ func (Password) GoString() string { return redacted }
 // LogValue makes slog log "[redacted]" instead of the password.
 func (Password) LogValue() slog.Value { return slog.StringValue(redacted) }
 
-// MarshalText makes the encoders that honour encoding.TextMarshaler (encoding/json, encoding/xml,
+// MarshalText makes the encoders that honor encoding.TextMarshaler (encoding/json, encoding/xml,
 // and the YAML and TOML libraries) write "[redacted]" too, so a Password inside a value that is
 // encoded for a log or a debug dump does not leak. The text is not a way to save a password: it
 // cannot be read back.

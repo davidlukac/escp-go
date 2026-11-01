@@ -28,7 +28,7 @@ By default it is a scripted switch: it answers the key exchange, checks the cred
 | `EnableRows` | tables with one element per row (ports, priorities, rates) |
 | `EnableModel` | a model of a freshly reset switch that enforces the rules between settings (refusals, exclusivity, derived values) as measured on hardware, firmware 20250710, and 20230218 where a comment says so; it implies the first two |
 
-The naming is one convention: `Enable...` switches a behaviour on, `Set...` seeds a value (`SetMAC`, `SetFirmware`, `SetLease`), and the accessors read back what the switch saw (`WriteCount`, `LastSet`, `AllSets`, `PortSetting`, `LED`, `Hostname`, `Received`).
+The naming is one convention: `Enable...` switches a behavior on, `Set...` seeds a value (`SetMAC`, `SetFirmware`, `SetLease`), and the accessors read back what the switch saw (`WriteCount`, `LastSet`, `AllSets`, `PortSetting`, `LED`, `Hostname`, `Received`).
 
 ## Failures to survive
 
