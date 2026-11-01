@@ -118,6 +118,35 @@ func (s PortSet) Ints() []int {
 	return out
 }
 
+// MarshalText is the text of String, "2,3,5" or "none", so that encoders write the ports and not the
+// bitmap.
+func (s PortSet) MarshalText() ([]byte, error) { return []byte(s.String()), nil }
+
+// UnmarshalText reads what MarshalText writes: ports separated by commas (spaces around them are
+// allowed), or "none" or nothing for the empty set. A port outside 1 to MaxPort or text that is no
+// number is an error that matches ErrInvalid. A port written twice is read once.
+func (s *PortSet) UnmarshalText(text []byte) error {
+	str := strings.TrimSpace(string(text))
+	if str == "" || str == "none" {
+		*s = 0
+		return nil
+	}
+	var ports []PortID
+	for _, part := range strings.Split(str, ",") {
+		n, err := strconv.Atoi(strings.TrimSpace(part))
+		if err != nil {
+			return invalidf("escp: %q is not a list of port numbers (write 2,3,5 or none)", str)
+		}
+		ports = append(ports, PortID(n))
+	}
+	set, err := NewPortSet(ports...)
+	if err != nil {
+		return err
+	}
+	*s = set
+	return nil
+}
+
 // String lists the ports in ascending order, "2,3,5"; the empty set is "none".
 func (s PortSet) String() string {
 	if s.IsEmpty() {

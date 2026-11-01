@@ -29,6 +29,36 @@ const (
 	ImpactManagement
 )
 
+// ParseImpact converts a class name as String spells it; any other text is an error that matches
+// ErrInvalid.
+func ParseImpact(name string) (Impact, error) {
+	for _, i := range []Impact{ImpactCosmetic, ImpactTraffic, ImpactManagement} {
+		if i.String() == name {
+			return i, nil
+		}
+	}
+	return 0, invalidf("escp: unknown impact %q (valid: cosmetic, traffic, management)", name)
+}
+
+// MarshalText is the name of the class, as String spells it; a value that is no class is an error,
+// since a name that no decoder reads back would lose it.
+func (i Impact) MarshalText() ([]byte, error) {
+	if !i.Valid() {
+		return nil, invalidf("escp: %d is not an impact class", int(i))
+	}
+	return []byte(i.String()), nil
+}
+
+// UnmarshalText reads a class name with the rule of ParseImpact.
+func (i *Impact) UnmarshalText(text []byte) error {
+	v, err := ParseImpact(string(text))
+	if err != nil {
+		return err
+	}
+	*i = v
+	return nil
+}
+
 // Valid reports whether i is one of the three classes.
 func (i Impact) Valid() bool { return i >= ImpactCosmetic && i <= ImpactManagement }
 
