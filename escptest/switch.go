@@ -428,7 +428,7 @@ func (f *Switch) serve() {
 		if err != nil {
 			continue
 		}
-		f.handle(from, h, tlvs, viaSession)
+		f.handle(request{from: from, h: h, tlvs: tlvs, viaSession: viaSession})
 	}
 }
 
@@ -459,279 +459,384 @@ func (f *Switch) send(to *net.UDPAddr, op byte, req wire.Header, errCode int32, 
 	_, _ = f.conn.WriteToUDP(b, to)
 }
 
-// handle answers one packet. viaSession says it was encrypted with the session key; credentials
-// must never travel under the static key, so a SET that carries them that way is ignored, as the
-// vendor utility never sends one and a client that did would be sending the password in the clear.
-func (f *Switch) handle(from *net.UDPAddr, h wire.Header, tlvs []wire.TLV, viaSession bool) {
+// request is a packet the switch received, decoded, with where it came from and how it was
+// encrypted.
+type request struct {
+	from *net.UDPAddr
+	h    wire.Header
+	tlvs []wire.TLV
+	// viaSession says it was encrypted with the session key.
+	viaSession bool
+}
+
+// find returns the value of the first TLV of the given type.
+func (r request) find(t wire.TLVType) ([]byte, bool) {
+	for _, x := range r.tlvs {
+		if x.Type == t {
+			return x.Value, true
+		}
+	}
+	return nil, false
+}
+
+// has reports whether the request carries a TLV of the given type.
+func (r request) has(t wire.TLVType) bool {
+	_, ok := r.find(t)
+	return ok
+}
+
+// reply answers the request with the given operation, code and TLVs; useSession says whether the
+// reply travels under the session key (the replies to discovery do not).
+func (f *Switch) reply(r request, op byte, code int32, tlvs []wire.TLV, useSession bool) {
+	f.send(r.from, op, r.h, code, tlvs, useSession)
+}
+
+// handle answers one packet.
+func (f *Switch) handle(r request) {
 	f.mu.Lock()
-	gone := f.departed && (h.Op != wire.OpDiscovery || f.faults.OnSystemSet == SystemSetVanishes)
+	gone := f.departed && (r.h.Op != wire.OpDiscovery || f.faults.OnSystemSet == SystemSetVanishes)
 	f.mu.Unlock()
 	if gone {
 		return
 	}
-	find := func(t wire.TLVType) ([]byte, bool) {
-		for _, x := range tlvs {
-			if x.Type == t {
-				return x.Value, true
-			}
-		}
-		return nil, false
-	}
-	switch h.Op {
+	switch r.h.Op {
 	case wire.OpDiscovery:
-		f.mu.Lock()
-		override := f.faults.DiscoverReply
-		f.mu.Unlock()
-		if override != nil {
-			f.send(from, wire.OpReply, h, 0, toTLVs(override), false)
-			return
-		}
-		f.mu.Lock()
-		addr, firmware := f.addr, f.firmware
-		mac := f.macAddr()
-		dhcp := byte(0) // a static address, like switch 03
-		if f.dhcp {
-			dhcp = 1
-			addr = map[wire.TLVType][]byte{wire.TLVIP: f.lease.IP[:], wire.TLVNetmask: f.lease.Mask[:], wire.TLVGateway: f.lease.Gateway[:]}
-		}
-		name := "TL-SG108E-fake"
-		if f.hostname != "" {
-			name = f.hostname
-		}
-		if f.staleDiscoveries > 0 {
-			f.staleDiscoveries--
-			addr = map[wire.TLVType][]byte{wire.TLVIP: {127, 0, 0, 9}, wire.TLVNetmask: {255, 255, 255, 0}, wire.TLVGateway: {127, 0, 0, 254}}
-		}
-		f.mu.Unlock()
-		ip, mask, gw := []byte{127, 0, 0, 1}, []byte{255, 255, 255, 0}, []byte{127, 0, 0, 254}
-		if addr != nil {
-			ip, mask, gw = addr[wire.TLVIP], addr[wire.TLVNetmask], addr[wire.TLVGateway]
-		}
-		f.send(from, wire.OpReply, h, 0, []wire.TLV{
-			{Type: wire.TLVModel, Value: []byte("TL-SG108E\x00")}, {Type: wire.TLVHostname, Value: []byte(name + "\x00")},
-			{Type: wire.TLVMAC, Value: mac[:]}, {Type: wire.TLVIP, Value: ip},
-			{Type: wire.TLVNetmask, Value: mask}, {Type: wire.TLVGateway, Value: gw},
-			{Type: wire.TLVFirmware, Value: []byte(firmware + "\x00")}, {Type: wire.TLVHardware, Value: []byte("TL-SG108E 6.0\x00")},
-			{Type: wire.TLVDHCP, Value: []byte{dhcp}}, {Type: wire.TLVFactoryDefault, Value: []byte{1}},
-		}, false)
+		f.handleDiscovery(r)
 	case wire.OpSet:
-		if _, hasUser := find(wire.TLVUsername); hasUser && !viaSession {
-			return
-		}
-		if _, ok := find(wire.TLVConfigFile); ok && len(tlvs) == 3 {
-			u, _ := find(wire.TLVUsername)
-			p, _ := find(wire.TLVPassword)
-			if wire.CString(u) != f.user || wire.CString(p) != f.password {
-				f.send(from, wire.OpSetReply, h, 5, nil, true)
-				return
-			}
-			f.mu.Lock()
-			mode := f.backupMode
-			if len(f.backupScript) > 0 {
-				mode, f.backupScript = f.backupScript[0], f.backupScript[1:]
-			}
-			f.mu.Unlock()
-			if mode == BackupSilent {
-				return
-			}
-			if mode == BackupFlood {
-				// A sender that never clears the fragment flag.
-				h1 := h
-				h1.Fragment = 1
-				for i := 0; i < 100; i++ {
-					f.send(from, wire.OpSetReply, h1, 0, []wire.TLV{{Type: wire.TLVConfigFile, Value: make([]byte, 1000)}}, true)
-				}
-				return
-			}
-			cfg := ConfigFile()
-			switch mode {
-			case BackupBadMagic:
-				cfg[0] = 0
-			case BackupShort:
-				cfg = cfg[:4]
-			case BackupCorrupt:
-				cfg[1500] ^= 0xff // in the second fragment
-			}
-			first, second := cfg, []byte(nil)
-			if len(cfg) > 1400 {
-				first, second = cfg[:1400], cfg[1400:]
-			}
-			h1 := h
-			h1.Fragment = 1
-			if second == nil {
-				h1.Fragment = 0
-			}
-			if mode != BackupDropFirst {
-				f.send(from, wire.OpSetReply, h1, 0, []wire.TLV{{Type: wire.TLVConfigFile, Value: first}}, true)
-			}
-			if mode == BackupDuplicate {
-				f.send(from, wire.OpSetReply, h1, 0, []wire.TLV{{Type: wire.TLVConfigFile, Value: first}}, true)
-			}
-			if second != nil && mode != BackupDropSecond {
-				f.send(from, wire.OpSetReply, h, 0, []wire.TLV{{Type: wire.TLVConfigFile, Value: second}}, true)
-			}
-			return
-		}
-		if v, ok := find(wire.TLVRSAKey); ok {
-			f.mu.Lock()
-			drop, code := f.faults.RSADrop, f.faults.RSACode
-			if key := DecryptSessionKey(v); !drop && key != nil {
-				f.session = key
-			}
-			f.mu.Unlock()
-			if drop {
-				return
-			}
-			if code == 0 {
-				code = wire.ErrCodeKeyAccepted
-			}
-			f.send(from, wire.OpSetReply, h, code, nil, true)
-			return
-		}
-		f.mu.Lock()
-		DropSets, rejectFrom, RejectCode, accepted := f.faults.DropSets, f.faults.RejectSetsFrom, f.faults.RejectCode, len(f.history)
-		if DropSets {
-			f.droppedSets++
-		}
-		f.mu.Unlock()
-		if DropSets {
-			return
-		}
-		u, _ := find(wire.TLVUsername)
-		p, _ := find(wire.TLVPassword)
-		if wire.CString(u) != f.user || wire.CString(p) != f.password {
-			f.send(from, wire.OpSetReply, h, 5, nil, true)
-			return
-		}
-		if rejectFrom > 0 && accepted+1 >= rejectFrom {
-			if RejectCode == 0 {
-				RejectCode = 9
-			}
-			f.send(from, wire.OpSetReply, h, RejectCode, nil, true)
-			return
-		}
-		if code := f.refuse(tlvs); code != 0 {
-			f.send(from, wire.OpSetReply, h, code, nil, true)
-			return
-		}
-		f.mu.Lock()
-		f.lastSet = nil
-		for _, t := range tlvs {
-			if t.Type != wire.TLVUsername && t.Type != wire.TLVPassword {
-				f.lastSet = append(f.lastSet, wire.TLV{Type: t.Type, Value: append([]byte(nil), t.Value...)})
-			}
-		}
-		f.history = append(f.history, append([]wire.TLV(nil), f.lastSet...))
-		if f.stateful {
-			for _, t := range f.lastSet {
-				f.storeSet(t)
-			}
-		}
-		f.mu.Unlock()
-		if v, ok := find(wire.TLVPorts); ok && len(v) == 7 {
-			f.mu.Lock()
-			if f.portSets == nil {
-				f.portSets = map[byte][]byte{}
-			}
-			f.portSets[v[0]] = append([]byte(nil), v...)
-			f.mu.Unlock()
-		}
-		if v, ok := find(wire.TLVHostname); ok {
-			f.mu.Lock()
-			f.hostname = wire.CString(v)
-			f.setIP, _ = find(wire.TLVIP)
-			f.staleDiscoveries = f.faults.StaleAfterSet
-			if v, ok := find(wire.TLVDHCP); ok && len(v) == 1 {
-				if v[0] != 0 && !f.dhcp {
-					f.acquiring = f.lease.Silence // asking for a lease: nothing answers for a moment
-				}
-				f.dhcp = v[0] != 0
-			}
-			// A switch that leases its address ignores the static one in the request (measured).
-			if ip, ok := find(wire.TLVIP); ok && !f.dhcp {
-				mask, _ := find(wire.TLVNetmask)
-				gw, _ := find(wire.TLVGateway)
-				f.addr = map[wire.TLVType][]byte{wire.TLVIP: ip, wire.TLVNetmask: mask, wire.TLVGateway: gw}
-			}
-			f.mu.Unlock()
-		}
-		if v, ok := find(wire.TLVLED); ok && len(v) == 1 {
-			f.mu.Lock()
-			f.led = v[0] == 1
-			f.mu.Unlock()
-		}
-		if _, isSystem := find(wire.TLVHostname); isSystem {
-			f.mu.Lock()
-			leaves := f.faults.OnSystemSet != SystemSetReplies
-			f.departed = f.departed || leaves
-			applied := f.faults.AfterSystemSet
-			f.mu.Unlock()
-			if applied != nil {
-				applied()
-			}
-			if leaves {
-				return
-			}
-		}
-		f.send(from, wire.OpSetReply, h, 0, nil, true)
+		f.handleSet(r)
 	case wire.OpGet:
+		f.handleGet(r)
+	}
+}
+
+// handleDiscovery answers the unauthenticated probe with the switch's identity and address: the
+// scripted reply when a test replaced it, else what the model holds (a lease while DHCP is on, an old
+// address while stale replies are due).
+func (f *Switch) handleDiscovery(r request) {
+	f.mu.Lock()
+	override := f.faults.DiscoverReply
+	f.mu.Unlock()
+	if override != nil {
+		f.reply(r, wire.OpReply, 0, toTLVs(override), false)
+		return
+	}
+	f.mu.Lock()
+	addr, firmware := f.addr, f.firmware
+	mac := f.macAddr()
+	dhcp := byte(0) // a static address, like a switch that was set up by hand
+	if f.dhcp {
+		dhcp = 1
+		addr = map[wire.TLVType][]byte{wire.TLVIP: f.lease.IP[:], wire.TLVNetmask: f.lease.Mask[:], wire.TLVGateway: f.lease.Gateway[:]}
+	}
+	name := "TL-SG108E-fake"
+	if f.hostname != "" {
+		name = f.hostname
+	}
+	if f.staleDiscoveries > 0 {
+		f.staleDiscoveries--
+		addr = map[wire.TLVType][]byte{wire.TLVIP: {127, 0, 0, 9}, wire.TLVNetmask: {255, 255, 255, 0}, wire.TLVGateway: {127, 0, 0, 254}}
+	}
+	f.mu.Unlock()
+	ip, mask, gw := []byte{127, 0, 0, 1}, []byte{255, 255, 255, 0}, []byte{127, 0, 0, 254}
+	if addr != nil {
+		ip, mask, gw = addr[wire.TLVIP], addr[wire.TLVNetmask], addr[wire.TLVGateway]
+	}
+	f.reply(r, wire.OpReply, 0, []wire.TLV{
+		{Type: wire.TLVModel, Value: []byte("TL-SG108E\x00")}, {Type: wire.TLVHostname, Value: []byte(name + "\x00")},
+		{Type: wire.TLVMAC, Value: mac[:]}, {Type: wire.TLVIP, Value: ip},
+		{Type: wire.TLVNetmask, Value: mask}, {Type: wire.TLVGateway, Value: gw},
+		{Type: wire.TLVFirmware, Value: []byte(firmware + "\x00")}, {Type: wire.TLVHardware, Value: []byte("TL-SG108E 6.0\x00")},
+		{Type: wire.TLVDHCP, Value: []byte{dhcp}}, {Type: wire.TLVFactoryDefault, Value: []byte{1}},
+	}, false)
+}
+
+// handleSet answers a SET: the configuration read (an authenticated SET with an empty file TLV), the
+// key exchange, or a write. Credentials must never travel under the static key, so a SET that carries
+// them that way is ignored, as the vendor utility never sends one and a client that did would be
+// sending the password in the clear.
+func (f *Switch) handleSet(r request) {
+	if r.has(wire.TLVUsername) && !r.viaSession {
+		return
+	}
+	switch {
+	case r.has(wire.TLVConfigFile) && len(r.tlvs) == 3:
+		f.handleConfigRead(r)
+	case r.has(wire.TLVRSAKey):
+		f.handleKeyExchange(r)
+	default:
+		f.handleWrite(r)
+	}
+}
+
+// credentialsOK reports whether the request carries the user name and password the switch accepts.
+func (f *Switch) credentialsOK(r request) bool {
+	u, _ := r.find(wire.TLVUsername)
+	p, _ := r.find(wire.TLVPassword)
+	return wire.CString(u) == f.user && wire.CString(p) == f.password
+}
+
+// replyBadCredentials answers a SET whose user name or password is wrong (code 5).
+func (f *Switch) replyBadCredentials(r request) { f.reply(r, wire.OpSetReply, 5, nil, true) }
+
+// configChunk is how many bytes of the configuration file one packet carries.
+const configChunk = 1400
+
+// handleConfigRead sends the configuration file in two fragments, or misbehaves as the test asked
+// (BackupMode).
+func (f *Switch) handleConfigRead(r request) {
+	if !f.credentialsOK(r) {
+		f.replyBadCredentials(r)
+		return
+	}
+	f.mu.Lock()
+	mode := f.backupMode
+	if len(f.backupScript) > 0 {
+		mode, f.backupScript = f.backupScript[0], f.backupScript[1:]
+	}
+	f.mu.Unlock()
+	file := func(h wire.Header, part []byte) {
+		f.send(r.from, wire.OpSetReply, h, 0, []wire.TLV{{Type: wire.TLVConfigFile, Value: part}}, true)
+	}
+	if mode == BackupSilent {
+		return
+	}
+	if mode == BackupFlood {
+		// A sender that never clears the fragment flag.
+		more := r.h
+		more.Fragment = 1
+		for range 100 {
+			file(more, make([]byte, 1000))
+		}
+		return
+	}
+	cfg := ConfigFile()
+	switch mode {
+	case BackupBadMagic:
+		cfg[0] = 0
+	case BackupShort:
+		cfg = cfg[:4]
+	case BackupCorrupt:
+		cfg[configChunk+100] ^= 0xff // in the second fragment
+	}
+	first, second := cfg, []byte(nil)
+	if len(cfg) > configChunk {
+		first, second = cfg[:configChunk], cfg[configChunk:]
+	}
+	firstHeader := r.h
+	firstHeader.Fragment = 1
+	if second == nil {
+		firstHeader.Fragment = 0
+	}
+	if mode != BackupDropFirst {
+		file(firstHeader, first)
+	}
+	if mode == BackupDuplicate {
+		file(firstHeader, first)
+	}
+	if second != nil && mode != BackupDropSecond {
+		file(r.h, second)
+	}
+}
+
+// handleKeyExchange takes the session key, or refuses or ignores it as the test asked.
+func (f *Switch) handleKeyExchange(r request) {
+	v, _ := r.find(wire.TLVRSAKey)
+	f.mu.Lock()
+	drop, code := f.faults.RSADrop, f.faults.RSACode
+	if key := DecryptSessionKey(v); !drop && key != nil {
+		f.session = key
+	}
+	f.mu.Unlock()
+	if drop {
+		return
+	}
+	if code == 0 {
+		code = wire.ErrCodeKeyAccepted
+	}
+	f.reply(r, wire.OpSetReply, code, nil, true)
+}
+
+// defaultRejectCode is the reply code of a SET that Faults.RejectSetsFrom rejects and that names none.
+const defaultRejectCode = 9
+
+// handleWrite answers a SET that changes a setting: it may be ignored, refused for its credentials,
+// rejected on purpose or refused by the model; otherwise it is recorded and applied.
+func (f *Switch) handleWrite(r request) {
+	f.mu.Lock()
+	dropSets, rejectFrom, rejectCode, accepted := f.faults.DropSets, f.faults.RejectSetsFrom, f.faults.RejectCode, len(f.history)
+	if dropSets {
+		f.droppedSets++
+	}
+	f.mu.Unlock()
+	if dropSets {
+		return
+	}
+	if !f.credentialsOK(r) {
+		f.replyBadCredentials(r)
+		return
+	}
+	if rejectFrom > 0 && accepted+1 >= rejectFrom {
+		if rejectCode == 0 {
+			rejectCode = defaultRejectCode
+		}
+		f.reply(r, wire.OpSetReply, rejectCode, nil, true)
+		return
+	}
+	if code := f.refuse(r.tlvs); code != 0 {
+		f.reply(r, wire.OpSetReply, code, nil, true)
+		return
+	}
+	f.record(r)
+	f.applyPortSetting(r)
+	f.applySystem(r)
+	if v, ok := r.find(wire.TLVLED); ok && len(v) == 1 {
 		f.mu.Lock()
-		GetFn := f.faults.GetFn
+		f.led = v[0] == 1
 		f.mu.Unlock()
-		if GetFn != nil {
-			types := make([]wire.TLVType, len(tlvs))
-			for i, t := range tlvs {
-				types[i] = t.Type
-			}
-			reply, code, drop := GetFn(types)
-			if !drop {
-				f.send(from, wire.OpReply, h, code, toTLVs(reply), true)
-			}
-			return
-		}
-		if held := f.held(tlvs); len(held) > 0 {
-			f.send(from, wire.OpReply, h, 0, held, true)
-			return
-		}
-		if _, ok := find(wire.TLVQoSMode); ok {
-			f.send(from, wire.OpReply, h, 0, []wire.TLV{{Type: wire.TLVQoSMode, Value: []byte{0}}}, true)
-			return
-		}
-		if _, ok := find(wire.TLVQoSPriority); ok {
-			var rows []wire.TLV
-			for p := 1; p <= 8; p++ {
-				rows = append(rows, wire.TLV{Type: wire.TLVQoSPriority, Value: []byte{byte(p), 0}})
-			}
-			f.send(from, wire.OpReply, h, 0, rows, true)
-			return
-		}
-		if _, ok := find(wire.TLVPortCount); ok {
-			f.send(from, wire.OpReply, h, 0, []wire.TLV{{Type: wire.TLVPortCount, Value: []byte{8}}}, true)
-			return
-		}
-		if _, ok := find(wire.TLVVLANPortBased); ok {
-			// the port-based VLAN state of a fresh switch: mode on, VLAN 1 holding every port, up to 8 groups
-			f.send(from, wire.OpReply, h, 0, []wire.TLV{
-				{Type: wire.TLVVLANPortBased, Value: []byte{1}},
-				{Type: wire.TLVVLANPortBasedMax, Value: []byte{8}},
-				{Type: wire.TLVVLANPortBasedVID, Value: []byte{1, 0, 0, 0, 0xff}},
-			}, true)
-			return
-		}
-		if _, ok := find(wire.TLVAutoSave); ok {
-			f.send(from, wire.OpReply, h, 0, []wire.TLV{{Type: wire.TLVAutoSave, Value: []byte{1}}}, true)
-			return
-		}
-		if _, ok := find(wire.TLVLED); ok {
-			f.mu.Lock()
-			v := byte(0)
-			if f.led {
-				v = 1
-			}
-			f.mu.Unlock()
-			f.send(from, wire.OpReply, h, 0, []wire.TLV{{Type: wire.TLVLED, Value: []byte{v}}}, true)
+	}
+	if f.leavesAfter(r) {
+		return
+	}
+	f.reply(r, wire.OpSetReply, 0, nil, true)
+}
+
+// record remembers an accepted write, without the credentials, and stores it when the switch keeps state.
+func (f *Switch) record(r request) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.lastSet = nil
+	for _, t := range r.tlvs {
+		if t.Type != wire.TLVUsername && t.Type != wire.TLVPassword {
+			f.lastSet = append(f.lastSet, wire.TLV{Type: t.Type, Value: append([]byte(nil), t.Value...)})
 		}
 	}
+	f.history = append(f.history, append([]wire.TLV(nil), f.lastSet...))
+	if f.stateful {
+		for _, t := range f.lastSet {
+			f.storeSet(t)
+		}
+	}
+}
+
+// portEntryLen is the length of a port setting entry (TLV 4096).
+const portEntryLen = 7
+
+// applyPortSetting remembers the last port entry written for its port.
+func (f *Switch) applyPortSetting(r request) {
+	v, ok := r.find(wire.TLVPorts)
+	if !ok || len(v) != portEntryLen {
+		return
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.portSets == nil {
+		f.portSets = map[byte][]byte{}
+	}
+	f.portSets[v[0]] = append([]byte(nil), v...)
+}
+
+// applySystem applies the device description and the management address of a system SET, with the
+// DHCP behaviour measured on a real switch.
+func (f *Switch) applySystem(r request) {
+	name, ok := r.find(wire.TLVHostname)
+	if !ok {
+		return
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.hostname = wire.CString(name)
+	f.setIP, _ = r.find(wire.TLVIP)
+	f.staleDiscoveries = f.faults.StaleAfterSet
+	if v, ok := r.find(wire.TLVDHCP); ok && len(v) == 1 {
+		if v[0] != 0 && !f.dhcp {
+			f.acquiring = f.lease.Silence // asking for a lease: nothing answers for a moment
+		}
+		f.dhcp = v[0] != 0
+	}
+	// A switch that leases its address ignores the static one in the request (measured).
+	if ip, ok := r.find(wire.TLVIP); ok && !f.dhcp {
+		mask, _ := r.find(wire.TLVNetmask)
+		gw, _ := r.find(wire.TLVGateway)
+		f.addr = map[wire.TLVType][]byte{wire.TLVIP: ip, wire.TLVNetmask: mask, wire.TLVGateway: gw}
+	}
+}
+
+// leavesAfter runs the test's hook once a system SET has been applied and reports whether the switch
+// leaves without answering it (Faults.OnSystemSet). A SET that is not a system SET never leaves.
+func (f *Switch) leavesAfter(r request) bool {
+	if !r.has(wire.TLVHostname) {
+		return false
+	}
+	f.mu.Lock()
+	leaves := f.faults.OnSystemSet != SystemSetReplies
+	f.departed = f.departed || leaves
+	applied := f.faults.AfterSystemSet
+	f.mu.Unlock()
+	if applied != nil {
+		applied()
+	}
+	return leaves
+}
+
+// handleGet answers a GET: the test's script first, then what the switch holds, then the fixed
+// replies of a fresh switch.
+func (f *Switch) handleGet(r request) {
+	f.mu.Lock()
+	scripted := f.faults.GetFn
+	f.mu.Unlock()
+	if scripted != nil {
+		types := make([]wire.TLVType, len(r.tlvs))
+		for i, t := range r.tlvs {
+			types[i] = t.Type
+		}
+		settings, code, drop := scripted(types)
+		if !drop {
+			f.reply(r, wire.OpReply, code, toTLVs(settings), true)
+		}
+		return
+	}
+	if held := f.held(r.tlvs); len(held) > 0 {
+		f.reply(r, wire.OpReply, 0, held, true)
+		return
+	}
+	if fresh, ok := f.freshGet(r); ok {
+		f.reply(r, wire.OpReply, 0, fresh, true)
+	}
+}
+
+// freshGet is the reply of a freshly reset switch to the first type of the request that it knows,
+// for the settings that nothing has written and no test has seeded.
+func (f *Switch) freshGet(r request) ([]wire.TLV, bool) {
+	switch {
+	case r.has(wire.TLVQoSMode):
+		return []wire.TLV{{Type: wire.TLVQoSMode, Value: []byte{0}}}, true
+	case r.has(wire.TLVQoSPriority):
+		var rows []wire.TLV
+		for p := 1; p <= 8; p++ {
+			rows = append(rows, wire.TLV{Type: wire.TLVQoSPriority, Value: []byte{byte(p), 0}})
+		}
+		return rows, true
+	case r.has(wire.TLVPortCount):
+		return []wire.TLV{{Type: wire.TLVPortCount, Value: []byte{8}}}, true
+	case r.has(wire.TLVVLANPortBased):
+		// the port-based VLAN state of a fresh switch: mode on, VLAN 1 holding every port, up to 8 groups
+		return []wire.TLV{
+			{Type: wire.TLVVLANPortBased, Value: []byte{1}},
+			{Type: wire.TLVVLANPortBasedMax, Value: []byte{8}},
+			{Type: wire.TLVVLANPortBasedVID, Value: []byte{1, 0, 0, 0, 0xff}},
+		}, true
+	case r.has(wire.TLVAutoSave):
+		return []wire.TLV{{Type: wire.TLVAutoSave, Value: []byte{1}}}, true
+	case r.has(wire.TLVLED):
+		f.mu.Lock()
+		v := byte(0)
+		if f.led {
+			v = 1
+		}
+		f.mu.Unlock()
+		return []wire.TLV{{Type: wire.TLVLED, Value: []byte{v}}}, true
+	}
+	return nil, false
 }
 
 // EnableRows declares a table the switch keeps one TLV per row of (the ports, the QoS priorities,
