@@ -7,7 +7,7 @@ whose commits this repository keeps.
 
 ## 0.2.0
 
-- **Breaking changes**, made together before consumers settle on the 0.1 names; none changes behaviour, wire bytes or error texts. Rename with the table below.
+- **Breaking changes**, made together before consumers settle on the 0.1 names; none changes behaviour or wire bytes. The one visible text that changes is the name of an 802.1Q write as a write gate sees it: `Operation.Name`, and so `*safety.ImpactError` messages, the `operation` log attribute and the dry-run list, is now `SetDot1QVLAN` / `DeleteDot1QVLAN` (was `SetVLAN8021Q` / `DeleteVLAN8021Q`), following the method names. Rename with the table below.
 
   | 0.1.0 | 0.2.0 |
   |---|---|
