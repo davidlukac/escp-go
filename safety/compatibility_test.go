@@ -50,11 +50,11 @@ func TestParseCompatibilityRefusals(t *testing.T) {
 	}
 	for _, tt := range []struct{ name, doc, want string }{
 		{"not json", `{`, "unexpected end"},
-		{"unknown support", row(`"support":"maybe"`), "unknown support"},
-		{"no model", `{"rows":[{"hardware":"h","firmware":"f","support":"untested"}]}`, "required"},
-		{"verified without builds", row(`"support":"verified"`), "names the builds"},
+		{"unknown support", row(`"support":"maybe"`), "row 1: unknown support"},
+		{"no model", `{"rows":[{"hardware":"h","firmware":"f","support":"untested"}]}`, "row 1: model, hardware and firmware are required"},
+		{"verified without builds", row(`"support":"verified"`), "row 1: a verified row names the builds"},
 		{"bad build", row(`"support":"verified","builds":["2025-07"]`), "not a build date"},
-		{"duplicate build", `{"rows":[{"model":"m","hardware":"h","firmware":"f","support":"verified","builds":["20250710"]},{"model":"m","hardware":"h","firmware":"g","support":"verified","builds":["20250710"]}]}`, "twice"},
+		{"duplicate build", `{"rows":[{"model":"m","hardware":"h","firmware":"f","support":"verified","builds":["20250710"]},{"model":"m","hardware":"h","firmware":"g","support":"verified","builds":["20250710"]}]}`, "row 2: build 20250710 appears twice"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			if _, err := parseCompatibility([]byte(tt.doc)); err == nil || !strings.Contains(err.Error(), tt.want) {

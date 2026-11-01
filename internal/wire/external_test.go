@@ -83,3 +83,40 @@ func TestOpNameNamesEveryOpAndNumbersTheRest(t *testing.T) {
 		}
 	}
 }
+
+// The smallest packets that are packets: a header and the end marker; a TLV with no value; a TLV
+// whose value ends exactly where the packet does. One byte less is refused.
+func TestUnmarshalAcceptsThePacketsAtTheEdgeOfValidity(t *testing.T) {
+	end := []byte{0xff, 0xff, 0, 0}
+	build := func(op byte, payload []byte) []byte {
+		b := wire.Marshal(wire.Header{Op: op, Seq: 1}, nil)[:wire.HeaderLen] // a header and nothing after it
+		b = append(b, payload...)
+		b[21] = byte(len(b)) // the declared length (all of these are shorter than 256)
+		return b
+	}
+	empty := []byte{0, 5, 0, 0} // TLV 5, no value
+	for _, tc := range []struct {
+		name string
+		pkt  []byte
+		tlvs int
+	}{
+		{"only the end marker", build(wire.OpReply, end), 0},
+		{"the highest opcode", build(wire.OpSetReply, end), 0},
+		{"a TLV without a value", build(wire.OpReply, append(append([]byte(nil), empty...), end...)), 1},
+		{"a TLV without a value and no end marker", build(wire.OpReply, empty), 1},
+		{"a TLV that ends with the packet", build(wire.OpReply, []byte{0, 5, 0, 2, 9, 9}), 1},
+	} {
+		if _, tlvs, err := wire.Unmarshal(tc.pkt); err != nil || len(tlvs) != tc.tlvs {
+			t.Errorf("%s: %d TLVs, %v; want %d", tc.name, len(tlvs), err, tc.tlvs)
+		}
+	}
+	if wire.LooksLikeHeader(build(wire.OpReply, end)[:wire.HeaderLen+len(end)-1]) {
+		t.Error("a packet one byte shorter than a header and an end marker is no packet")
+	}
+	if _, _, err := wire.Unmarshal(build(wire.OpSetReply+1, end)); err == nil {
+		t.Error("the opcode after the highest was accepted")
+	}
+	if _, _, err := wire.Unmarshal(build(wire.OpReply, []byte{0, 5, 0, 3, 9, 9})); err == nil {
+		t.Error("a TLV that claims one byte more than there is was accepted")
+	}
+}

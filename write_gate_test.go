@@ -347,6 +347,14 @@ func TestGateChangingItsOperationChangesNothingThatIsSent(t *testing.T) {
 	}
 }
 
+func TestImpactValidIsExactlyTheThreeClasses(t *testing.T) {
+	for i, want := range map[Impact]bool{0: false, ImpactCosmetic: true, ImpactTraffic: true, ImpactManagement: true, ImpactManagement + 1: false, -1: false} {
+		if i.Valid() != want {
+			t.Errorf("Impact(%d).Valid() = %v, want %v", int(i), i.Valid(), want)
+		}
+	}
+}
+
 func TestImpactNames(t *testing.T) {
 	for impact, want := range map[Impact]string{ImpactCosmetic: "cosmetic", ImpactTraffic: "traffic", ImpactManagement: "management", 0: "unknown(0)", 7: "unknown(7)"} {
 		if got := impact.String(); got != want {

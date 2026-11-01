@@ -183,6 +183,34 @@ func TestDiscoverCanBeLimitedToOneInterface(t *testing.T) {
 	}
 }
 
+// The window is how long Discover listens, no more: the second probe goes out halfway, and the
+// call ends at the end of the window, not twice that. The bounds leave room for a slow machine.
+func TestDiscoverListensForTheWindowAndNoLonger(t *testing.T) {
+	hostPort := escptest.FreeUDPPort(t)
+	r := startResponder(t, hostPort, nil)
+	const window = 600 * time.Millisecond
+	start := time.Now()
+	if _, err := discoverWith(context.Background(), DiscoverOptions{Window: window},
+		loopbackEnv(t, r, hostPort, netInterface{Name: "en0", MAC: macOne, Broadcasts: lo})); err != nil {
+		t.Fatal(err)
+	}
+	if took := time.Since(start); took < window-50*time.Millisecond || took > window+300*time.Millisecond {
+		t.Fatalf("a window of %v took %v", window, took)
+	}
+}
+
+// A zero window is the default, not no window: the call waits for replies.
+func TestDiscoverWithAZeroWindowWaitsForTheDefault(t *testing.T) {
+	hostPort := escptest.FreeUDPPort(t)
+	r := startResponder(t, hostPort, nil)
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+	_, err := discoverWith(ctx, DiscoverOptions{}, loopbackEnv(t, r, hostPort, netInterface{Name: "en0", MAC: macOne, Broadcasts: lo}))
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("got %v, want the call to still be listening when the context ended (default window %v)", err, defaultDiscoverWindow)
+	}
+}
+
 func TestDiscoverWithNoAnswerIsEmptyNotAnError(t *testing.T) {
 	hostPort := escptest.FreeUDPPort(t)
 	r := startResponder(t, hostPort, nil)

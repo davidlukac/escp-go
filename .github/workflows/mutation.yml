@@ -1,0 +1,79 @@
+# Mutation testing (gremlins, pinned in devtools/go.mod): the code's conditionals, boundaries and
+# arithmetic are flipped one at a time, and the tests of the package must fail for each. Coverage says a
+# line ran; this says a test would notice if it were wrong. `make mutation` and `make mutation-diff`
+# reproduce both jobs locally.
+#
+#   * On a pull request: only the lines the PR changes (a minute or two). Informational: it shows the
+#     mutants that survived in the job summary; an equivalent mutant is not a reason to bend a test.
+#   * Weekly and on request: the whole module (about a quarter of an hour). It fails below the efficacy
+#     threshold, so a slow slide in test quality is noticed.
+name: Mutation testing
+
+on:
+  pull_request:
+    paths:
+      - "**.go"
+      - "go.mod"
+      - "devtools/go.mod"
+      - ".github/workflows/mutation.yml"
+  schedule:
+    - cron: "17 4 * * 0"
+  workflow_dispatch:
+    inputs:
+      efficacy:
+        description: Fail below this percentage of caught mutants
+        default: "90"
+
+concurrency:
+  group: mutation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  changed:
+    name: Mutants in the changed lines
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+        with:
+          go-version: stable
+      - name: Mutate the lines this pull request changes
+        run: make mutation-diff BASE="origin/${BASE_REF}" WORKERS=4
+        env:
+          BASE_REF: ${{ github.base_ref }}
+      - name: Summary
+        if: always()
+        run: go run ./internal/mutationreport build/mutation.json >> "$GITHUB_STEP_SUMMARY"
+
+  whole-module:
+    name: The whole module
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+        with:
+          go-version: stable
+      - name: Mutate every covered operator
+        run: make mutation WORKERS=4 EFFICACY="${EFFICACY}"
+        env:
+          EFFICACY: ${{ inputs.efficacy || '90' }}
+      - name: Summary
+        if: always()
+        run: go run ./internal/mutationreport build/mutation.json >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: mutation-report
+          path: build/mutation.json
+          if-no-files-found: ignore
+          retention-days: 30
