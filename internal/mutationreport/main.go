@@ -59,11 +59,11 @@ func run(args []string, stdout, stderr io.Writer) int {
 		_, _ = fmt.Fprintf(stdout, "The report cannot be read: %v\n", err)
 		return exitOK
 	}
-	counts, survivors := summarise(r)
+	counts, survivors := summarize(r)
 	_, _ = fmt.Fprintln(stdout, counts)
 	if len(survivors) > 0 {
 		_, _ = fmt.Fprintln(stdout)
-		_, _ = fmt.Fprintln(stdout, "Surviving mutants (a behaviour no test pins; an equivalent mutant is not a reason to bend a test):")
+		_, _ = fmt.Fprintln(stdout, "Surviving mutants (a behavior no test pins; an equivalent mutant is not a reason to bend a test):")
 		_, _ = fmt.Fprintln(stdout)
 		for _, s := range survivors {
 			_, _ = fmt.Fprintln(stdout, s)
@@ -72,9 +72,9 @@ func run(args []string, stdout, stderr io.Writer) int {
 	return exitOK
 }
 
-// summarise counts the mutants per outcome ("KILLED: 16, LIVED: 1") and lists the ones that lived,
+// summarize counts the mutants per outcome ("KILLED: 16, LIVED: 1") and lists the ones that lived,
 // one Markdown bullet each, in the order of the report.
-func summarise(r report) (counts string, survivors []string) {
+func summarize(r report) (counts string, survivors []string) {
 	byStatus := map[string]int{}
 	for _, f := range r.Files {
 		for _, m := range f.Mutations {

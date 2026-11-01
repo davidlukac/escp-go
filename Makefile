@@ -40,7 +40,7 @@ fuzz:
 
 # Mutation testing (gremlins, pinned in devtools/go.mod): every covered conditional, boundary and arithmetic
 # operator of the code is flipped one at a time and the tests of its package must fail. A mutant that
-# survives is a behaviour no test pins. `make mutation` runs them all (about 15 minutes with 8 workers;
+# survives is a behavior no test pins. `make mutation` runs them all (about 15 minutes with 8 workers;
 # EFFICACY=90 fails below that share of caught mutants, WORKERS=n sets the parallelism);
 # `make mutation-diff` only the lines changed since BASE (default origin/main), which is what a pull
 # request runs. The report is build/mutation.json. Left out: the fake switch (escptest, judged by the

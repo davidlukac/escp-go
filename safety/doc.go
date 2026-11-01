@@ -19,7 +19,7 @@
 // # What the write is
 //
 // A gate is also told the operation: the client method, the ports it names and its Impact
-// (cosmetic, traffic or management: the worst the method can do, not a judgement of one
+// (cosmetic, traffic or management: the worst the method can do, not a judgment of one
 // particular write: a port setting is Traffic even when it disables the uplink). MaxImpact
 // refuses above a class with an *ImpactError. Which ports a write touches is a separate
 // question, answered by PortGate: it refuses a write that names (or, for a group it replaces
