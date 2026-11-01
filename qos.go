@@ -45,6 +45,25 @@ func ParseQoSMode(name string) (QoSMode, error) {
 	return 0, invalidf("escp: unknown QoS mode %q (valid: %v)", name, QoSModes())
 }
 
+// MarshalText is the web UI's name of the mode, as String spells it; a code this client does not know
+// is an error, since a name that no decoder reads back would lose it.
+func (m QoSMode) MarshalText() ([]byte, error) {
+	if !m.Valid() {
+		return nil, invalidf("escp: %d is not a QoS mode", int(m))
+	}
+	return []byte(m.String()), nil
+}
+
+// UnmarshalText reads a mode name with the rule of ParseQoSMode.
+func (m *QoSMode) UnmarshalText(text []byte) error {
+	v, err := ParseQoSMode(string(text))
+	if err != nil {
+		return err
+	}
+	*m = v
+	return nil
+}
+
 // Priority is a port's priority queue as the web UI shows it: PriorityLowest (1) to PriorityHighest (4).
 // On the wire it is one less.
 type Priority int

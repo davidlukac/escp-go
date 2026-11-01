@@ -37,6 +37,25 @@ func MACFromBytes(b []byte) (m MAC, ok bool) {
 	return MAC(b), true
 }
 
+// MarshalText is the text form of String, so that encoders (encoding/json and the YAML and TOML
+// libraries) write "aa:bb:cc:dd:ee:ff" and not six numbers; the zero value is the empty text.
+func (m MAC) MarshalText() ([]byte, error) { return []byte(m.String()), nil }
+
+// UnmarshalText reads the text MarshalText writes: the form ParseMAC accepts, or the empty text for
+// "no MAC". Anything else is an error that matches ErrInvalid.
+func (m *MAC) UnmarshalText(text []byte) error {
+	if len(text) == 0 {
+		*m = MAC{}
+		return nil
+	}
+	v, err := ParseMAC(string(text))
+	if err != nil {
+		return err
+	}
+	*m = v
+	return nil
+}
+
 // IsZero reports whether m is the zero value, "no MAC".
 func (m MAC) IsZero() bool { return m == MAC{} }
 

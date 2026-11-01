@@ -74,6 +74,19 @@ func ParseSpeed(name string) (Speed, error) {
 	return "", invalidf("escp: unknown speed %q (valid: %v)", name, configurableSpeeds)
 }
 
+// UnmarshalText reads a speed name, so that a decoder refuses what no port has: the six configurable
+// speeds and SpeedLinkDown (a reading reports it). An error matches ErrInvalid. The text of a Speed is
+// the value itself, so nothing is needed to encode one.
+func (s *Speed) UnmarshalText(text []byte) error {
+	for _, known := range append(configurableSpeeds[:len(configurableSpeeds):len(configurableSpeeds)], SpeedLinkDown) {
+		if string(known) == string(text) {
+			*s = known
+			return nil
+		}
+	}
+	return invalidf("escp: unknown speed %q (valid: %v or %s)", text, configurableSpeeds, SpeedLinkDown)
+}
+
 // speedFromCode names a speed code of a read reply (0 = no link).
 func speedFromCode(b byte) Speed {
 	if b == 0 {

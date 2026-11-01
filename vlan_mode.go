@@ -34,6 +34,19 @@ func ParseVLANMode(name string) (VLANMode, error) {
 	return "", invalidf("escp: unknown VLAN mode %q (valid: %v)", name, VLANModes())
 }
 
+// UnmarshalText reads a mode name, so that a decoder refuses what no switch reports: the three modes
+// and VLANModeNone (a reading names it). An error matches ErrInvalid. The text of a VLANMode is the
+// value itself, so nothing is needed to encode one.
+func (m *VLANMode) UnmarshalText(text []byte) error {
+	for _, known := range append(VLANModes(), VLANModeNone) {
+		if string(known) == string(text) {
+			*m = known
+			return nil
+		}
+	}
+	return invalidf("escp: unknown VLAN mode %q (valid: %v or %s)", text, VLANModes(), VLANModeNone)
+}
+
 // VLANModeSetting is the active VLAN mode and, for the MTU VLAN, its uplink port (zero for
 // every other mode).
 type VLANModeSetting struct {

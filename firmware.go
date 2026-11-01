@@ -21,8 +21,14 @@ func ParseBuildDate(s string) (BuildDate, error) {
 // String is the date as written.
 func (b BuildDate) String() string { return string(b) }
 
-// UnmarshalText reads a build date from JSON (and any text decoder), with the rule of ParseBuildDate.
+// UnmarshalText reads a build date from JSON (and any text decoder), with the rule of ParseBuildDate;
+// the empty text is the empty value, "no build date", so that every BuildDate reads back as it was
+// written.
 func (b *BuildDate) UnmarshalText(text []byte) error {
+	if len(text) == 0 {
+		*b = ""
+		return nil
+	}
 	v, err := ParseBuildDate(string(text))
 	if err != nil {
 		return err
@@ -56,6 +62,16 @@ func ParseFirmware(s string) Firmware {
 
 // String is the version string as the switch reported it.
 func (f Firmware) String() string { return f.raw }
+
+// MarshalText is the version string as the switch reported it, so that an encoder keeps all of it (the
+// build date is read out of the string again when it is decoded).
+func (f Firmware) MarshalText() ([]byte, error) { return []byte(f.raw), nil }
+
+// UnmarshalText reads a version string like ParseFirmware, which never fails.
+func (f *Firmware) UnmarshalText(text []byte) error {
+	*f = ParseFirmware(string(text))
+	return nil
+}
 
 // IsZero reports whether the switch reported no firmware version.
 func (f Firmware) IsZero() bool { return f.raw == "" }
