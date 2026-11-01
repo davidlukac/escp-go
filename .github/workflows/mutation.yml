@@ -58,6 +58,8 @@ jobs:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
+    permissions:
+      contents: write # the badge goes to the `badges` branch, as the coverage badge does
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
@@ -77,3 +79,37 @@ jobs:
           path: build/mutation.json
           if-no-files-found: ignore
           retention-days: 30
+      # The score of the run, as a shields.io endpoint file on the `badges` branch (written by CI only,
+      # never by hand; the README badge reads it from there). Only a run of main publishes it, and
+      # only from a report that was read, so a run that stopped early leaves the last badge in place.
+      - name: Compute the mutation score badge
+        id: badge
+        if: always() && github.ref == 'refs/heads/main' && hashFiles('build/mutation.json') != ''
+        run: |
+          go run ./internal/mutationreport badge build/mutation.json > "$RUNNER_TEMP/mutation.json"
+          cat "$RUNNER_TEMP/mutation.json"
+      - name: Publish to the badges branch
+        if: always() && steps.badge.outcome == 'success'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # A second worktree: the main checkout stays on the commit the job was built from,
+          # because the job's post step for ./.github/actions/setup reads that action from it.
+          if git ls-remote --exit-code --heads origin badges >/dev/null 2>&1; then
+            git fetch --depth=1 origin badges:refs/remotes/origin/badges
+            git worktree add --force -B badges "$RUNNER_TEMP/badges" origin/badges
+          else
+            git worktree add --orphan -b badges "$RUNNER_TEMP/badges"
+          fi
+          cd "$RUNNER_TEMP/badges"
+          cp "$RUNNER_TEMP/mutation.json" mutation.json
+          git add mutation.json
+          git diff --cached --quiet && { echo "mutation score unchanged"; exit 0; }
+          git commit -m "chore: mutation score $(jq -r .message mutation.json)"
+          # the coverage job writes to the same branch (another file): on a rejected push, take its commit
+          # in and push again
+          for attempt in 1 2 3; do
+            git push origin badges && exit 0
+            git pull --rebase origin badges
+          done
+          exit 1

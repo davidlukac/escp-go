@@ -6,6 +6,8 @@
   <a href="https://github.com/davidlukac/escp-go/tags"><img alt="Version" src="https://img.shields.io/github/v/tag/davidlukac/escp-go?sort=semver&label=version&color=7c3aed"></a>
   <a href="go.mod"><img alt="Go version" src="https://img.shields.io/github/go-mod/go-version/davidlukac/escp-go?logo=go&logoColor=white&color=00ADD8"></a>
   <a href="CONTRIBUTING.md#2-tests"><img alt="Test coverage" src="https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fdavidlukac%2Fescp-go%2Fbadges%2Fcoverage.json"></a>
+  <a href="CONTRIBUTING.md#2-tests"><img alt="Mutation score" src="https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fdavidlukac%2Fescp-go%2Fbadges%2Fmutation.json"></a>
+  <a href="https://github.com/davidlukac/escp-go/actions/workflows/codeql.yml"><img alt="CodeQL" src="https://github.com/davidlukac/escp-go/actions/workflows/codeql.yml/badge.svg?branch=main"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
 </p>
 
