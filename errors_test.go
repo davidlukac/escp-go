@@ -80,27 +80,31 @@ func TestEveryRefusedArgumentIsErrInvalid(t *testing.T) {
 			return c.SetPort(ctx, PortConfig{ID: 5, Enabled: true, Speed: Speed100Full, FlowControl: true})
 		}, "flow control needs speed"},
 		{"SetBandwidth", func(c *Client) error {
-			return c.SetBandwidth(ctx, PortBandwidth{Port: 5, IngressKbps: 100})
+			return c.SetBandwidth(ctx, PortBandwidth{Port: 5, Ingress: 100})
 		}, "invalid rate 100 kbps for port 5"},
 		{"SetStormControl rate", func(c *Client) error {
-			return c.SetStormControl(ctx, StormConfig{Port: 5, Broadcast: true, RateKbps: 100})
+			return c.SetStormControl(ctx, StormConfig{Port: 5, Broadcast: true, Rate: 100})
 		}, "storm control on port 5 needs a rate"},
 		{"SetStormControl type", func(c *Client) error {
-			return c.SetStormControl(ctx, StormConfig{Port: 5, RateKbps: 64})
+			return c.SetStormControl(ctx, StormConfig{Port: 5, Rate: 64})
 		}, "has a rate (64) but no traffic type"},
 		{"SetPortMirror no source", func(c *Client) error {
-			return c.SetPortMirror(ctx, Mirror{Enabled: true, MirrorPort: 5})
+			return c.SetPortMirror(ctx, Mirror{Enabled: true, Destination: 5})
 		}, "needs at least one ingress or egress"},
 		{"SetPortMirror itself", func(c *Client) error {
-			return c.SetPortMirror(ctx, Mirror{Enabled: true, MirrorPort: 5, IngressPorts: MustPortSet(5)})
+			return c.SetPortMirror(ctx, Mirror{Enabled: true, Destination: 5, IngressPorts: MustPortSet(5)})
 		}, "cannot mirror itself"},
 		{"SetPortMirror disabled with ports", func(c *Client) error {
-			return c.SetPortMirror(ctx, Mirror{MirrorPort: 5})
+			return c.SetPortMirror(ctx, Mirror{Destination: 5})
 		}, "a disabled mirror must have no"},
 		{"SetLAG", func(c *Client) error { return c.SetLAG(ctx, LAG{ID: 1, Ports: MustPortSet(1)}) }, "a LAG takes"},
 		{"SetQoSMode", func(c *Client) error { return c.SetQoSMode(ctx, QoSMode(9)) }, "invalid QoS mode 9"},
-		{"SetPortPriorities port", func(c *Client) error { return c.SetPortPriorities(ctx, map[PortID]Priority{9: PriorityLowest}) }, "port 9 does not exist"},
-		{"SetPortPriorities priority", func(c *Client) error { return c.SetPortPriorities(ctx, map[PortID]Priority{2: Priority(9)}) }, "invalid priority 9 for port 2"},
+		{"SetPortPriorities port", func(c *Client) error {
+			return c.SetPortPriorities(ctx, []PortPriority{{Port: 9, Priority: PriorityLowest}})
+		}, "port 9 does not exist"},
+		{"SetPortPriorities priority", func(c *Client) error {
+			return c.SetPortPriorities(ctx, []PortPriority{{Port: 2, Priority: Priority(9)}})
+		}, "invalid priority 9 for port 2"},
 		{"SetDot1QVLAN both", func(c *Client) error {
 			return c.SetDot1QVLAN(ctx, Dot1QVLAN{ID: 20, Tagged: MustPortSet(2), Untagged: MustPortSet(2)})
 		}, "both tagged and untagged"},
@@ -152,8 +156,8 @@ func TestFailuresOfTheSwitchAreNotErrInvalid(t *testing.T) {
 		if err := (&invalidError{msg: "x"}); !errors.Is(err, ErrInvalid) {
 			t.Fatal("the type must match its sentinel")
 		}
-		if errors.Is(ErrInvalidConfig, ErrInvalid) {
-			t.Fatal("ErrInvalidConfig is about a reply, not an argument")
+		if errors.Is(ErrInvalidConfigFile, ErrInvalid) {
+			t.Fatal("ErrInvalidConfigFile is about a reply, not an argument")
 		}
 	})
 }

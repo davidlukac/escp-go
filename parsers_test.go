@@ -27,7 +27,7 @@ func TestParsersIgnoreForeignTLVs(t *testing.T) {
 		{"bandwidth", func() (any, error) {
 			return parseBandwidth([]wire.TLV{foreign, th(wire.TLVBandwidthEgress, "010000000040")})
 		},
-			[]PortBandwidth{{Port: 1, EgressKbps: 0x40}}},
+			[]PortBandwidth{{Port: 1, Egress: 0x40}}},
 		{"mirror", func() (any, error) {
 			return parseMirror([]wire.TLV{foreign, th(wire.TLVMirror, "00000000000000000000")})
 		},

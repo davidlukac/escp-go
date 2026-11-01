@@ -72,7 +72,7 @@ func TestLiveInactiveSettings(t *testing.T) {
 		if err != nil {
 			return "PortBasedVLAN read error: " + err.Error()
 		}
-		return fmt.Sprintf("enabled=%v max=%d groups=%+v", v.Enabled, v.MaxVLAN, v.VLANs)
+		return fmt.Sprintf("enabled=%v max=%d groups=%+v", v.Enabled, v.MaxGroups, v.VLANs)
 	}
 	snapshot := func() string {
 		var s []string
@@ -107,7 +107,7 @@ func TestLiveInactiveSettings(t *testing.T) {
 	// QoS, mirror and IGMP as they were, then the comparison with the start state.
 	defer func() {
 		if q, err := c.Dot1Q(ctx); err == nil && q.Enabled {
-			if err := c.SetPVIDs(ctx, map[PortID]VLANID{a: 1, b: 1}); err != nil {
+			if err := c.SetPVIDs(ctx, []PortPVID{{Port: a, PVID: 1}, {Port: b, PVID: 1}}); err != nil {
 				t.Errorf("RESTORE: PVIDs: %v", err)
 			}
 			if err := c.DeleteDot1QVLAN(ctx, 20); err != nil {
@@ -129,12 +129,8 @@ func TestLiveInactiveSettings(t *testing.T) {
 				back = append(back, p)
 			}
 		}
-		changes := map[PortID]Priority{}
-		for _, p := range back {
-			changes[p.Port] = p.Priority
-		}
-		if len(changes) > 0 {
-			if err := c.SetPortPriorities(ctx, changes); err != nil {
+		if len(back) > 0 {
+			if err := c.SetPortPriorities(ctx, back); err != nil {
 				t.Errorf("RESTORE: priorities: %v", err)
 			}
 		}
@@ -166,7 +162,7 @@ func TestLiveInactiveSettings(t *testing.T) {
 	err = c.SetDot1QVLAN(ctx, Dot1QVLAN{ID: 20, Name: "staged", Untagged: MustPortSet(PortID(a)), Tagged: MustPortSet(PortID(b))})
 	obs("A1 SetDot1QVLAN(20) while 802.1Q is off: %s", result(err))
 	obs("A1 read right after: %s | raw %s", dot1q(), raw(wire.TLVVLAN8021Q, wire.TLVVLAN8021QVLAN, wire.TLVVLAN8021QPVID))
-	err = c.SetPVIDs(ctx, map[PortID]VLANID{a: 20})
+	err = c.SetPVIDs(ctx, []PortPVID{{Port: a, PVID: 20}})
 	obs("A2 SetPVIDs(a=20) while 802.1Q is off: %s", result(err))
 	obs("A2 read right after: %s", dot1q())
 	setMode(VLANModeDot1Q)
@@ -175,7 +171,7 @@ func TestLiveInactiveSettings(t *testing.T) {
 	// leave 802.1Q clean before the next probe
 	if q, err := c.Dot1Q(ctx); err == nil {
 		if _, ok := vlanByID(q, 20); ok {
-			_ = c.SetPVIDs(ctx, map[PortID]VLANID{a: 1, b: 1})
+			_ = c.SetPVIDs(ctx, []PortPVID{{Port: a, PVID: 1}, {Port: b, PVID: 1}})
 			if err := c.DeleteDot1QVLAN(ctx, 20); err != nil {
 				t.Fatalf("cleaning VLAN 20: %v", err)
 			}
@@ -210,7 +206,7 @@ func TestLiveInactiveSettings(t *testing.T) {
 	obs("C2 in port-based mode: %s | raw 802.1Q %s", portBased(), raw(wire.TLVVLAN8021Q, wire.TLVVLAN8021QVLAN))
 	setMode(VLANModeDot1Q)
 	obs("C2 back in 802.1Q mode (trip through port-based): %s", dot1q())
-	_ = c.SetPVIDs(ctx, map[PortID]VLANID{a: 1, b: 1})
+	_ = c.SetPVIDs(ctx, []PortPVID{{Port: a, PVID: 1}, {Port: b, PVID: 1}})
 	_ = c.DeleteDot1QVLAN(ctx, 20)
 	setMode(VLANModePortBased)
 
@@ -230,7 +226,7 @@ func TestLiveInactiveSettings(t *testing.T) {
 	if prio0 == staged {
 		staged = PriorityLowest
 	}
-	err = c.SetPortPriorities(ctx, map[PortID]Priority{a: staged})
+	err = c.SetPortPriorities(ctx, []PortPriority{{Port: a, Priority: staged}})
 	obs("D1 SetPortPriorities(a=%d) in a QoS mode where priorities are ignored: %s", staged, result(err))
 	q, _ := c.QoS(ctx)
 	obs("D1 read right after: mode=%s priority of a=%v | raw %s", q.Mode, prioOf(q, a), raw(wire.TLVQoSMode, wire.TLVQoSPriority))

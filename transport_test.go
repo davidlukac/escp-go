@@ -202,7 +202,7 @@ func TestSendFailureOnClosedSocketAffectsReadsAndBackup(t *testing.T) {
 	if _, err := c.Info(context.Background()); err == nil || !strings.Contains(err.Error(), "send") {
 		t.Fatalf("want a send error on a closed socket, got %v", err)
 	}
-	if _, err := c.PortStatistics(context.Background()); err == nil {
+	if _, err := c.PortStats(context.Background()); err == nil {
 		t.Fatal("a read on a closed socket must fail")
 	}
 	if _, err := c.ConfigBackup(context.Background()); err == nil {

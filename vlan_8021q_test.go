@@ -20,7 +20,7 @@ func TestParseDot1QDisabled(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Enabled || got.MaxVLAN != 32 || len(got.VLANs) != 0 || len(got.PVIDs) != 8 || got.PVIDs[7] != (PortPVID{Port: 8, PVID: 1}) {
+	if got.Enabled || got.MaxVLANs != 32 || len(got.VLANs) != 0 || len(got.PVIDs) != 8 || got.PVIDs[7] != (PortPVID{Port: 8, PVID: 1}) {
 		t.Fatalf("got %+v", got)
 	}
 }
@@ -85,7 +85,7 @@ func TestDot1QCheckRoom(t *testing.T) {
 		{"a switch that did not report its maximum is not bounded here", 0, table(100), 200, ""},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			err := Dot1Q{MaxVLAN: c.max, VLANs: c.vlans}.CheckRoom(c.id)
+			err := Dot1Q{MaxVLANs: c.max, VLANs: c.vlans}.CheckRoom(c.id)
 			if c.wantErr == "" {
 				if err != nil {
 					t.Fatal(err)

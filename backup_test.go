@@ -50,8 +50,8 @@ func TestConfigBackupRejectsNonConfigData(t *testing.T) {
 			f := escptest.Start(t)
 			f.SetBackupMode(mode)
 			c := dialFake(t, f, "secret")
-			if _, err := c.ConfigBackup(context.Background()); !errors.Is(err, ErrInvalidConfig) {
-				t.Errorf("want ErrInvalidConfig, got %v", err)
+			if _, err := c.ConfigBackup(context.Background()); !errors.Is(err, ErrInvalidConfigFile) {
+				t.Errorf("want ErrInvalidConfigFile, got %v", err)
 			}
 		})
 	}
@@ -157,8 +157,8 @@ func TestConfigBackupFailsRatherThanReturnAPartialFile(t *testing.T) {
 	f.SetBackupScript(escptest.BackupCorrupt, escptest.BackupOK, escptest.BackupCorrupt, escptest.BackupOK, escptest.BackupCorrupt, escptest.BackupOK)
 	c := dialFake(t, f, "secret") // three rounds with the default two retries
 	got, err := c.ConfigBackup(context.Background())
-	if !errors.Is(err, ErrInvalidConfig) || !strings.Contains(err.Error(), "two downloads differ") {
-		t.Fatalf("got %v, want ErrInvalidConfig saying that the downloads differ", err)
+	if !errors.Is(err, ErrInvalidConfigFile) || !strings.Contains(err.Error(), "two downloads differ") {
+		t.Fatalf("got %v, want ErrInvalidConfigFile saying that the downloads differ", err)
 	}
 	if got != nil {
 		t.Fatalf("a failed backup returned %d bytes", len(got))
@@ -201,8 +201,8 @@ func TestAssembleConfig(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			got, err := assembleConfig(tc.parts)
 			if tc.wantLen == 0 {
-				if !errors.Is(err, ErrInvalidConfig) || !strings.Contains(err.Error(), tc.errPart) {
-					t.Fatalf("got %v, want ErrInvalidConfig containing %q", err, tc.errPart)
+				if !errors.Is(err, ErrInvalidConfigFile) || !strings.Contains(err.Error(), tc.errPart) {
+					t.Fatalf("got %v, want ErrInvalidConfigFile containing %q", err, tc.errPart)
 				}
 				return
 			}

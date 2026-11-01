@@ -19,7 +19,7 @@ func (c *Client) requireNoStorm(ctx context.Context, port PortID, ingress Kbps) 
 	for _, r := range rows {
 		if r.Port == port && r.Enabled {
 			return invalidf("escp: port %d has storm control on (%s), and the switch keeps either storm control or an ingress limit on a port: "+
-				"an ingress limit of %s would turn storm control off. Turn storm control off first, or leave the ingress limit at 0", port, r.RateKbps, ingress)
+				"an ingress limit of %s would turn storm control off. Turn storm control off first, or leave the ingress limit at 0", port, r.Rate, ingress)
 		}
 	}
 	return nil
@@ -32,9 +32,9 @@ func (c *Client) requireNoIngressLimit(ctx context.Context, port PortID) error {
 		return err
 	}
 	for _, r := range rows {
-		if r.Port == port && r.IngressKbps != 0 {
+		if r.Port == port && r.Ingress != 0 {
 			return invalidf("escp: port %d has an ingress limit of %s, and the switch keeps either storm control or an ingress limit on a port: "+
-				"storm control would remove the limit. Set the ingress limit to 0 first, or leave storm control off", port, r.IngressKbps)
+				"storm control would remove the limit. Set the ingress limit to 0 first, or leave storm control off", port, r.Ingress)
 		}
 	}
 	return nil

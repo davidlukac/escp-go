@@ -45,13 +45,13 @@ func TestWritersRefusePortsTheSwitchDoesNotHave(t *testing.T) {
 		{"SetBandwidth", func(c *Client) error { return c.SetBandwidth(ctx, PortBandwidth{Port: 9}) }},
 		{"SetStormControl", func(c *Client) error { return c.SetStormControl(ctx, StormConfig{Port: 9}) }},
 		{"SetPortMirror destination", func(c *Client) error {
-			return c.SetPortMirror(ctx, Mirror{Enabled: true, MirrorPort: 9, IngressPorts: MustPortSet(2)})
+			return c.SetPortMirror(ctx, Mirror{Enabled: true, Destination: 9, IngressPorts: MustPortSet(2)})
 		}},
 		{"SetPortMirror ingress", func(c *Client) error {
-			return c.SetPortMirror(ctx, Mirror{Enabled: true, MirrorPort: 5, IngressPorts: MustPortSet(9)})
+			return c.SetPortMirror(ctx, Mirror{Enabled: true, Destination: 5, IngressPorts: MustPortSet(9)})
 		}},
 		{"SetPortMirror egress", func(c *Client) error {
-			return c.SetPortMirror(ctx, Mirror{Enabled: true, MirrorPort: 5, EgressPorts: MustPortSet(9)})
+			return c.SetPortMirror(ctx, Mirror{Enabled: true, Destination: 5, EgressPorts: MustPortSet(9)})
 		}},
 		{"SetPortBasedVLAN", func(c *Client) error { return c.SetPortBasedVLAN(ctx, PortVLAN{ID: 2, Ports: MustPortSet(2, 9)}) }},
 		{"SetDot1QVLAN tagged", func(c *Client) error {
@@ -60,7 +60,7 @@ func TestWritersRefusePortsTheSwitchDoesNotHave(t *testing.T) {
 		{"SetDot1QVLAN untagged", func(c *Client) error {
 			return c.SetDot1QVLAN(ctx, Dot1QVLAN{ID: 20, Untagged: MustPortSet(9)})
 		}},
-		{"SetPVIDs", func(c *Client) error { return c.SetPVIDs(ctx, map[PortID]VLANID{2: 1, 9: 1}) }},
+		{"SetPVIDs", func(c *Client) error { return c.SetPVIDs(ctx, []PortPVID{{Port: 2, PVID: 1}, {Port: 9, PVID: 1}}) }},
 		{"SetVLANMode", func(c *Client) error {
 			return c.SetVLANMode(ctx, VLANModeSetting{Mode: VLANModeMTU, UplinkPort: 9})
 		}},

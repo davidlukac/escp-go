@@ -31,31 +31,31 @@ func TestValidatorsAndWritersAgree(t *testing.T) {
 		{"port: link-down is no setting", PortConfig{ID: 3, Speed: SpeedLinkDown}.Validate, func() error { return c.SetPort(ctx, PortConfig{ID: 3, Speed: SpeedLinkDown}) }, false},
 		{"port: flow control at 100M", PortConfig{ID: 3, Speed: Speed100Full, FlowControl: true}.Validate, func() error { return c.SetPort(ctx, PortConfig{ID: 3, Speed: Speed100Full, FlowControl: true}) }, false},
 
-		{"storm: a type and a rate", StormConfig{Port: 3, Broadcast: true, RateKbps: 128}.Validate, func() error { return c.SetStormControl(ctx, StormConfig{Port: 3, Broadcast: true, RateKbps: 128}) }, true},
+		{"storm: a type and a rate", StormConfig{Port: 3, Broadcast: true, Rate: 128}.Validate, func() error { return c.SetStormControl(ctx, StormConfig{Port: 3, Broadcast: true, Rate: 128}) }, true},
 		{"storm: off", StormConfig{Port: 3}.Validate, func() error { return c.SetStormControl(ctx, StormConfig{Port: 3}) }, true},
-		{"storm: port 0", StormConfig{Broadcast: true, RateKbps: 128}.Validate, func() error { return c.SetStormControl(ctx, StormConfig{Broadcast: true, RateKbps: 128}) }, false},
+		{"storm: port 0", StormConfig{Broadcast: true, Rate: 128}.Validate, func() error { return c.SetStormControl(ctx, StormConfig{Broadcast: true, Rate: 128}) }, false},
 		{"storm: a type and no rate", StormConfig{Port: 3, Multicast: true}.Validate, func() error { return c.SetStormControl(ctx, StormConfig{Port: 3, Multicast: true}) }, false},
-		{"storm: a rate off the step", StormConfig{Port: 3, Multicast: true, RateKbps: 100}.Validate, func() error { return c.SetStormControl(ctx, StormConfig{Port: 3, Multicast: true, RateKbps: 100}) }, false},
-		{"storm: a rate and no type", StormConfig{Port: 3, RateKbps: 128}.Validate, func() error { return c.SetStormControl(ctx, StormConfig{Port: 3, RateKbps: 128}) }, false},
+		{"storm: a rate off the step", StormConfig{Port: 3, Multicast: true, Rate: 100}.Validate, func() error { return c.SetStormControl(ctx, StormConfig{Port: 3, Multicast: true, Rate: 100}) }, false},
+		{"storm: a rate and no type", StormConfig{Port: 3, Rate: 128}.Validate, func() error { return c.SetStormControl(ctx, StormConfig{Port: 3, Rate: 128}) }, false},
 
-		{"bandwidth: both directions", PortBandwidth{Port: 3, IngressKbps: 128, EgressKbps: 256}.Validate, func() error { return c.SetBandwidth(ctx, PortBandwidth{Port: 3, IngressKbps: 128, EgressKbps: 256}) }, true},
+		{"bandwidth: both directions", PortBandwidth{Port: 3, Ingress: 128, Egress: 256}.Validate, func() error { return c.SetBandwidth(ctx, PortBandwidth{Port: 3, Ingress: 128, Egress: 256}) }, true},
 		{"bandwidth: unlimited", PortBandwidth{Port: 3}.Validate, func() error { return c.SetBandwidth(ctx, PortBandwidth{Port: 3}) }, true},
-		{"bandwidth: port 0", PortBandwidth{IngressKbps: 128}.Validate, func() error { return c.SetBandwidth(ctx, PortBandwidth{IngressKbps: 128}) }, false},
-		{"bandwidth: a bad ingress rate", PortBandwidth{Port: 3, IngressKbps: 100}.Validate, func() error { return c.SetBandwidth(ctx, PortBandwidth{Port: 3, IngressKbps: 100}) }, false},
-		{"bandwidth: a bad egress rate", PortBandwidth{Port: 3, EgressKbps: MaxBandwidthKbps + RateStepKbps}.Validate, func() error {
-			return c.SetBandwidth(ctx, PortBandwidth{Port: 3, EgressKbps: MaxBandwidthKbps + RateStepKbps})
+		{"bandwidth: port 0", PortBandwidth{Ingress: 128}.Validate, func() error { return c.SetBandwidth(ctx, PortBandwidth{Ingress: 128}) }, false},
+		{"bandwidth: a bad ingress rate", PortBandwidth{Port: 3, Ingress: 100}.Validate, func() error { return c.SetBandwidth(ctx, PortBandwidth{Port: 3, Ingress: 100}) }, false},
+		{"bandwidth: a bad egress rate", PortBandwidth{Port: 3, Egress: MaxBandwidthKbps + RateStepKbps}.Validate, func() error {
+			return c.SetBandwidth(ctx, PortBandwidth{Port: 3, Egress: MaxBandwidthKbps + RateStepKbps})
 		}, false},
 
 		{"mirror: off", Mirror{}.Validate, func() error { return c.SetPortMirror(ctx, Mirror{}) }, true},
-		{"mirror: on", Mirror{Enabled: true, MirrorPort: 5, IngressPorts: ports(2)}.Validate, func() error {
-			return c.SetPortMirror(ctx, Mirror{Enabled: true, MirrorPort: 5, IngressPorts: ports(2)})
+		{"mirror: on", Mirror{Enabled: true, Destination: 5, IngressPorts: ports(2)}.Validate, func() error {
+			return c.SetPortMirror(ctx, Mirror{Enabled: true, Destination: 5, IngressPorts: ports(2)})
 		}, true},
-		{"mirror: off with a port", Mirror{MirrorPort: 5}.Validate, func() error { return c.SetPortMirror(ctx, Mirror{MirrorPort: 5}) }, false},
+		{"mirror: off with a port", Mirror{Destination: 5}.Validate, func() error { return c.SetPortMirror(ctx, Mirror{Destination: 5}) }, false},
 		{"mirror: off with sources", Mirror{EgressPorts: ports(2)}.Validate, func() error { return c.SetPortMirror(ctx, Mirror{EgressPorts: ports(2)}) }, false},
 		{"mirror: no destination", Mirror{Enabled: true, IngressPorts: ports(2)}.Validate, func() error { return c.SetPortMirror(ctx, Mirror{Enabled: true, IngressPorts: ports(2)}) }, false},
-		{"mirror: no source", Mirror{Enabled: true, MirrorPort: 5}.Validate, func() error { return c.SetPortMirror(ctx, Mirror{Enabled: true, MirrorPort: 5}) }, false},
-		{"mirror: itself", Mirror{Enabled: true, MirrorPort: 5, EgressPorts: ports(4, 5)}.Validate, func() error {
-			return c.SetPortMirror(ctx, Mirror{Enabled: true, MirrorPort: 5, EgressPorts: ports(4, 5)})
+		{"mirror: no source", Mirror{Enabled: true, Destination: 5}.Validate, func() error { return c.SetPortMirror(ctx, Mirror{Enabled: true, Destination: 5}) }, false},
+		{"mirror: itself", Mirror{Enabled: true, Destination: 5, EgressPorts: ports(4, 5)}.Validate, func() error {
+			return c.SetPortMirror(ctx, Mirror{Enabled: true, Destination: 5, EgressPorts: ports(4, 5)})
 		}, false},
 
 		{"802.1Q VLAN: tagged and untagged", Dot1QVLAN{ID: 20, Name: "iot", Tagged: ports(8), Untagged: ports(2)}.Validate, func() error {

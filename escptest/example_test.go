@@ -60,7 +60,7 @@ func ExampleSwitch_EnableModel() {
 	defer func() { _ = c.Close() }()
 
 	ctx := context.Background()
-	fmt.Println("mirror:", c.SetPortMirror(ctx, escp.Mirror{Enabled: true, MirrorPort: 4, IngressPorts: escp.MustPortSet(2)}))
+	fmt.Println("mirror:", c.SetPortMirror(ctx, escp.Mirror{Enabled: true, Destination: 4, IngressPorts: escp.MustPortSet(2)}))
 	err = c.SetLAG(ctx, escp.LAG{ID: 1, Ports: escp.MustPortSet(2, 3)})
 	var refused *escp.RejectedError
 	if errors.As(err, &refused) {

@@ -24,7 +24,7 @@ var errGateRefused = errors.New("test gate: refused")
 var writeCalls = map[string]func(context.Context, *Client) error{
 	"SetLED": func(ctx context.Context, c *Client) error { return c.SetLED(ctx, false) },
 	"SetBandwidth": func(ctx context.Context, c *Client) error {
-		return c.SetBandwidth(ctx, PortBandwidth{Port: 2, IngressKbps: 64, EgressKbps: 64})
+		return c.SetBandwidth(ctx, PortBandwidth{Port: 2, Ingress: 64, Egress: 64})
 	},
 	"SetIGMP": func(ctx context.Context, c *Client) error {
 		return c.SetIGMP(ctx, IGMPConfig{Enabled: true, ReportSuppression: false})
@@ -35,19 +35,21 @@ var writeCalls = map[string]func(context.Context, *Client) error{
 		return c.SetPort(ctx, PortConfig{ID: 2, Enabled: true, Speed: "auto", FlowControl: false})
 	},
 	"SetPortMirror": func(ctx context.Context, c *Client) error {
-		return c.SetPortMirror(ctx, Mirror{Enabled: true, MirrorPort: 2, IngressPorts: MustPortSet(3)})
+		return c.SetPortMirror(ctx, Mirror{Enabled: true, Destination: 2, IngressPorts: MustPortSet(3)})
 	},
-	"SetQoSMode":        func(ctx context.Context, c *Client) error { return c.SetQoSMode(ctx, 1) },
-	"SetPortPriorities": func(ctx context.Context, c *Client) error { return c.SetPortPriorities(ctx, map[PortID]Priority{2: 1}) },
+	"SetQoSMode": func(ctx context.Context, c *Client) error { return c.SetQoSMode(ctx, 1) },
+	"SetPortPriorities": func(ctx context.Context, c *Client) error {
+		return c.SetPortPriorities(ctx, []PortPriority{{Port: 2, Priority: 1}})
+	},
 	"SetStormControl": func(ctx context.Context, c *Client) error {
-		return c.SetStormControl(ctx, StormConfig{Port: 2, UnknownUnicast: true, Multicast: false, Broadcast: false, RateKbps: 64})
+		return c.SetStormControl(ctx, StormConfig{Port: 2, UnknownUnicast: true, Multicast: false, Broadcast: false, Rate: 64})
 	},
 	"SetHostname": func(ctx context.Context, c *Client) error { return c.SetHostname(ctx, "sw-test") },
 	"SetDot1QVLAN": func(ctx context.Context, c *Client) error {
 		return c.SetDot1QVLAN(ctx, Dot1QVLAN{ID: 10, Name: "test", Untagged: MustPortSet(2)})
 	},
 	"DeleteDot1QVLAN": func(ctx context.Context, c *Client) error { return c.DeleteDot1QVLAN(ctx, 10) },
-	"SetPVIDs":        func(ctx context.Context, c *Client) error { return c.SetPVIDs(ctx, map[PortID]VLANID{2: 1}) },
+	"SetPVIDs":        func(ctx context.Context, c *Client) error { return c.SetPVIDs(ctx, []PortPVID{{Port: 2, PVID: 1}}) },
 	"SetVLANMode": func(ctx context.Context, c *Client) error {
 		return c.SetVLANMode(ctx, VLANModeSetting{Mode: VLANModeMTU, UplinkPort: 8})
 	},
@@ -294,15 +296,17 @@ func TestOperationPortsFollowTheArguments(t *testing.T) {
 		ports PortSet
 	}{
 		{"a mirror names its destination and both kinds of source", func(c *Client) error {
-			return c.SetPortMirror(ctx, Mirror{Enabled: true, MirrorPort: 5, IngressPorts: MustPortSet(1, 2), EgressPorts: MustPortSet(3)})
+			return c.SetPortMirror(ctx, Mirror{Enabled: true, Destination: 5, IngressPorts: MustPortSet(1, 2), EgressPorts: MustPortSet(3)})
 		}, MustPortSet(5, 1, 2, 3)},
 		{"a disabled mirror names none", func(c *Client) error { return c.SetPortMirror(ctx, Mirror{}) }, 0},
 		{"an 802.1Q VLAN names its tagged and its untagged ports", func(c *Client) error {
 			return c.SetDot1QVLAN(ctx, Dot1QVLAN{ID: 20, Tagged: MustPortSet(8), Untagged: MustPortSet(3, 4)})
 		}, MustPortSet(8, 3, 4)},
-		{"several PVIDs are all named", func(c *Client) error { return c.SetPVIDs(ctx, map[PortID]VLANID{6: 1, 2: 1, 4: 1}) }, MustPortSet(2, 4, 6)},
+		{"several PVIDs are all named", func(c *Client) error {
+			return c.SetPVIDs(ctx, []PortPVID{{Port: 6, PVID: 1}, {Port: 2, PVID: 1}, {Port: 4, PVID: 1}})
+		}, MustPortSet(2, 4, 6)},
 		{"several priorities are all named", func(c *Client) error {
-			return c.SetPortPriorities(ctx, map[PortID]Priority{7: 1, 3: 2})
+			return c.SetPortPriorities(ctx, []PortPriority{{Port: 7, Priority: 1}, {Port: 3, Priority: 2}})
 		}, MustPortSet(3, 7)},
 		{"the MTU VLAN names its uplink", func(c *Client) error {
 			return c.SetVLANMode(ctx, VLANModeSetting{Mode: VLANModeMTU, UplinkPort: 5})

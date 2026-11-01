@@ -16,8 +16,8 @@ func TestMirrorRejectsAnInvalidDestinationBeforeSending(t *testing.T) {
 	c := dialFast(t, f, "secret")
 	ctx := context.Background()
 	for name, m := range map[string]Mirror{
-		"destination 0":  {Enabled: true, MirrorPort: 0, IngressPorts: MustPortSet(4)},
-		"destination 40": {Enabled: true, MirrorPort: 40, IngressPorts: MustPortSet(4), EgressPorts: MustPortSet(5)},
+		"destination 0":  {Enabled: true, Destination: 0, IngressPorts: MustPortSet(4)},
+		"destination 40": {Enabled: true, Destination: 40, IngressPorts: MustPortSet(4), EgressPorts: MustPortSet(5)},
 	} {
 		if err := c.SetPortMirror(ctx, m); err == nil {
 			t.Errorf("%s must be rejected", name)
@@ -41,7 +41,7 @@ func TestParseMirror(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := Mirror{Enabled: true, MirrorPort: 8, IngressPorts: MustPortSet(1, 2), EgressPorts: MustPortSet(3)}
+	want := Mirror{Enabled: true, Destination: 8, IngressPorts: MustPortSet(1, 2), EgressPorts: MustPortSet(3)}
 	if !reflect.DeepEqual(on, want) {
 		t.Fatalf("enabled: %+v", on)
 	}
@@ -54,7 +54,7 @@ func TestSetMirrorWire(t *testing.T) {
 	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
 	ctx := context.Background()
-	if err := c.SetPortMirror(ctx, Mirror{Enabled: true, MirrorPort: 7, IngressPorts: MustPortSet(4), EgressPorts: MustPortSet(1, 2)}); err != nil {
+	if err := c.SetPortMirror(ctx, Mirror{Enabled: true, Destination: 7, IngressPorts: MustPortSet(4), EgressPorts: MustPortSet(1, 2)}); err != nil {
 		t.Fatal(err)
 	}
 	if got := f.LastSet(); !reflect.DeepEqual(got[0].Value, []byte{1, 7, 0, 0, 0, 8, 0, 0, 0, 3}) {
@@ -68,10 +68,10 @@ func TestSetMirrorWire(t *testing.T) {
 	}
 	n := f.WriteCount()
 	for _, bad := range []Mirror{
-		{Enabled: true, MirrorPort: 7},
-		{Enabled: true, MirrorPort: 7, IngressPorts: MustPortSet(7)},
-		{Enabled: true, MirrorPort: 0, IngressPorts: MustPortSet(1)},
-		{MirrorPort: 7},
+		{Enabled: true, Destination: 7},
+		{Enabled: true, Destination: 7, IngressPorts: MustPortSet(7)},
+		{Enabled: true, Destination: 0, IngressPorts: MustPortSet(1)},
+		{Destination: 7},
 	} {
 		if err := c.SetPortMirror(ctx, bad); err == nil {
 			t.Errorf("%+v must be rejected", bad)

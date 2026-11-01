@@ -54,7 +54,7 @@ func TestCancellationBetweenTwoWritesStopsTheSecond(t *testing.T) {
 		}})
 	c.allowLoopback = true
 	t.Cleanup(func() { c.Close() })
-	err := c.SetBandwidth(ctx, PortBandwidth{Port: 2, IngressKbps: 64, EgressKbps: 64})
+	err := c.SetBandwidth(ctx, PortBandwidth{Port: 2, Ingress: 64, Egress: 64})
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("got %v, want context.Canceled", err)
 	}

@@ -53,9 +53,9 @@ func parsePortStats(tlvs []wire.TLV) ([]PortStats, error) {
 	return out, nil
 }
 
-// PortStatistics reads the traffic counters of every port. The counters change on every read, so
+// PortStats reads the traffic counters of every port. The counters change on every read, so
 // they do not belong in anything compared between two reads.
-func (c *Client) PortStatistics(ctx context.Context) ([]PortStats, error) {
+func (c *Client) PortStats(ctx context.Context) ([]PortStats, error) {
 	tlvs, err := c.getTLVs(ctx, wire.TLVPortStats)
 	if err != nil {
 		return nil, err

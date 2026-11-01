@@ -30,7 +30,7 @@ Tests that cut across sources have names of their own: `cancel_test` (cancellati
 
 ## Naming
 
-- A field that holds a port number is named for what the record is. A record that *is* a port (`Port`, `PortConfig`, `PortStats`) calls it `ID`; a record that *refers to* a port (`PortBandwidth`, `PortStorm`, `StormConfig`, `PortPVID`, `PortPriority`) calls it `Port`; a port with a role in the record is named for the role (`MTUVLAN.UplinkPort`, `Mirror.MirrorPort`).
+- A field that holds a port number is named for what the record is. A record that *is* a port (`Port`, `PortConfig`, `PortStats`) calls it `ID`; a record that *refers to* a port (`PortBandwidth`, `PortStorm`, `StormConfig`, `PortPVID`, `PortPriority`) calls it `Port`; a port with a role in the record is named for the role (`MTUVLAN.UplinkPort`, `Mirror.Destination`).
 - Readers are named for what they return (`Ports`, `QoS`, `LED`, `Dot1Q`), writers `Set...` and `Delete...`.
 - The 802.1Q family shares the prefix `Dot1Q`: `Dot1Q` (the table the switch reports), `Dot1QVLAN` (one VLAN), `SetDot1QVLAN`, `DeleteDot1QVLAN`, and `VLANModeDot1Q` for the mode.
 - Every type a writer takes can be checked: it has a `Validate` method that returns an error matching `ErrInvalid`, and the writer calls that method, so the two cannot disagree (`validate_test.go` pins it).

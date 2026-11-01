@@ -40,7 +40,7 @@
 //
 // Test errors with errors.Is and errors.As, never by message: ErrInvalid (refused before any
 // write), ErrNoReply, ErrRejected and *RejectedError (the switch refused a write), ErrWrongSwitch,
-// ErrNotFound, ErrMoveUnconfirmed, ErrNoInterface, ErrInvalidConfig and ErrReplyTooLarge. The
+// ErrNotFound, ErrMoveUnconfirmed, ErrNoInterface, ErrInvalidConfigFile and ErrReplyTooLarge. The
 // gates of package safety return their own typed errors.
 //
 // # Logging

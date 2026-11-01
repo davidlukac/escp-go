@@ -49,11 +49,11 @@ func modelClient(t *testing.T) (*escptest.Switch, *Client) {
 func TestIngressLimitIsRefusedWhileStormControlIsOn(t *testing.T) {
 	f, c := modelClient(t)
 	ctx := context.Background()
-	if err := c.SetStormControl(ctx, StormConfig{Port: 3, Broadcast: true, RateKbps: 1024}); err != nil {
+	if err := c.SetStormControl(ctx, StormConfig{Port: 3, Broadcast: true, Rate: 1024}); err != nil {
 		t.Fatal(err)
 	}
 	writes := f.WriteCount()
-	err := c.SetBandwidth(ctx, PortBandwidth{Port: 3, IngressKbps: 10240, EgressKbps: 20480})
+	err := c.SetBandwidth(ctx, PortBandwidth{Port: 3, Ingress: 10240, Egress: 20480})
 	if !errors.Is(err, ErrInvalid) {
 		t.Fatalf("got %v, want ErrInvalid", err)
 	}
@@ -66,7 +66,7 @@ func TestIngressLimitIsRefusedWhileStormControlIsOn(t *testing.T) {
 		t.Fatalf("%d SET(s) reached the switch", f.WriteCount()-writes)
 	}
 	bw, st := limiterPair(t, c, 3)
-	if bw.IngressKbps != 0 || bw.EgressKbps != 0 || !st.Enabled || st.RateKbps != 1024 {
+	if bw.Ingress != 0 || bw.Egress != 0 || !st.Enabled || st.Rate != 1024 {
 		t.Fatalf("the refused write changed the port: %+v %+v", bw, st)
 	}
 }
@@ -74,11 +74,11 @@ func TestIngressLimitIsRefusedWhileStormControlIsOn(t *testing.T) {
 func TestStormControlIsRefusedWhileAnIngressLimitIsSet(t *testing.T) {
 	f, c := modelClient(t)
 	ctx := context.Background()
-	if err := c.SetBandwidth(ctx, PortBandwidth{Port: 3, IngressKbps: 10240, EgressKbps: 20480}); err != nil {
+	if err := c.SetBandwidth(ctx, PortBandwidth{Port: 3, Ingress: 10240, Egress: 20480}); err != nil {
 		t.Fatal(err)
 	}
 	writes := f.WriteCount()
-	err := c.SetStormControl(ctx, StormConfig{Port: 3, Multicast: true, RateKbps: 64})
+	err := c.SetStormControl(ctx, StormConfig{Port: 3, Multicast: true, Rate: 64})
 	if !errors.Is(err, ErrInvalid) {
 		t.Fatalf("got %v, want ErrInvalid", err)
 	}
@@ -91,7 +91,7 @@ func TestStormControlIsRefusedWhileAnIngressLimitIsSet(t *testing.T) {
 		t.Fatalf("%d SET(s) reached the switch", f.WriteCount()-writes)
 	}
 	bw, st := limiterPair(t, c, 3)
-	if bw.IngressKbps != 10240 || bw.EgressKbps != 20480 || st.Enabled {
+	if bw.Ingress != 10240 || bw.Egress != 20480 || st.Enabled {
 		t.Fatalf("the refused write changed the port: %+v %+v", bw, st)
 	}
 }
@@ -101,31 +101,31 @@ func TestStormControlIsRefusedWhileAnIngressLimitIsSet(t *testing.T) {
 func TestTheOtherSettingsOfThePortStayWritable(t *testing.T) {
 	_, c := modelClient(t)
 	ctx := context.Background()
-	if err := c.SetStormControl(ctx, StormConfig{Port: 3, Broadcast: true, RateKbps: 1024}); err != nil {
+	if err := c.SetStormControl(ctx, StormConfig{Port: 3, Broadcast: true, Rate: 1024}); err != nil {
 		t.Fatal(err)
 	}
-	if err := c.SetBandwidth(ctx, PortBandwidth{Port: 3, EgressKbps: 20480}); err != nil {
+	if err := c.SetBandwidth(ctx, PortBandwidth{Port: 3, Egress: 20480}); err != nil {
 		t.Fatalf("egress limit and ingress 0 beside storm control: %v", err)
 	}
-	if err := c.SetBandwidth(ctx, PortBandwidth{Port: 4, IngressKbps: 10240}); err != nil {
+	if err := c.SetBandwidth(ctx, PortBandwidth{Port: 4, Ingress: 10240}); err != nil {
 		t.Fatalf("ingress limit on another port: %v", err)
 	}
-	if bw, st := limiterPair(t, c, 3); bw.EgressKbps != 20480 || !st.Enabled {
+	if bw, st := limiterPair(t, c, 3); bw.Egress != 20480 || !st.Enabled {
 		t.Fatalf("port 3: %+v %+v", bw, st)
 	}
 	if err := c.SetStormControl(ctx, StormConfig{Port: 3}); err != nil { // off
 		t.Fatalf("storm control off: %v", err)
 	}
-	if err := c.SetBandwidth(ctx, PortBandwidth{Port: 3, IngressKbps: 10240, EgressKbps: 20480}); err != nil {
+	if err := c.SetBandwidth(ctx, PortBandwidth{Port: 3, Ingress: 10240, Egress: 20480}); err != nil {
 		t.Fatalf("ingress limit once storm control is off: %v", err)
 	}
 	if err := c.SetStormControl(ctx, StormConfig{Port: 3}); err != nil { // off again, beside an ingress limit
 		t.Fatalf("storm control off beside an ingress limit: %v", err)
 	}
-	if bw, st := limiterPair(t, c, 3); bw.IngressKbps != 10240 || st.Enabled {
+	if bw, st := limiterPair(t, c, 3); bw.Ingress != 10240 || st.Enabled {
 		t.Fatalf("port 3: %+v %+v", bw, st)
 	}
-	if err := c.SetStormControl(ctx, StormConfig{Port: 5, Broadcast: true, RateKbps: 64}); err != nil {
+	if err := c.SetStormControl(ctx, StormConfig{Port: 5, Broadcast: true, Rate: 64}); err != nil {
 		t.Fatalf("storm control on another port: %v", err)
 	}
 }
@@ -135,10 +135,10 @@ func TestNoWriteWhenTheOtherLimiterCannotBeRead(t *testing.T) {
 	f := escptest.Start(t) // no model: the tables are not answered
 	c := dialFast(t, f, "secret")
 	ctx := context.Background()
-	if err := c.SetBandwidth(ctx, PortBandwidth{Port: 3, IngressKbps: 64}); !errors.Is(err, ErrNoReply) {
+	if err := c.SetBandwidth(ctx, PortBandwidth{Port: 3, Ingress: 64}); !errors.Is(err, ErrNoReply) {
 		t.Fatalf("SetBandwidth: got %v, want ErrNoReply", err)
 	}
-	if err := c.SetStormControl(ctx, StormConfig{Port: 3, Broadcast: true, RateKbps: 64}); !errors.Is(err, ErrNoReply) {
+	if err := c.SetStormControl(ctx, StormConfig{Port: 3, Broadcast: true, Rate: 64}); !errors.Is(err, ErrNoReply) {
 		t.Fatalf("SetStormControl: got %v, want ErrNoReply", err)
 	}
 	if n := f.WriteCount(); n != 0 {
@@ -160,13 +160,13 @@ func TestTheFakeSwitchClearsTheOtherLimiterLikeTheRealOne(t *testing.T) {
 	if err := c.setTLVs(ctx, op, ingress); err != nil {
 		t.Fatal(err)
 	}
-	if bw, st := limiterPair(t, c, 3); bw.IngressKbps != 10240 || st.Enabled || st.Broadcast || st.RateKbps != 0 {
+	if bw, st := limiterPair(t, c, 3); bw.Ingress != 10240 || st.Enabled || st.Broadcast || st.Rate != 0 {
 		t.Fatalf("an ingress limit must clear storm control: %+v %+v", bw, st)
 	}
 	if err := c.setTLVs(ctx, op, storm); err != nil {
 		t.Fatal(err)
 	}
-	if bw, st := limiterPair(t, c, 3); bw.IngressKbps != 0 || !st.Enabled {
+	if bw, st := limiterPair(t, c, 3); bw.Ingress != 0 || !st.Enabled {
 		t.Fatalf("storm control must clear the ingress limit: %+v %+v", bw, st)
 	}
 }

@@ -25,7 +25,7 @@ type PortStorm struct {
 	UnknownUnicast bool // limit unknown-unicast traffic
 	Multicast      bool // limit multicast traffic
 	Broadcast      bool // limit broadcast traffic
-	RateKbps       Kbps // the limit, a multiple of RateStepKbps; 0 when none is set
+	Rate           Kbps // the limit, a multiple of RateStepKbps; 0 when none is set
 	// Enabled mirrors the web UI: a rate is set and at least one traffic type is selected.
 	Enabled bool
 }
@@ -41,8 +41,8 @@ func parseStorm(tlvs []wire.TLV) ([]PortStorm, error) {
 			return nil, fmt.Errorf("escp: storm control entry has %d bytes, want %d", len(v), stormEntryLen)
 		}
 		p := PortStorm{Port: PortID(v[stormOffPort]), UnknownUnicast: v[stormOffUnknownUnicast] != 0, Multicast: v[stormOffMulticast] != 0,
-			Broadcast: v[stormOffBroadcast] != 0, RateKbps: Kbps(binary.BigEndian.Uint32(v[stormOffRate:]))}
-		p.Enabled = p.RateKbps != 0 && (p.UnknownUnicast || p.Multicast || p.Broadcast)
+			Broadcast: v[stormOffBroadcast] != 0, Rate: Kbps(binary.BigEndian.Uint32(v[stormOffRate:]))}
+		p.Enabled = p.Rate != 0 && (p.UnknownUnicast || p.Multicast || p.Broadcast)
 		out = append(out, p)
 	}
 	return out, nil
@@ -64,7 +64,7 @@ type StormConfig struct {
 	UnknownUnicast bool
 	Multicast      bool
 	Broadcast      bool
-	RateKbps       Kbps
+	Rate           Kbps
 }
 
 // limited reports whether any traffic type is selected: storm control is on exactly then.
@@ -78,10 +78,10 @@ func (cfg StormConfig) Validate() error {
 		return err
 	}
 	switch {
-	case cfg.limited() && (cfg.RateKbps < RateStepKbps || cfg.RateKbps.Validate() != nil):
-		return invalidf("escp: storm control on port %d needs a rate that is a multiple of %d kbps between %d and %d, got %d", cfg.Port, RateStepKbps, RateStepKbps, MaxBandwidthKbps, cfg.RateKbps)
-	case !cfg.limited() && cfg.RateKbps != 0:
-		return invalidf("escp: storm control on port %d has a rate (%d) but no traffic type selected", cfg.Port, cfg.RateKbps)
+	case cfg.limited() && (cfg.Rate < RateStepKbps || cfg.Rate.Validate() != nil):
+		return invalidf("escp: storm control on port %d needs a rate that is a multiple of %d kbps between %d and %d, got %d", cfg.Port, RateStepKbps, RateStepKbps, MaxBandwidthKbps, cfg.Rate)
+	case !cfg.limited() && cfg.Rate != 0:
+		return invalidf("escp: storm control on port %d has a rate (%d) but no traffic type selected", cfg.Port, cfg.Rate)
 	}
 	return nil
 }
@@ -109,6 +109,6 @@ func (c *Client) SetStormControl(ctx context.Context, cfg StormConfig) error {
 	v[stormOffPort] = byte(cfg.Port)
 	v[stormOffEnabled] = boolByte(limited)
 	v[stormOffUnknownUnicast], v[stormOffMulticast], v[stormOffBroadcast] = boolByte(cfg.UnknownUnicast), boolByte(cfg.Multicast), boolByte(cfg.Broadcast)
-	binary.BigEndian.PutUint32(v[stormOffRate:], uint32(cfg.RateKbps))
+	binary.BigEndian.PutUint32(v[stormOffRate:], uint32(cfg.Rate))
 	return c.setTLVs(ctx, Operation{Name: "SetStormControl", Ports: cfg.Port.set(), Impact: ImpactTraffic}, wire.TLV{Type: wire.TLVStormControl, Value: v})
 }
