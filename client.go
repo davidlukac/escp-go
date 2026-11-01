@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"net"
 	"net/netip"
-	"strconv"
 	"sync"
 	"time"
 
@@ -116,13 +115,22 @@ func (c *Client) open(ctx context.Context) error {
 	if c.conn != nil {
 		return nil
 	}
-	lc := net.ListenConfig{Control: udp.Share}
-	pc, err := lc.ListenPacket(ctx, "udp4", net.JoinHostPort("", strconv.Itoa(c.cfg.HostPort)))
+	conn, err := bindReplyPort(ctx, c.cfg.HostPort)
 	if err != nil {
-		return fmt.Errorf("escp: binding UDP port %d (is a client that does not share the port running, such as an old Easy Smart utility?): %w", c.cfg.HostPort, err)
+		return err
 	}
-	c.conn = pc.(*net.UDPConn) // a "udp4" listener is always a *net.UDPConn
+	c.conn = conn
 	return nil
+}
+
+// bindReplyPort binds the UDP port the switches reply to, sharing it with the other clients of the
+// host (see PROTOCOL.md). Client and Discover bind it the same way, so a failure reads the same.
+func bindReplyPort(ctx context.Context, port int) (*net.UDPConn, error) {
+	conn, err := udp.Listen(ctx, port)
+	if err != nil {
+		return nil, fmt.Errorf("escp: binding UDP port %d (is a client that does not share the port running, such as an old Easy Smart utility?): %w", port, err)
+	}
+	return conn, nil
 }
 
 // discardPort is the UDP "discard" port: localMAC only needs the socket to learn which local address a
@@ -137,7 +145,15 @@ func localMAC(dst net.IP) [6]byte {
 	}
 	defer func() { _ = probe.Close() }() // best-effort: the probe socket only reveals the local address
 	ifs, _ := net.Interfaces()
-	return macHolding(probe.LocalAddr().(*net.UDPAddr).IP, ifs, func(i net.Interface) ([]net.Addr, error) { return i.Addrs() })
+	return macHolding(localIP(probe), ifs, func(i net.Interface) ([]net.Addr, error) { return i.Addrs() })
+}
+
+// localIP is the local address of a UDP connection, nil for a connection that is not one.
+func localIP(c net.Conn) net.IP {
+	if a, ok := c.LocalAddr().(*net.UDPAddr); ok {
+		return a.IP
+	}
+	return nil
 }
 
 // macHolding returns the hardware address of the first interface of ifs that has a six-byte hardware
