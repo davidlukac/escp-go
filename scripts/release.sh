@@ -6,7 +6,7 @@
 # coverage policy, lint, vulnerabilities) and commits ONLY CHANGELOG.md as `chore: release X.Y.Z`.
 # It refuses to run on main, on a dirty tree, and for a version that is not newer than the latest tag.
 # Second form: tags the current main commit locally. It never pushes: pushing a tag and publishing
-# need the owner's go-ahead (RELEASING.md).
+# need a maintainer's decision (RELEASING.md).
 #
 # Versions: while the module is 0.x, a change that breaks the exported API (a removed or renamed
 # name, a changed signature, a changed error or log attribute contract) is a minor version, anything
@@ -23,7 +23,7 @@ if [ "${1:-}" = "--tag" ]; then
   [ "$BRANCH" = main ] || die "tag from main after the squash merge (on $BRANCH)"
   grep -q "^## $VER\$" CHANGELOG.md || die "CHANGELOG.md has no '## $VER' entry; is the release PR merged and pulled?"
   git tag -a "v$VER" -m "v$VER"
-  echo "tagged v$VER locally (not pushed; pushing tags needs the owner's go-ahead)"
+  echo "tagged v$VER locally (not pushed; pushing a tag is what publishes, a maintainer decides)"
   exit 0
 fi
 

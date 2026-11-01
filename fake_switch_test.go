@@ -156,8 +156,8 @@ func TestFakeModelVLANModesAndDot1Q(t *testing.T) {
 	}
 }
 
-// The modelled switch has a static address in the documentation range, like switch 03 has a static
-// address, so the management-address resource can be exercised without a write that could leave the machine.
+// The modelled switch has a static address in the documentation range, like a real
+// switch on a static address, so a management-address write can be exercised without one that could leave the machine.
 func TestFakeModelHasAStaticDocumentationAddress(t *testing.T) {
 	f := escptest.Start(t)
 	f.EnableModel(nil)

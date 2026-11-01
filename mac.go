@@ -5,7 +5,8 @@ import (
 	"strings"
 )
 
-// macLen is the length of an Ethernet MAC address in bytes.
+// macLen is the length of an Ethernet MAC address in bytes. MAC spells the number out, so that the
+// documentation of the type shows it.
 const macLen = 6
 
 // macTextLen is the length of its text form, "aa:bb:cc:dd:ee:ff".
@@ -15,7 +16,10 @@ const macTextLen = 3*macLen - 1
 // IP address does. It is a comparable value, so two of them are equal with ==, and the zero value
 // means "no MAC" (no device has the all-zero address). Every place that reads, writes, compares or
 // prints a switch's MAC goes through this type.
-type MAC [macLen]byte
+type MAC [6]byte
+
+// The conversion compiles only while MAC is macLen bytes long.
+var _ = [macLen]byte(MAC{})
 
 // ParseMAC reads the text form "aa:bb:cc:dd:ee:ff": six hex bytes, any case, separated by colons
 // or by hyphens (one kind of separator). Anything else, including the dotted and unseparated forms
