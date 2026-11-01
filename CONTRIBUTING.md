@@ -1,12 +1,12 @@
 # Contributing
 
-Issues and pull requests are welcome. Open an issue first for a new setting or a change to the exported API. This page is the checklist for **any change to the client**; tick every line that applies, or write in the pull request why it does not.
+Issues and pull requests are welcome, under the [Code of Conduct](CODE_OF_CONDUCT.md). Open an issue first for a new setting or a change to the exported API. This page is the checklist for **any change to the client**; tick every line that applies, or write in the pull request why it does not.
 
 ## 0. Before you start
 
 - [ ] Run `make hooks` once per clone. The pre-commit hook runs format, vet (also `-tags live`), lint, tests with `-race` and the coverage policy, and must never be bypassed (`--no-verify`): a red hook is what CI would show.
 - [ ] Work on a branch (`feat/`, `fix/`, `docs/`, `test/`, `chore/`). Nothing goes to `main` directly.
-- [ ] Decide the kind of change; it drives the version ([RELEASING.md](RELEASING.md)): a change that breaks the exported API is a minor version while the module is 0.x, a new setting or a fix is a patch, tests, docs and CI do not release by themselves.
+- [ ] Decide the kind of change; it drives the version ([RELEASING.md](RELEASING.md)): a change that breaks the exported API or adds to it (a new setting, an exported name) is a minor version, a fix is a patch (while the module is 0.x; from 1.0 a break is a major version); tests, docs and CI do not release by themselves.
 - [ ] A change that can cut management access or break traffic (the IP settings, the VLAN mode, PVIDs, link aggregation, port settings of a used port) is designed with the write gates in mind and is never exercised on a switch you cannot afford to lose. Settings that can lock a user out (credentials, reboot, factory reset, config restore, firmware) are deliberately not offered.
 
 ## 1. Code

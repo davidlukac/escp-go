@@ -9,8 +9,9 @@
 # need a maintainer's decision (RELEASING.md).
 #
 # Versions: while the module is 0.x, a change that breaks the exported API (a removed or renamed
-# name, a changed signature, a changed error or log attribute contract) is a minor version, anything
-# else a patch. From 1.0.0 the usual rules apply. `make apidiff` lists the API changes.
+# name, a changed signature, a changed error or log attribute contract) or adds to it (a new
+# setting, an exported name) is a minor version, a fix a patch. From 1.0.0 a break is a major
+# version. `make apidiff` lists the API changes.
 set -eu
 cd "$(git rev-parse --show-toplevel)"
 die() { echo "release.sh: $*" >&2; exit 1; }
