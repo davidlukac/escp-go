@@ -129,8 +129,8 @@ func TestQoSModeSpellingsAndCodes(t *testing.T) {
 		t.Fatalf("got %v", got)
 	}
 	for i, w := range want {
-		if got[i] != w.mode || int(w.mode) != w.code || w.mode.String() != w.name || !w.mode.Valid() {
-			t.Errorf("mode %d: %v (%d) %q valid=%v, want code %d name %q", i, got[i], int(got[i]), got[i], got[i].Valid(), w.code, w.name)
+		if got[i] != w.mode || int(w.mode) != w.code || w.mode.String() != w.name || w.mode.Validate() != nil {
+			t.Errorf("mode %d: %v (%d) %q valid=%v, want code %d name %q", i, got[i], int(got[i]), got[i], got[i].Validate() == nil, w.code, w.name)
 		}
 		if parsed, err := ParseQoSMode(w.name); err != nil || parsed != w.mode {
 			t.Errorf("ParseQoSMode(%q) = %v, %v", w.name, parsed, err)
@@ -140,8 +140,8 @@ func TestQoSModeSpellingsAndCodes(t *testing.T) {
 
 func TestQoSModeUnknownValues(t *testing.T) {
 	for _, bad := range []QoSMode{-1, 3, 255} {
-		if bad.Valid() {
-			t.Errorf("%d must not be valid", int(bad))
+		if err := bad.Validate(); !errors.Is(err, ErrInvalid) {
+			t.Errorf("%d must not be valid: %v", int(bad), err)
 		}
 	}
 	if got := QoSMode(9).String(); got != "unknown(9)" {
@@ -171,8 +171,8 @@ func TestSetQoSModeRefusesUnknownModesWithoutSending(t *testing.T) {
 
 func TestPriorityBounds(t *testing.T) {
 	for p, valid := range map[Priority]bool{0: false, 1: true, 2: true, 3: true, 4: true, 5: false, -1: false} {
-		if p.Valid() != valid {
-			t.Errorf("Priority(%d).Valid() = %v", int(p), p.Valid())
+		if err := p.Validate(); (err == nil) != valid || (err != nil && !errors.Is(err, ErrInvalid)) {
+			t.Errorf("Priority(%d).Validate() = %v, want valid=%v", int(p), err, valid)
 		}
 	}
 	if PriorityLowest != 1 || PriorityHighest != 4 {

@@ -60,10 +60,6 @@ type PortBasedVLAN struct {
 // wire's range (PortVLANID.Validate) applies.
 type PortVLANLimit int
 
-// NewPortVLANLimit is the limit of a switch that supports the given number of groups and has the
-// given number of ports; either may be 0 when the switch did not say.
-func NewPortVLANLimit(groups, ports int) PortVLANLimit { return PortVLANLimit(max(groups, ports)) }
-
 // Known reports whether the switch said anything that bounds the ids.
 func (l PortVLANLimit) Known() bool { return l > 0 }
 
@@ -82,10 +78,11 @@ func (l PortVLANLimit) Check(id PortVLANID) error {
 	return nil
 }
 
-// GroupLimit is the highest group id of the switch whose state v is and which has portCount ports
-// (0 when unknown).
-func (v PortBasedVLAN) GroupLimit(portCount int) PortVLANLimit {
-	return NewPortVLANLimit(v.MaxGroups, portCount)
+// GroupLimit is the highest group id of the switch whose state v is and whose device facts are sys
+// (System.PortCount): the larger of the number of groups v says it supports and the number of ports.
+// Either is 0 when the switch did not say; both 0 is an unknown limit.
+func (v PortBasedVLAN) GroupLimit(sys System) PortVLANLimit {
+	return PortVLANLimit(max(v.MaxGroups, sys.PortCount))
 }
 
 // Group returns the member ports of group id and whether the group exists.
@@ -168,7 +165,7 @@ func (c *Client) requirePortVLANGroup(ctx context.Context, id PortVLANID) error 
 		if err != nil {
 			return err
 		}
-		limit = v.GroupLimit(ports)
+		limit = v.GroupLimit(System{PortCount: ports})
 		c.mu.Lock()
 		c.groupLimit = limit
 		c.mu.Unlock()

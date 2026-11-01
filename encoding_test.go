@@ -2,6 +2,7 @@ package escp
 
 import (
 	"encoding/json"
+	"errors"
 	"net/netip"
 	"reflect"
 	"strings"
@@ -171,6 +172,31 @@ func TestPortSetTextForms(t *testing.T) {
 		var back PortSet
 		if err := back.UnmarshalText(text); err != nil || back != set {
 			t.Fatalf("%v: %q read back as %v, %v", set, text, back, err)
+		}
+	}
+}
+
+// The named values validate like every other input type: Validate returns an error that matches
+// ErrInvalid, and refuses what the writers refuse (the reported-only SpeedLinkDown and VLANModeNone).
+func TestNamedValuesValidate(t *testing.T) {
+	for _, s := range ConfigurableSpeeds() {
+		if err := s.Validate(); err != nil {
+			t.Errorf("speed %q: %v", s, err)
+		}
+	}
+	for _, s := range []Speed{SpeedLinkDown, "", "warp"} {
+		if err := s.Validate(); !errors.Is(err, ErrInvalid) {
+			t.Errorf("speed %q: got %v, want ErrInvalid", s, err)
+		}
+	}
+	for _, m := range VLANModes() {
+		if err := m.Validate(); err != nil {
+			t.Errorf("VLAN mode %q: %v", m, err)
+		}
+	}
+	for _, m := range []VLANMode{VLANModeNone, "", "vxlan"} {
+		if err := m.Validate(); !errors.Is(err, ErrInvalid) {
+			t.Errorf("VLAN mode %q: got %v, want ErrInvalid", m, err)
 		}
 	}
 }

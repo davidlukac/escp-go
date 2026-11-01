@@ -24,12 +24,17 @@ var qosModeNames = [...]string{QoSPortBased: "port-based", QoS8021p: "802.1p", Q
 // QoSModes lists the modes SetQoSMode accepts, in the order of their codes.
 func QoSModes() []QoSMode { return []QoSMode{QoSPortBased, QoS8021p, QoSDSCP8021p} }
 
-// Valid reports whether the switch knows the mode.
-func (m QoSMode) Valid() bool { return m >= 0 && int(m) < len(qosModeNames) }
+// Validate reports whether the switch knows the mode; the error matches ErrInvalid.
+func (m QoSMode) Validate() error {
+	if m < 0 || int(m) >= len(qosModeNames) {
+		return invalidf("escp: invalid QoS mode %d (valid: 0, 1, 2)", int(m))
+	}
+	return nil
+}
 
 // String returns the web UI's name of the mode, or unknown(n) for a code this client does not know.
 func (m QoSMode) String() string {
-	if !m.Valid() {
+	if m.Validate() != nil {
 		return fmt.Sprintf("unknown(%d)", int(m))
 	}
 	return qosModeNames[m]
@@ -48,8 +53,8 @@ func ParseQoSMode(name string) (QoSMode, error) {
 // MarshalText is the web UI's name of the mode, as String spells it; a code this client does not know
 // is an error, since a name that no decoder reads back would lose it.
 func (m QoSMode) MarshalText() ([]byte, error) {
-	if !m.Valid() {
-		return nil, invalidf("escp: %d is not a QoS mode", int(m))
+	if err := m.Validate(); err != nil {
+		return nil, err
 	}
 	return []byte(m.String()), nil
 }
@@ -74,8 +79,14 @@ const (
 	PriorityHighest Priority = 4
 )
 
-// Valid reports whether the priority is within PriorityLowest..PriorityHighest.
-func (p Priority) Valid() bool { return p >= PriorityLowest && p <= PriorityHighest }
+// Validate reports whether the priority is within PriorityLowest..PriorityHighest; the error matches
+// ErrInvalid.
+func (p Priority) Validate() error {
+	if p < PriorityLowest || p > PriorityHighest {
+		return invalidf("escp: invalid priority %d (valid: %d-%d)", int(p), PriorityLowest, PriorityHighest)
+	}
+	return nil
+}
 
 // PortPriority is a port's priority queue (PriorityLowest to PriorityHighest).
 type PortPriority struct {
@@ -131,8 +142,8 @@ func (c *Client) QoS(ctx context.Context) (QoS, error) {
 // mode must be one of QoSModes. Per-port priorities (SetPortPriorities) only take effect in
 // QoSPortBased; the switch accepts them in the other modes and ignores them.
 func (c *Client) SetQoSMode(ctx context.Context, mode QoSMode) error {
-	if !mode.Valid() {
-		return invalidf("escp: invalid QoS mode %d (valid: 0, 1, 2)", mode)
+	if err := mode.Validate(); err != nil {
+		return err
 	}
 	return c.setTLVs(ctx, Operation{Name: "SetQoSMode", Impact: ImpactTraffic}, wire.TLV{Type: wire.TLVQoSMode, Value: []byte{byte(mode)}})
 }
@@ -142,7 +153,7 @@ func (p PortPriority) Validate() error {
 	if err := p.Port.Validate(); err != nil {
 		return err
 	}
-	if !p.Priority.Valid() {
+	if p.Priority.Validate() != nil {
 		return invalidf("escp: invalid priority %d for port %d (valid: %d-%d)", p.Priority, p.Port, PriorityLowest, PriorityHighest)
 	}
 	return nil

@@ -49,8 +49,8 @@ func TestLibraryLimitsMatchTheWebUI(t *testing.T) {
 		"vlan_id_max_digits":            digits(int(MaxVLANID)),
 		"pvid_max_digits":               digits(int(MaxVLANID)),
 		"management_vlan_max_id":        int(MaxVLANID),
-		"bandwidth_rate_max_digits":     digits(MaxBandwidthKbps),
-		"storm_rate_max_digits":         digits(MaxBandwidthKbps),
+		"bandwidth_rate_max_digits":     digits(int(MaxBandwidth)),
+		"storm_rate_max_digits":         digits(int(MaxBandwidth)),
 		"lag_group_count":               LAGGroupCount,
 	}
 	// Known divergences: the library value, and why it is left as it is.

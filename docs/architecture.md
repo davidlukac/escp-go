@@ -35,7 +35,7 @@ Tests that cut across sources have names of their own: `cancel_test` (cancellati
 - Readers are named for what they return (`Ports`, `QoS`, `LED`, `Dot1Q`), writers `Set...` and `Delete...`.
 - The 802.1Q family shares the prefix `Dot1Q`: `Dot1Q` (the table the switch reports), `Dot1QVLAN` (one VLAN), `SetDot1QVLAN`, `DeleteDot1QVLAN`, and `VLANModeDot1Q` for the mode.
 - Every type a writer takes can be checked: it has a `Validate` method that returns an error matching `ErrInvalid`, and the writer calls that method, so the two cannot disagree (`validate_test.go` pins it).
-- Closed sets are types with a list function and, where the names are text, a `Parse...` function (`Speed`, `QoSMode`, `VLANMode`; `Priority` is a number with `Valid`). Their spellings are the web UI's and the Terraform provider's; consumers keep them in saved state, so they do not change.
+- Closed sets are types with a list function and, where the names are text, a `Parse...` function (`Speed`, `QoSMode`, `VLANMode`; `Priority` is a number, `Impact` a class). Every one has `Validate() error`, like every other input type: a method that answers a bare bool is not part of the API. Their spellings are the web UI's and the Terraform provider's; consumers keep them in saved state, so they do not change.
 - Attribute names in log lines are a contract ([logging](logging.md)).
 
 ## Rules the code keeps
