@@ -113,6 +113,25 @@ func TestADeviceWithAnotherMACIsNeverWrittenTo(t *testing.T) {
 	}
 }
 
+// Another device answering is not a silence to wait out: waiting longer or resending changes
+// nothing, so the call ends at once, however long the timeout is.
+func TestAWrongDeviceEndsTheCallAtOnce(t *testing.T) {
+	f := escptest.Start(t)
+	f.SetMAC(otherMAC)
+	c, _ := dialMAC(t, f, "127.0.0.1", wantMAC, nil)
+	c.cfg.Timeout = time.Minute
+	c.haveSwMAC = true // not a first contact, which has a short budget of its own
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	start := time.Now()
+	if _, err := c.Info(ctx); !errors.Is(err, ErrWrongSwitch) {
+		t.Fatalf("Info = %v, want ErrWrongSwitch", err)
+	}
+	if took := time.Since(start); took > 10*time.Second {
+		t.Fatalf("the wrong device was waited on for %v", took)
+	}
+}
+
 func TestTheMACInTheDiscoveryReplyIsCheckedToo(t *testing.T) {
 	// the header carries the wanted MAC but the description names another device
 	f := escptest.Start(t)
