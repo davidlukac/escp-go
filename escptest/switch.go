@@ -9,6 +9,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/davidlukac/escp-go/internal/udp"
 	"github.com/davidlukac/escp-go/internal/wire"
 )
 
@@ -62,6 +63,7 @@ const (
 // trivially (p=3443843009, q=3765816959), which is also why ESCP offers no real secrecy.
 type Switch struct {
 	conn     *net.UDPConn
+	port     int // the UDP port conn is bound to
 	user     string
 	password string
 
@@ -150,12 +152,12 @@ func FreeUDPPort(t testing.TB) int {
 // FreePort is FreeUDPPort for code that is not a test, such as an example: it returns the error
 // instead of failing a test.
 func FreePort() (int, error) {
-	c, err := listenUnreserved(listenLoopback)
+	c, port, err := listenUnreserved(listenLoopback)
 	if err != nil {
 		return 0, err
 	}
-	defer func() { _ = c.Close() }() // best effort: only the port number is kept
-	return c.LocalAddr().(*net.UDPAddr).Port, nil
+	_ = c.Close() // best effort: only the port number is kept
+	return port, nil
 }
 
 // reserved holds every port this package has handed out, for the life of the process.
@@ -174,24 +176,29 @@ func listenLoopback() (*net.UDPConn, error) {
 
 // listenUnreserved binds with listen until the kernel gives a port this package has not handed
 // out before, and reserves it.
-func listenUnreserved(listen func() (*net.UDPConn, error)) (*net.UDPConn, error) {
+func listenUnreserved(listen func() (*net.UDPConn, error)) (*net.UDPConn, int, error) {
 	var lastPort int
 	for range maxReservedTries {
 		c, err := listen()
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
-		lastPort = c.LocalAddr().(*net.UDPAddr).Port
+		ap, err := udp.AddrPort(c.LocalAddr())
+		if err != nil {
+			_ = c.Close()
+			return nil, 0, err
+		}
+		lastPort = int(ap.Port())
 		reservedMu.Lock()
 		taken := reserved[lastPort]
 		reserved[lastPort] = true
 		reservedMu.Unlock()
 		if !taken {
-			return c, nil
+			return c, lastPort, nil
 		}
 		_ = c.Close() // best effort: the port was already given to someone else, try another
 	}
-	return nil, fmt.Errorf("escptest: no unreserved UDP port after %d tries (last %d)", maxReservedTries, lastPort)
+	return nil, 0, fmt.Errorf("escptest: no unreserved UDP port after %d tries (last %d)", maxReservedTries, lastPort)
 }
 
 // Start runs a fake switch on a free loopback UDP port until the test ends. The LED starts on.
@@ -208,12 +215,12 @@ func Start(t testing.TB) *Switch {
 // Listen is Start for code that is not a test, such as an example: it runs a fake switch on a
 // free loopback UDP port and returns it; the caller closes it. The LED starts on.
 func Listen() (*Switch, error) {
-	conn, err := listenUnreserved(listenLoopback)
+	conn, port, err := listenUnreserved(listenLoopback)
 	if err != nil {
 		return nil, err
 	}
 	lease := DefaultLease()
-	f := &Switch{conn: conn, user: Username, password: Password, led: true, firmware: DefaultFirmware, lease: &lease}
+	f := &Switch{conn: conn, port: port, user: Username, password: Password, led: true, firmware: DefaultFirmware, lease: &lease}
 	go f.serve()
 	return f, nil
 }
@@ -222,7 +229,7 @@ func Listen() (*Switch, error) {
 func (f *Switch) Close() error { return f.conn.Close() }
 
 // Port is the UDP port the switch listens on; give it to the client as its switch port.
-func (f *Switch) Port() int { return f.conn.LocalAddr().(*net.UDPAddr).Port }
+func (f *Switch) Port() int { return f.port }
 
 // DropPacket makes the switch ignore the nth packet it receives (1-based), to test retries.
 func (f *Switch) DropPacket(n int) { f.mu.Lock(); f.dropNth = n; f.mu.Unlock() }

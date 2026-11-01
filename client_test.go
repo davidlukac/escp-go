@@ -3,6 +3,7 @@ package escp
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"net/netip"
 	"reflect"
@@ -287,5 +288,42 @@ func TestSeveralClientsShareTheReplyPort(t *testing.T) {
 func TestDialRefusesABroadcastAddressThatIsNotIPv4(t *testing.T) {
 	if _, err := Dial(Config{Host: "127.0.0.1", BroadcastAddr: netip.MustParseAddr("fe80::1")}); !errors.Is(err, ErrInvalid) {
 		t.Fatalf("got %v, want ErrInvalid", err)
+	}
+}
+
+// localIP reads the local address of a UDP connection and answers nil for any other kind, instead of
+// panicking on a type assertion.
+func TestLocalIP(t *testing.T) {
+	udpConn, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer udpConn.Close()
+	if got := localIP(udpConn); !got.Equal(net.IPv4(127, 0, 0, 1)) {
+		t.Errorf("a UDP connection: got %v, want 127.0.0.1", got)
+	}
+	server, client := net.Pipe() // its local address is not a UDP address
+	defer server.Close()
+	defer client.Close()
+	if got := localIP(client); got != nil {
+		t.Errorf("a connection that is not UDP: got %v, want nil", got)
+	}
+}
+
+// Client and Discover bind the reply port the same way, so a port that is taken reads the same in both.
+func TestBindReplyPortExplainsAPortThatIsTaken(t *testing.T) {
+	holder, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4zero}) // exclusive: no sharing option
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer holder.Close()
+	port := holder.LocalAddr().(*net.UDPAddr).Port
+	conn, err := bindReplyPort(context.Background(), port)
+	if err == nil {
+		conn.Close()
+		t.Skip("the system lets a socket share a port that is held exclusively")
+	}
+	if !strings.Contains(err.Error(), fmt.Sprintf("binding UDP port %d", port)) || !strings.Contains(err.Error(), "does not share the port") {
+		t.Errorf("got %v", err)
 	}
 }

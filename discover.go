@@ -10,10 +10,8 @@ import (
 	"net"
 	"net/netip"
 	"slices"
-	"strconv"
 	"time"
 
-	"github.com/davidlukac/escp-go/internal/udp"
 	"github.com/davidlukac/escp-go/internal/wire"
 )
 
@@ -218,12 +216,10 @@ func discoverUntil(ctx context.Context, opts DiscoverOptions, env discoverEnv, d
 
 // collectReplies sends the probes, listens for the window and returns the distinct replies.
 func collectReplies(ctx context.Context, env discoverEnv, probes []probe, window time.Duration, done func(map[string]Info) bool) ([]Info, error) {
-	lc := net.ListenConfig{Control: udp.Share}
-	pc, err := lc.ListenPacket(ctx, "udp4", net.JoinHostPort("", strconv.Itoa(env.hostPort)))
+	conn, err := bindReplyPort(ctx, env.hostPort)
 	if err != nil {
-		return nil, fmt.Errorf("escp: binding UDP port %d (is a client that does not share the port running, such as an old Easy Smart utility?): %w", env.hostPort, err)
+		return nil, err
 	}
-	conn := pc.(*net.UDPConn) // a "udp4" listener is always a *net.UDPConn
 	defer func() { _ = conn.Close() }()
 	// A cancelled context must end a read that is waiting for its deadline.
 	stop := context.AfterFunc(ctx, func() { _ = conn.SetReadDeadline(time.Now()) })
