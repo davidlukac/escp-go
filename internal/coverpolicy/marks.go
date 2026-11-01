@@ -5,6 +5,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"go/types"
 	"os"
 	"regexp"
 	"strings"
@@ -17,6 +18,7 @@ var marker = regexp.MustCompile(`^\s*//\s*coverage:\s*ignore\b(.*)$`)
 type exclusion struct {
 	start, end int
 	reason     string
+	name       string // the function's name, or "(Receiver).name" for a method
 }
 
 // markedFunctions returns the functions of the Go file at path whose doc comment says
@@ -53,8 +55,16 @@ func markedFunctions(path string) ([]exclusion, []string) {
 			}
 		}
 		if marked {
-			found = append(found, exclusion{start: fset.Position(fn.Pos()).Line, end: fset.Position(fn.End()).Line, reason: reason})
+			found = append(found, exclusion{start: fset.Position(fn.Pos()).Line, end: fset.Position(fn.End()).Line, reason: reason, name: funcName(fn)})
 		}
 	}
 	return found, problems
+}
+
+// funcName is the name of a function, with "(recv)." in front for a method.
+func funcName(fn *ast.FuncDecl) string {
+	if fn.Recv == nil || len(fn.Recv.List) == 0 {
+		return fn.Name.Name
+	}
+	return "(" + types.ExprString(fn.Recv.List[0].Type) + ")." + fn.Name.Name
 }

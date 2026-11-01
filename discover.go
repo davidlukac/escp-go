@@ -122,14 +122,17 @@ func subnetBroadcast(a net.Addr) netip.Addr {
 }
 
 // hostInterfaces lists the usable interfaces of this host.
-//
-// coverage: ignore - thin wrapper over net.Interfaces; the filtering is tested in usableInterfaces
 func hostInterfaces() ([]netInterface, error) {
-	all, err := net.Interfaces()
+	return interfacesOf(net.Interfaces, func(i net.Interface) ([]net.Addr, error) { return i.Addrs() })
+}
+
+// interfacesOf is hostInterfaces with the two reads of the operating system passed in.
+func interfacesOf(list func() ([]net.Interface, error), addrs func(net.Interface) ([]net.Addr, error)) ([]netInterface, error) {
+	all, err := list()
 	if err != nil {
 		return nil, fmt.Errorf("escp: listing network interfaces: %w", err)
 	}
-	return usableInterfaces(all, func(i net.Interface) ([]net.Addr, error) { return i.Addrs() }), nil
+	return usableInterfaces(all, addrs), nil
 }
 
 // selectInterfaces applies DiscoverOptions.Interface to the usable interfaces.

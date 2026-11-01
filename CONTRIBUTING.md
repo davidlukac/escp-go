@@ -25,7 +25,7 @@ Issues and pull requests are welcome, under the [Code of Conduct](CODE_OF_CONDUC
 
 ## 2. Tests
 
-Coverage must stay at 100% of reachable statements (`make cover`; exclusions only with a `// coverage: ignore - <reason>` comment on the function). A test that depends on timing is a bug: build the state deterministically. After writing a test, break the code on purpose and confirm the test fails.
+Coverage must stay at 100% of reachable statements (`make cover`; the only exclusion is `// coverage: ignore - <reason>` on a process entry point, `func main`; a test checks it. Anything else gets a seam a test can drive: a function that takes its dependencies, a pure function behind a wrapper). A test that depends on timing is a bug: build the state deterministically. After writing a test, break the code on purpose and confirm the test fails.
 
 - [ ] Wire tests with exact bytes against the fake switch (`escptest`): the golden path, a captured vector where one exists, short or truncated replies, boundary values, invalid input (matches `ErrInvalid`), and **nothing sent** when validation or the gate refuses.
 - [ ] The gate sees the right operation, ports and impact (`write_gate_test.go`); a cancelled context sends nothing.

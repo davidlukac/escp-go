@@ -163,8 +163,6 @@ func macHolding(addr net.IP, ifs []net.Interface, addrs func(net.Interface) ([]n
 
 // hostLocator is the lookup a client uses: Locate on the interfaces of this host, logging to the
 // client's logger (before it is identified: Locate does that).
-//
-// coverage: ignore - thin wrapper that would probe the real network; Locate is tested through locateWith
 func hostLocator(log *slog.Logger) func(ctx context.Context, mac MAC) (Info, error) {
 	return func(ctx context.Context, mac MAC) (Info, error) {
 		return Locate(ctx, mac, DiscoverOptions{Logger: log})

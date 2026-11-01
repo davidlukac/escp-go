@@ -342,3 +342,33 @@ func TestRunDefaultsTheRootToTheCurrentDirectory(t *testing.T) {
 		t.Fatalf("exit %d, stderr %q", code, stderr.String())
 	}
 }
+
+// A `coverage: ignore` mark is for a process entry point, whose os.Exit a test cannot survive, and
+// for nothing else: any other code is given a seam that a test can drive (a function that takes its
+// dependencies, a pure function behind a wrapper). The policy checks the marks of this very module.
+func TestOnlyProcessEntryPointsAreExcludedFromThePolicy(t *testing.T) {
+	root := filepath.Join("..", "..")
+	var marked int
+	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") || strings.Contains(path, "build"+string(filepath.Separator)) {
+			return err
+		}
+		found, problems := markedFunctions(path)
+		for _, p := range problems {
+			t.Error(p)
+		}
+		for _, ex := range found {
+			marked++
+			if ex.name != "main" {
+				t.Errorf("%s:%d: %s is excluded from the coverage policy (%s); only func main may be", path, ex.start, ex.name, ex.reason)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if marked == 0 {
+		t.Fatal("found no excluded function: the walk is looking in the wrong place")
+	}
+}
