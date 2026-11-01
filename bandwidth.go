@@ -70,17 +70,29 @@ const (
 // MaxBandwidthKbps is the largest limit the web UI offers.
 const MaxBandwidthKbps = 1000000
 
-func bandwidthTLV(typ wire.TLVType, port PortID, kbps Kbps) (wire.TLV, error) {
-	if kbps.Validate() != nil {
-		return wire.TLV{}, invalidf("escp: invalid rate %d kbps for port %d: use 0 (unlimited) or a multiple of %d up to %d", kbps, port, RateStepKbps, MaxBandwidthKbps)
+// Validate checks the limits before they are written: a valid port and, in each direction, 0
+// (unlimited) or a multiple of RateStepKbps up to MaxBandwidthKbps. The error matches ErrInvalid.
+func (b PortBandwidth) Validate() error {
+	if err := b.Port.Validate(); err != nil {
+		return err
 	}
+	for _, rate := range []Kbps{b.IngressKbps, b.EgressKbps} {
+		if rate.Validate() != nil {
+			return invalidf("escp: invalid rate %d kbps for port %d: use 0 (unlimited) or a multiple of %d up to %d", rate, b.Port, RateStepKbps, MaxBandwidthKbps)
+		}
+	}
+	return nil
+}
+
+// bandwidthTLV encodes one direction of a limit that PortBandwidth.Validate accepted.
+func bandwidthTLV(typ wire.TLVType, port PortID, kbps Kbps) wire.TLV {
 	v := make([]byte, bwEntryLen)
 	v[bwOffPort] = byte(port)
 	if kbps != 0 {
 		v[bwOffEnabled] = 1
 	}
 	binary.BigEndian.PutUint32(v[bwOffRate:], uint32(kbps))
-	return wire.TLV{Type: typ, Value: v}, nil
+	return wire.TLV{Type: typ, Value: v}
 }
 
 // SetBandwidth sets a port's ingress and egress limits in kbps (0 = unlimited,
@@ -90,17 +102,10 @@ func bandwidthTLV(typ wire.TLVType, port PortID, kbps Kbps) (wire.TLV, error) {
 // it; callers must guard against that. The two requests are not atomic: if the second
 // fails (or its gate refuses, or the call is cancelled) the ingress limit stays applied.
 func (c *Client) SetBandwidth(ctx context.Context, limit PortBandwidth) error {
-	if err := limit.Port.Validate(); err != nil {
+	if err := limit.Validate(); err != nil {
 		return err
 	}
-	in, err := bandwidthTLV(wire.TLVBandwidthIngress, limit.Port, limit.IngressKbps)
-	if err != nil {
-		return err
-	}
-	eg, err := bandwidthTLV(wire.TLVBandwidthEgress, limit.Port, limit.EgressKbps)
-	if err != nil {
-		return err
-	}
+	in, eg := bandwidthTLV(wire.TLVBandwidthIngress, limit.Port, limit.IngressKbps), bandwidthTLV(wire.TLVBandwidthEgress, limit.Port, limit.EgressKbps)
 	if err := c.requirePorts(ctx, limit.Port.set()); err != nil {
 		return err
 	}

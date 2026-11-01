@@ -33,8 +33,8 @@ Tests that cut across sources have names of their own: `cancel_test` (cancellati
 - A field that holds a port number is named for what the record is. A record that *is* a port (`Port`, `PortConfig`, `PortStats`) calls it `ID`; a record that *refers to* a port (`PortBandwidth`, `PortStorm`, `StormConfig`, `PortPVID`, `PortPriority`) calls it `Port`; a port with a role in the record is named for the role (`MTUVLAN.UplinkPort`, `Mirror.MirrorPort`).
 - Readers are named for what they return (`Ports`, `QoS`, `LED`, `Dot1Q`), writers `Set...` and `Delete...`.
 - The 802.1Q family shares the prefix `Dot1Q`: `Dot1Q` (the table the switch reports), `Dot1QVLAN` (one VLAN), `SetDot1QVLAN`, `DeleteDot1QVLAN`, and `VLANModeDot1Q` for the mode.
-- Every type that can be checked has a `Validate` method that returns an error matching `ErrInvalid`.
-- Closed sets are types with `String`, `Parse...`, `Valid` and a list function (`Speed`, `QoSMode`, `Priority`, `VLANMode`). Their spellings are the web UI's and the Terraform provider's; consumers keep them in saved state, so they do not change.
+- Every type a writer takes can be checked: it has a `Validate` method that returns an error matching `ErrInvalid`, and the writer calls that method, so the two cannot disagree (`validate_test.go` pins it).
+- Closed sets are types with a list function and, where the names are text, a `Parse...` function (`Speed`, `QoSMode`, `VLANMode`; `Priority` is a number with `Valid`). Their spellings are the web UI's and the Terraform provider's; consumers keep them in saved state, so they do not change.
 - Attribute names in log lines are a contract ([logging](logging.md)).
 
 ## Rules the code keeps

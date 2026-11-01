@@ -67,6 +67,25 @@ type StormConfig struct {
 	RateKbps       Kbps
 }
 
+// limited reports whether any traffic type is selected: storm control is on exactly then.
+func (cfg StormConfig) limited() bool { return cfg.UnknownUnicast || cfg.Multicast || cfg.Broadcast }
+
+// Validate checks the setting before it is written: a valid port, and either a traffic type with a
+// rate (a multiple of RateStepKbps, at least one step, at most MaxBandwidthKbps) or no traffic type
+// and no rate. The error matches ErrInvalid.
+func (cfg StormConfig) Validate() error {
+	if err := cfg.Port.Validate(); err != nil {
+		return err
+	}
+	switch {
+	case cfg.limited() && (cfg.RateKbps < RateStepKbps || cfg.RateKbps.Validate() != nil):
+		return invalidf("escp: storm control on port %d needs a rate that is a multiple of %d kbps between %d and %d, got %d", cfg.Port, RateStepKbps, RateStepKbps, MaxBandwidthKbps, cfg.RateKbps)
+	case !cfg.limited() && cfg.RateKbps != 0:
+		return invalidf("escp: storm control on port %d has a rate (%d) but no traffic type selected", cfg.Port, cfg.RateKbps)
+	}
+	return nil
+}
+
 // SetStormControl configures storm control on one port. Following the vendor
 // utility: selecting any traffic type requires a rate (a multiple of 64 kbps,
 // at least 64, at most MaxBandwidthKbps); selecting none disables it and the
@@ -74,16 +93,10 @@ type StormConfig struct {
 // broadcast/multicast; callers must guard against that. Storm control is refused (ErrInvalid) on a port that has an
 // ingress limit: the switch would remove the limit without saying so.
 func (c *Client) SetStormControl(ctx context.Context, cfg StormConfig) error {
-	if err := cfg.Port.Validate(); err != nil {
+	if err := cfg.Validate(); err != nil {
 		return err
 	}
-	limited := cfg.UnknownUnicast || cfg.Multicast || cfg.Broadcast
-	switch {
-	case limited && (cfg.RateKbps < RateStepKbps || cfg.RateKbps.Validate() != nil):
-		return invalidf("escp: storm control on port %d needs a rate that is a multiple of %d kbps between %d and %d, got %d", cfg.Port, RateStepKbps, RateStepKbps, MaxBandwidthKbps, cfg.RateKbps)
-	case !limited && cfg.RateKbps != 0:
-		return invalidf("escp: storm control on port %d has a rate (%d) but no traffic type selected", cfg.Port, cfg.RateKbps)
-	}
+	limited := cfg.limited()
 	if err := c.requirePorts(ctx, cfg.Port.set()); err != nil {
 		return err
 	}
