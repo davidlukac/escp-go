@@ -44,7 +44,7 @@ func startResponder(t *testing.T, hostPort int, replies func(h wire.Header) [][]
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { conn.Close() })
-	r := &responder{port: conn.LocalAddr().(*net.UDPAddr).Port, probes: make(chan wire.Header, 64)}
+	r := &responder{port: localPort(t, conn), probes: make(chan wire.Header, 64)}
 	go func() {
 		buf := make([]byte, maxDatagram)
 		for {
@@ -291,7 +291,7 @@ func TestDiscoverReportsABusyReplyPort(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer busy.Close()
-	port := busy.LocalAddr().(*net.UDPAddr).Port
+	port := localPort(t, busy)
 	_, err = discoverWith(context.Background(), DiscoverOptions{Window: 50 * time.Millisecond}, discoverEnv{
 		interfaces: func() ([]netInterface, error) {
 			return []netInterface{{Name: "en0", MAC: macOne, Broadcasts: lo}}, nil

@@ -2,6 +2,7 @@ package safety
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -69,7 +70,7 @@ func TestParseCompatibilityRefusals(t *testing.T) {
 
 func TestMustLoadCompatibilityStopsOnABadTable(t *testing.T) {
 	defer func() {
-		if r := recover(); r == nil || !strings.Contains(r.(string), "compatibility.json") {
+		if r := recover(); r == nil || !strings.Contains(fmt.Sprint(r), "compatibility.json") {
 			t.Fatalf("recovered %v, want a panic naming compatibility.json", r)
 		}
 	}()

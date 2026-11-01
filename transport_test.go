@@ -216,7 +216,7 @@ func TestBindFailureIsReported(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer taken.Close()
-	port := taken.LocalAddr().(*net.UDPAddr).Port
+	port := localPort(t, taken)
 	c, err := Dial(Config{Host: "127.0.0.1", HostPort: port, Timeout: 100 * time.Millisecond})
 	if err != nil {
 		t.Fatal(err)

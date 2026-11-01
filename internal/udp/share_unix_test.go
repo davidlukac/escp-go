@@ -36,7 +36,11 @@ func TestShareSocketSetsTheOptionsOnARealSocket(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer first.Close()
-	port := first.LocalAddr().(*net.UDPAddr).Port
+	firstAddr, err := AddrPort(first.LocalAddr())
+	if err != nil {
+		t.Fatal(err)
+	}
+	port := int(firstAddr.Port())
 	second, err := lc.ListenPacket(t.Context(), "udp4", net.JoinHostPort("", strconv.Itoa(port)))
 	if err != nil {
 		t.Fatalf("a second sharing listener on port %d must be allowed: %v", port, err)
