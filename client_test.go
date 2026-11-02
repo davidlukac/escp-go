@@ -346,3 +346,110 @@ func TestBindReplyPortExplainsAPortThatIsTaken(t *testing.T) {
 		t.Errorf("got %v", err)
 	}
 }
+
+// stubLookup is a resolver for dial: it answers from a fixed list, or waits for the context.
+type stubLookup struct {
+	addrs []net.IPAddr
+	err   error
+	block bool
+	asked []string
+}
+
+func (s *stubLookup) LookupIPAddr(ctx context.Context, host string) ([]net.IPAddr, error) {
+	s.asked = append(s.asked, host)
+	if s.block {
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}
+	return s.addrs, s.err
+}
+
+func TestDialContextReportsAContextThatEndsDuringTheLookup(t *testing.T) {
+	canceled, cancel := context.WithCancel(context.Background())
+	cancel()
+	expired, stop := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+	defer stop()
+	for name, tc := range map[string]struct {
+		ctx  context.Context
+		want error
+	}{
+		"canceled": {canceled, context.Canceled},
+		"expired":  {expired, context.DeadlineExceeded},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := dial(tc.ctx, &stubLookup{block: true}, Config{Host: "sw.example"})
+			if !errors.Is(err, tc.want) || errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), `resolving "sw.example"`) {
+				t.Fatalf("got %v, want %v naming the host", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestDialContextTakesTheFirstIPv4AddressOfAName(t *testing.T) {
+	look := &stubLookup{addrs: []net.IPAddr{
+		{IP: net.ParseIP("2001:db8::1")},
+		{IP: net.ParseIP("192.0.2.7")},
+		{IP: net.ParseIP("192.0.2.8")},
+	}}
+	c, err := dial(context.Background(), look, Config{Host: "sw.example"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := c.dest.IP.String(); got != "192.0.2.7" {
+		t.Errorf("destination %s, want the first IPv4 address 192.0.2.7", got)
+	}
+	if len(look.asked) != 1 || look.asked[0] != "sw.example" {
+		t.Errorf("looked up %v, want the host name once", look.asked)
+	}
+}
+
+func TestDialContextRefusesANameWithoutAnIPv4Address(t *testing.T) {
+	for name, look := range map[string]*stubLookup{
+		"only IPv6":  {addrs: []net.IPAddr{{IP: net.ParseIP("2001:db8::1")}}},
+		"no address": {},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := dial(context.Background(), look, Config{Host: "sw.example"})
+			if !errors.Is(err, errNoIPv4) || errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), `resolving "sw.example"`) {
+				t.Fatalf("got %v, want a resolution error with no IPv4 address", err)
+			}
+		})
+	}
+}
+
+// A literal address and the MAC-only form involve no lookup, so a context that has ended does not
+// matter to them: DialContext does what Dial does.
+func TestDialContextNeedsNoLookupForALiteralAddressOrAMAC(t *testing.T) {
+	done, cancel := context.WithCancel(context.Background())
+	cancel()
+	for name, cfg := range map[string]Config{
+		"literal address": {Host: "192.0.2.11"},
+		"MAC only":        {MAC: MAC{0x00, 0x00, 0x5e, 0x00, 0x53, 0x01}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			c, err := DialContext(done, cfg)
+			if err != nil {
+				t.Fatalf("got %v, want a client", err)
+			}
+			_ = c.Close()
+		})
+	}
+}
+
+func TestDialContextRefusesWhatDialRefuses(t *testing.T) {
+	if _, err := DialContext(context.Background(), Config{Host: "::1"}); !errors.Is(err, ErrInvalid) {
+		t.Errorf("an IPv6 host: got %v, want ErrInvalid", err)
+	}
+}
+
+// DialContext hands its context to the lookup: a name looked up under a context that has ended is
+// reported as the context's error, not resolved. The context is already canceled, so nothing is sent
+// to a resolver.
+func TestDialContextGivesItsContextToTheLookup(t *testing.T) {
+	done, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := DialContext(done, Config{Host: "sw.example"})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("got %v, want context.Canceled", err)
+	}
+}

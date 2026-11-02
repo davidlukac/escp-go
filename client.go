@@ -3,6 +3,7 @@ package escp
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -49,7 +50,7 @@ type Client struct {
 }
 
 // Dial prepares a client for the switch at cfg.Host, which must be an IPv4 address or a
-// name that resolves to one (a name is looked up now, and the lookup cannot be canceled), or,
+// name that resolves to one (a name is looked up now; use DialContext to bound or cancel the lookup), or,
 // when cfg.MAC is set, may be left empty to find the switch by its MAC address on the first
 // request. A configuration that Config.Validate refuses is refused here, with an error that
 // matches ErrInvalid, and not on the first call. It sends nothing to the switch and
@@ -57,6 +58,42 @@ type Client struct {
 // (a program that builds one and validates its input) has no side effects on the switch. Close the client
 // when done.
 func Dial(cfg Config) (*Client, error) {
+	return DialContext(context.Background(), cfg)
+}
+
+// DialContext is Dial with a context for the one step that can wait: the lookup of a host name.
+// It returns the context's error (wrapped, so errors.Is matches context.Canceled and
+// context.DeadlineExceeded) when ctx ends during the lookup. The returned client does not keep ctx:
+// it is no deadline for later calls, which take their own context. A literal IPv4 address and the
+// MAC-only form involve no lookup, so ctx does not matter for them.
+func DialContext(ctx context.Context, cfg Config) (*Client, error) {
+	return dial(ctx, net.DefaultResolver, cfg)
+}
+
+// ipLookuper is the part of *net.Resolver that Dial needs; tests replace it.
+type ipLookuper interface {
+	LookupIPAddr(ctx context.Context, host string) ([]net.IPAddr, error)
+}
+
+// resolveIPv4 returns the first IPv4 address host stands for: the address itself for a literal one,
+// else the first IPv4 address the lookup returns. A host with no IPv4 address is an error.
+func resolveIPv4(ctx context.Context, r ipLookuper, host string) (net.IP, error) {
+	addrs, err := r.LookupIPAddr(ctx, host)
+	if err != nil {
+		return nil, err
+	}
+	for _, a := range addrs {
+		if ip := a.IP.To4(); ip != nil {
+			return ip, nil
+		}
+	}
+	return nil, errNoIPv4
+}
+
+// errNoIPv4 is the cause of a host name that resolves, but not to an IPv4 address.
+var errNoIPv4 = errors.New("no IPv4 address")
+
+func dial(ctx context.Context, r ipLookuper, cfg Config) (*Client, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
@@ -85,12 +122,12 @@ func Dial(cfg Config) (*Client, error) {
 		// no address yet: the first request finds the switch by its MAC address
 		c.dest = &net.UDPAddr{Port: cfg.SwitchPort}
 	} else {
-		ip, err := net.ResolveIPAddr("ip4", cfg.Host)
+		ip, err := resolveIPv4(ctx, r, cfg.Host)
 		if err != nil {
 			return nil, fmt.Errorf("escp: resolving %q: %w", cfg.Host, err)
 		}
-		c.dest = &net.UDPAddr{IP: ip.IP, Port: cfg.SwitchPort}
-		c.hostMAC = localMAC(ip.IP)
+		c.dest = &net.UDPAddr{IP: ip, Port: cfg.SwitchPort}
+		c.hostMAC = localMAC(ip)
 	}
 	var n [2]byte
 	_, _ = rand.Read(n[:])
