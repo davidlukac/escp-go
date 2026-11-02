@@ -16,7 +16,7 @@ The library speaks the switch's own management protocol (ESCP), which has **no r
 
 - Use it from a host on a **trusted management network** (a dedicated VLAN or an out-of-band segment), never across an untrusted LAN.
 - Never log a `Config`; keep passwords out of source code and out of the logs you ship (the library's own log lines never carry a password, user name or session key).
-- The client shares its UDP reply port (`SO_REUSEPORT`) so several switches can be managed at once. Other processes on the same host that bind the port the same way can see replies; do not run it on a shared multi-user host.
+- The client shares its UDP reply port (`SO_REUSEPORT`) so several switches can be managed at once. Other processes on the same host that bind the port the same way can see replies, and the switches address their replies to the broadcast address, so every host of the segment sees them too; do not run it on a shared multi-user host or on a segment you do not control.
 - The write gates (`safety`) protect against self-inflicted lockouts, not against an attacker on the segment.
 
 ## In scope
