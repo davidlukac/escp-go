@@ -2,6 +2,7 @@ package wire
 
 import (
 	"encoding/binary"
+	"fmt"
 	"testing"
 )
 
@@ -18,11 +19,13 @@ func TestLooksLikeHeaderNeedsRoomForTheHeaderAndTheEndMarker(t *testing.T) {
 		{HeaderLen, false},
 		{HeaderLen - len(packetEnd), false},
 	} {
-		b := make([]byte, tc.size)
-		b[0], b[offOp] = protocolVersion, OpGet
-		binary.BigEndian.PutUint16(b[offLength:], uint16(tc.size))
-		if got := LooksLikeHeader(b); got != tc.want {
-			t.Errorf("a well-formed buffer of %d bytes: LooksLikeHeader = %v, want %v", tc.size, got, tc.want)
-		}
+		t.Run(fmt.Sprintf("size %d", tc.size), func(t *testing.T) {
+			b := make([]byte, tc.size)
+			b[0], b[offOp] = protocolVersion, OpGet
+			binary.BigEndian.PutUint16(b[offLength:], uint16(tc.size))
+			if got := LooksLikeHeader(b); got != tc.want {
+				t.Errorf("a well-formed buffer of %d bytes: LooksLikeHeader = %v, want %v", tc.size, got, tc.want)
+			}
+		})
 	}
 }

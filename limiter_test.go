@@ -58,9 +58,11 @@ func TestIngressLimitIsRefusedWhileStormControlIsOn(t *testing.T) {
 		t.Fatalf("got %v, want ErrInvalid", err)
 	}
 	for _, want := range []string{"port 3", "storm control on (1024 kbps)", "10240 kbps would turn storm control off", "Turn storm control off first"} {
-		if !strings.Contains(err.Error(), want) {
-			t.Errorf("%q is not in %q", want, err)
-		}
+		t.Run(want, func(t *testing.T) {
+			if !strings.Contains(err.Error(), want) {
+				t.Errorf("%q is not in %q", want, err)
+			}
+		})
 	}
 	if f.WriteCount() != writes {
 		t.Fatalf("%d SET(s) reached the switch", f.WriteCount()-writes)
@@ -83,9 +85,11 @@ func TestStormControlIsRefusedWhileAnIngressLimitIsSet(t *testing.T) {
 		t.Fatalf("got %v, want ErrInvalid", err)
 	}
 	for _, want := range []string{"port 3", "an ingress limit of 10240 kbps", "storm control would remove the limit", "Set the ingress limit to 0 first"} {
-		if !strings.Contains(err.Error(), want) {
-			t.Errorf("%q is not in %q", want, err)
-		}
+		t.Run(want, func(t *testing.T) {
+			if !strings.Contains(err.Error(), want) {
+				t.Errorf("%q is not in %q", want, err)
+			}
+		})
 	}
 	if f.WriteCount() != writes {
 		t.Fatalf("%d SET(s) reached the switch", f.WriteCount()-writes)

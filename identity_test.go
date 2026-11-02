@@ -294,8 +294,10 @@ func TestAddrOf(t *testing.T) {
 		"IPv4 in 16 bytes": {net.IPv4(192, 0, 2, 1), netip.MustParseAddr("192.0.2.1")},
 		"IPv6 stays IPv6":  {net.ParseIP("fe80::1"), netip.MustParseAddr("fe80::1")},
 	} {
-		if got := addrOf(tc.in); got != tc.want {
-			t.Errorf("%s: addrOf(%v) = %v, want %v", name, tc.in, got, tc.want)
-		}
+		t.Run(name, func(t *testing.T) {
+			if got := addrOf(tc.in); got != tc.want {
+				t.Errorf("%s: addrOf(%v) = %v, want %v", name, tc.in, got, tc.want)
+			}
+		})
 	}
 }

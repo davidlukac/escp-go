@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"net/netip"
 	"strings"
@@ -49,9 +50,11 @@ func TestEnableDHCPAsksForALeaseAndFollowsIt(t *testing.T) {
 		t.Fatalf("SET carries %d TLVs, want %d: %+v", len(sets[0]), len(want), sets[0])
 	}
 	for i, w := range want {
-		if sets[0][i].Type != escptest.TLVType(w.Type) || !bytes.Equal(sets[0][i].Value, w.Value) {
-			t.Errorf("TLV %d = %+v, want %+v", i, sets[0][i], w)
-		}
+		t.Run(fmt.Sprintf("TLV %d", i), func(t *testing.T) {
+			if sets[0][i].Type != escptest.TLVType(w.Type) || !bytes.Equal(sets[0][i].Value, w.Value) {
+				t.Errorf("TLV %d = %+v, want %+v", i, sets[0][i], w)
+			}
+		})
 	}
 	info, err := c.Info(context.Background())
 	if err != nil || !info.DHCP || info.Netmask.String() != "255.255.0.0" || info.Gateway.String() != "127.0.0.2" {

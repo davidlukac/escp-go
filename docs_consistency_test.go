@@ -48,28 +48,30 @@ func TestEveryErrorIsInTheErrorsGuide(t *testing.T) {
 	guide := readText(t, "docs/errors.md")
 	var names []string
 	for _, dir := range []string{".", "safety"} {
-		for _, f := range parsedPackage(t, dir) {
-			for _, decl := range f.Decls {
-				d, ok := decl.(*ast.GenDecl)
-				if !ok {
-					continue
-				}
-				for _, spec := range d.Specs {
-					switch s := spec.(type) {
-					case *ast.ValueSpec:
-						for _, n := range s.Names {
-							if n.IsExported() && strings.HasPrefix(n.Name, "Err") {
-								names = append(names, n.Name)
+		t.Run(dir, func(t *testing.T) {
+			for _, f := range parsedPackage(t, dir) {
+				for _, decl := range f.Decls {
+					d, ok := decl.(*ast.GenDecl)
+					if !ok {
+						continue
+					}
+					for _, spec := range d.Specs {
+						switch s := spec.(type) {
+						case *ast.ValueSpec:
+							for _, n := range s.Names {
+								if n.IsExported() && strings.HasPrefix(n.Name, "Err") {
+									names = append(names, n.Name)
+								}
 							}
-						}
-					case *ast.TypeSpec:
-						if s.Name.IsExported() && strings.HasSuffix(s.Name.Name, "Error") {
-							names = append(names, s.Name.Name)
+						case *ast.TypeSpec:
+							if s.Name.IsExported() && strings.HasSuffix(s.Name.Name, "Error") {
+								names = append(names, s.Name.Name)
+							}
 						}
 					}
 				}
 			}
-		}
+		})
 	}
 	if len(names) < 12 {
 		t.Fatalf("found only %d error names: the scan is broken (%v)", len(names), names)

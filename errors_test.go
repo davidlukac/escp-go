@@ -20,9 +20,11 @@ func TestRejectedErrorNamesTheCodeAndMatchesErrAuth(t *testing.T) {
 	}
 	msg := err.Error()
 	for _, want := range []string{"rejected the request", "error code 4", "refuses this setting"} {
-		if !strings.Contains(msg, want) {
-			t.Errorf("message %q must contain %q", msg, want)
-		}
+		t.Run(want, func(t *testing.T) {
+			if !strings.Contains(msg, want) {
+				t.Errorf("message %q must contain %q", msg, want)
+			}
+		})
 	}
 	var rejected *RejectedError
 	if !errors.As(fmt.Errorf("setting a LAG: %w", err), &rejected) || rejected.Code != 4 {

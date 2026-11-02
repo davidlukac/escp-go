@@ -3,6 +3,7 @@ package escp
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -145,9 +146,11 @@ func TestPortCountIsReadOnce(t *testing.T) {
 		t.Fatalf("no port was named, yet the port count was read %d time(s)", n)
 	}
 	for _, id := range []int{2, 3, 4} {
-		if err := c.SetPort(ctx, PortConfig{ID: PortID(id), Enabled: true, Speed: SpeedAuto}); err != nil {
-			t.Fatal(err)
-		}
+		t.Run(fmt.Sprint(id), func(t *testing.T) {
+			if err := c.SetPort(ctx, PortConfig{ID: PortID(id), Enabled: true, Speed: SpeedAuto}); err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 	if err := c.SetBandwidth(ctx, PortBandwidth{Port: 5}); err != nil {
 		t.Fatal(err)

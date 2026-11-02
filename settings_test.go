@@ -197,30 +197,32 @@ func TestTheGeneratedTablesAreCurrent(t *testing.T) {
 		{"README.md", "validators", validatorList(t)},
 		{"docs/writing-safely.md", "validators", validatorList(t)},
 	} {
-		begin := "<!-- " + g.name + ":begin (generated from escp.Settings: make settings-docs) -->"
-		end := "<!-- " + g.name + ":end -->"
-		text, err := os.ReadFile(g.file)
-		if err != nil {
-			t.Fatal(err)
-		}
-		doc := string(text)
-		i, j := strings.Index(doc, begin), strings.Index(doc, end)
-		if i < 0 || j < i {
-			t.Fatalf("%s has no %s block between\n%s\nand\n%s", g.file, g.name, begin, end)
-		}
-		want := doc[:i+len(begin)] + "\n\n" + g.content + "\n" + doc[j:]
-		if !strings.Contains(g.content, "\n") { // a list inside a sentence
-			want = doc[:i+len(begin)] + g.content + doc[j:]
-		}
-		if want == doc {
-			continue
-		}
-		if *updateDocs {
-			if err := os.WriteFile(g.file, []byte(want), 0o600); err != nil {
+		t.Run(g.name, func(t *testing.T) {
+			begin := "<!-- " + g.name + ":begin (generated from escp.Settings: make settings-docs) -->"
+			end := "<!-- " + g.name + ":end -->"
+			text, err := os.ReadFile(g.file)
+			if err != nil {
 				t.Fatal(err)
 			}
-			continue
-		}
-		t.Errorf("%s is out of date with escp.Settings: run `make settings-docs` and commit the result", g.file)
+			doc := string(text)
+			i, j := strings.Index(doc, begin), strings.Index(doc, end)
+			if i < 0 || j < i {
+				t.Fatalf("%s has no %s block between\n%s\nand\n%s", g.file, g.name, begin, end)
+			}
+			want := doc[:i+len(begin)] + "\n\n" + g.content + "\n" + doc[j:]
+			if !strings.Contains(g.content, "\n") { // a list inside a sentence
+				want = doc[:i+len(begin)] + g.content + doc[j:]
+			}
+			if want == doc {
+				return
+			}
+			if *updateDocs {
+				if err := os.WriteFile(g.file, []byte(want), 0o600); err != nil {
+					t.Fatal(err)
+				}
+				return
+			}
+			t.Errorf("%s is out of date with escp.Settings: run `make settings-docs` and commit the result", g.file)
+		})
 	}
 }

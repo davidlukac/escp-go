@@ -3,6 +3,7 @@ package escp
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"strings"
 	"testing"
@@ -41,9 +42,11 @@ func TestCredentialsMustTravelUnderTheSessionKey(t *testing.T) {
 
 func TestDecryptSessionKeyRefusesAShortValue(t *testing.T) {
 	for _, n := range []int{0, 1, 9} {
-		if got := escptest.DecryptSessionKey(make([]byte, n)); got != nil {
-			t.Errorf("a %d-byte value is no key exchange, got %v", n, got)
-		}
+		t.Run(fmt.Sprint(n), func(t *testing.T) {
+			if got := escptest.DecryptSessionKey(make([]byte, n)); got != nil {
+				t.Errorf("a %d-byte value is no key exchange, got %v", n, got)
+			}
+		})
 	}
 }
 

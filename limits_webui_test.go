@@ -105,8 +105,10 @@ func TestLibraryLimitsMatchTheWebUI(t *testing.T) {
 		t.Errorf("limits in webui-limits.json that are not classified: %v; add each to matches, diverges or notModeled", unclassified)
 	}
 	for name := range notModeled {
-		if _, ok := web.Limits[name]; !ok {
-			t.Errorf("notModeled lists %s, which webui-limits.json no longer has", name)
-		}
+		t.Run(name, func(t *testing.T) {
+			if _, ok := web.Limits[name]; !ok {
+				t.Errorf("notModeled lists %s, which webui-limits.json no longer has", name)
+			}
+		})
 	}
 }

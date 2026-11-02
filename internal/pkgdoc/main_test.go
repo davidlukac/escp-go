@@ -103,18 +103,22 @@ func TestEachPackageIsSavedAsHTMLAndAsTextUnderItsNameInTheModule(t *testing.T) 
 		"a_b.html": "<p>nested &amp; internal</p>", "a_b.txt": "nested & internal\n",
 		"zero.txt": "zero\n",
 	} {
-		got, err := os.ReadFile(filepath.Join(out, file))
-		if err != nil || string(got) != want {
-			t.Errorf("%s = %q, %v; want %q", file, got, err, want)
-		}
+		t.Run(file, func(t *testing.T) {
+			got, err := os.ReadFile(filepath.Join(out, file))
+			if err != nil || string(got) != want {
+				t.Errorf("%s = %q, %v; want %q", file, got, err, want)
+			}
+		})
 	}
 	if _, err := os.Stat(filepath.Join(out, "stale.txt")); err == nil {
 		t.Error("a file of an earlier run was left in the directory")
 	}
 	for _, want := range []string{"saved " + out + "/escp.html and .txt\n", "saved " + out + "/a_b.html and .txt\n"} {
-		if !strings.Contains(stdout, want) {
-			t.Errorf("stdout lacks %q:\n%s", want, stdout)
-		}
+		t.Run(want, func(t *testing.T) {
+			if !strings.Contains(stdout, want) {
+				t.Errorf("stdout lacks %q:\n%s", want, stdout)
+			}
+		})
 	}
 }
 
@@ -209,13 +213,15 @@ func TestWhatTheGoToolCannotSayStopsTheRunBeforeAnythingIsWritten(t *testing.T) 
 		"module":   {moduleErr: errors.New("no go.mod")},
 		"packages": {moduleName: "m", pkgsErr: errors.New("build failed")},
 	} {
-		code, _, errOut := runWith(t, tool, quickSettings(1), out)
-		if code != exitFailure || !strings.Contains(errOut, "no go.mod") && !strings.Contains(errOut, "build failed") {
-			t.Errorf("%s: code %d, stderr %q", name, code, errOut)
-		}
-		if _, err := os.Stat(out); err == nil {
-			t.Errorf("%s: the output directory was created", name)
-		}
+		t.Run(name, func(t *testing.T) {
+			code, _, errOut := runWith(t, tool, quickSettings(1), out)
+			if code != exitFailure || !strings.Contains(errOut, "no go.mod") && !strings.Contains(errOut, "build failed") {
+				t.Errorf("%s: code %d, stderr %q", name, code, errOut)
+			}
+			if _, err := os.Stat(out); err == nil {
+				t.Errorf("%s: the output directory was created", name)
+			}
+		})
 	}
 }
 
@@ -263,23 +269,29 @@ func TestServeReportsPkgsiteThatFailsOnItsOwn(t *testing.T) {
 
 func TestAnythingButAnOutputDirectoryOrServeIsAUsageError(t *testing.T) {
 	for _, args := range [][]string{{"a", "b"}, {"--unknown"}, {"-x"}, {"--serve", "extra"}} {
-		code, _, errOut := runWith(t, fakeTool{}, quickSettings(1), args...)
-		if code != exitUsage || !strings.Contains(errOut, "usage: pkgdoc") {
-			t.Errorf("%v: code %d, stderr %q", args, code, errOut)
-		}
+		t.Run(fmt.Sprint(args), func(t *testing.T) {
+			code, _, errOut := runWith(t, fakeTool{}, quickSettings(1), args...)
+			if code != exitUsage || !strings.Contains(errOut, "usage: pkgdoc") {
+				t.Errorf("%v: code %d, stderr %q", args, code, errOut)
+			}
+		})
 	}
 }
 
 func TestThePortComesFromTheEnvironmentOrIsTheDefault(t *testing.T) {
 	for in, want := range map[string]int{"": 8089, "9000": 9000, "1": 1, "65535": 65535} {
-		if got, err := portFrom(in); err != nil || got != want {
-			t.Errorf("portFrom(%q) = %d, %v; want %d", in, got, err, want)
-		}
+		t.Run(in, func(t *testing.T) {
+			if got, err := portFrom(in); err != nil || got != want {
+				t.Errorf("portFrom(%q) = %d, %v; want %d", in, got, err, want)
+			}
+		})
 	}
 	for _, in := range []string{"x", "0", "65536", "-1", "80.5"} {
-		if _, err := portFrom(in); err == nil {
-			t.Errorf("portFrom(%q) was accepted", in)
-		}
+		t.Run(in, func(t *testing.T) {
+			if _, err := portFrom(in); err == nil {
+				t.Errorf("portFrom(%q) was accepted", in)
+			}
+		})
 	}
 }
 
@@ -287,9 +299,11 @@ func TestAPackageNameIsItsPathInTheModuleWithUnderscores(t *testing.T) {
 	for pkg, want := range map[string]string{
 		"example.org/m": "escp", "example.org/m/safety": "safety", "example.org/m/internal/wire": "internal_wire",
 	} {
-		if got := pageName("example.org/m", pkg); got != want {
-			t.Errorf("pageName(%q) = %q, want %q", pkg, got, want)
-		}
+		t.Run(pkg, func(t *testing.T) {
+			if got := pageName("example.org/m", pkg); got != want {
+				t.Errorf("pageName(%q) = %q, want %q", pkg, got, want)
+			}
+		})
 	}
 }
 

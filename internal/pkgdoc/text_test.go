@@ -62,9 +62,11 @@ func TestTagNamesAreCaseInsensitiveAndAnUnterminatedMarkupEndsThePage(t *testing
 		t.Errorf("upper case: got %q", got)
 	}
 	for _, page := range []string{"<p>x<!-- never closed", "<p>x</p><!doctype", "<p>x<p title=\"open"} {
-		if got := htmlToText(page); !strings.HasPrefix(got, "x\n") {
-			t.Errorf("%q: got %q", page, got)
-		}
+		t.Run(page, func(t *testing.T) {
+			if got := htmlToText(page); !strings.HasPrefix(got, "x\n") {
+				t.Errorf("%q: got %q", page, got)
+			}
+		})
 	}
 	if got := htmlToText("<p>x</p><script>never closed"); got != "x\n" {
 		t.Errorf("an unclosed script: got %q", got)

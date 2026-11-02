@@ -2,6 +2,7 @@ package escp
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -13,9 +14,11 @@ func TestStormControlRejectsInvalidPortBeforeSending(t *testing.T) {
 	f := escptest.Start(t)
 	c := dialFast(t, f, "secret")
 	for _, port := range []int{0, 33} {
-		if err := c.SetStormControl(context.Background(), StormConfig{Port: PortID(port), UnknownUnicast: true, Multicast: false, Broadcast: false, Rate: 64}); err == nil {
-			t.Errorf("port %d must be rejected", port)
-		}
+		t.Run(fmt.Sprint(port), func(t *testing.T) {
+			if err := c.SetStormControl(context.Background(), StormConfig{Port: PortID(port), UnknownUnicast: true, Multicast: false, Broadcast: false, Rate: 64}); err == nil {
+				t.Errorf("port %d must be rejected", port)
+			}
+		})
 	}
 	if n := f.WriteCount(); n != 0 {
 		t.Fatalf("%d SET(s) reached the switch", n)
@@ -60,10 +63,12 @@ func TestParseStormEnabledNeedsARateAndAnyOneType(t *testing.T) {
 		{"no type", "000000", "00000400", false},
 		{"no rate", "010101", "00000000", false},
 	} {
-		got, err := parseStorm([]wire.TLV{tlvHex(t, wire.TLVStormControl, "0400"+tc.flags+tc.rate)})
-		if err != nil || len(got) != 1 || got[0].Enabled != tc.want {
-			t.Errorf("%s: %+v, %v; Enabled should be %v", tc.name, got, err, tc.want)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := parseStorm([]wire.TLV{tlvHex(t, wire.TLVStormControl, "0400"+tc.flags+tc.rate)})
+			if err != nil || len(got) != 1 || got[0].Enabled != tc.want {
+				t.Errorf("%s: %+v, %v; Enabled should be %v", tc.name, got, err, tc.want)
+			}
+		})
 	}
 }
 
@@ -91,9 +96,11 @@ func TestSetStormWire(t *testing.T) {
 		uu, mc, bc bool
 		rate       Kbps
 	}{{false, false, true, 0}, {false, false, true, 100}, {false, false, false, 64}, {true, false, false, 2000000}} {
-		if err := c.SetStormControl(ctx, StormConfig{Port: 7, UnknownUnicast: bad.uu, Multicast: bad.mc, Broadcast: bad.bc, Rate: bad.rate}); err == nil {
-			t.Errorf("%+v must be rejected", bad)
-		}
+		t.Run(fmt.Sprint(bad), func(t *testing.T) {
+			if err := c.SetStormControl(ctx, StormConfig{Port: 7, UnknownUnicast: bad.uu, Multicast: bad.mc, Broadcast: bad.bc, Rate: bad.rate}); err == nil {
+				t.Errorf("%+v must be rejected", bad)
+			}
+		})
 	}
 	if f.WriteCount() != n {
 		t.Fatal("rejected requests must not reach the switch")

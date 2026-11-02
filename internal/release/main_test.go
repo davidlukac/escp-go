@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -40,10 +41,12 @@ func TestParseVersion(t *testing.T) {
 		{"", version{}, true},
 		{"99999999999999999999.0.0", version{}, true}, // does not fit an int
 	} {
-		got, err := parseVersion(tc.in)
-		if (err != nil) != tc.bad || got != tc.want {
-			t.Errorf("parseVersion(%q) = %v, %v; want %v, bad=%v", tc.in, got, err, tc.want, tc.bad)
-		}
+		t.Run(tc.in, func(t *testing.T) {
+			got, err := parseVersion(tc.in)
+			if (err != nil) != tc.bad || got != tc.want {
+				t.Errorf("parseVersion(%q) = %v, %v; want %v, bad=%v", tc.in, got, err, tc.want, tc.bad)
+			}
+		})
 	}
 	if got := (version{1, 2, 3}).String(); got != "1.2.3" {
 		t.Errorf("String = %q", got)
@@ -63,9 +66,11 @@ func TestNewerThan(t *testing.T) {
 		{version{0, 4, 0}, version{0, 4, 1}, false},
 		{version{0, 4, 0}, version{0, 4, 0}, false},
 	} {
-		if got := tc.a.newerThan(tc.b); got != tc.want {
-			t.Errorf("%v newerThan %v = %v, want %v", tc.a, tc.b, got, tc.want)
-		}
+		t.Run(fmt.Sprintf("%v newer than %v", tc.a, tc.b), func(t *testing.T) {
+			if got := tc.a.newerThan(tc.b); got != tc.want {
+				t.Errorf("%v newerThan %v = %v, want %v", tc.a, tc.b, got, tc.want)
+			}
+		})
 	}
 }
 
@@ -322,10 +327,12 @@ func TestTagRefuses(t *testing.T) {
 
 func TestUsage(t *testing.T) {
 	for _, args := range [][]string{nil, {"0.3.0"}, {"--tag"}, {"a", "b", "c"}} {
-		code, _, errOut := newRepo().run(args...)
-		if code != exitUsage || !strings.Contains(errOut, "usage: release") {
-			t.Errorf("run(%v) = %d, %q", args, code, errOut)
-		}
+		t.Run(fmt.Sprint(args), func(t *testing.T) {
+			code, _, errOut := newRepo().run(args...)
+			if code != exitUsage || !strings.Contains(errOut, "usage: release") {
+				t.Errorf("run(%v) = %d, %q", args, code, errOut)
+			}
+		})
 	}
 }
 
@@ -333,6 +340,7 @@ func TestUsage(t *testing.T) {
 func TestAgainstARealRepository(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
+	// subtests: the environment is set for the whole test, not for one case
 	for k, v := range map[string]string{"GIT_AUTHOR_NAME": "T", "GIT_AUTHOR_EMAIL": "t@example.org", "GIT_COMMITTER_NAME": "T",
 		"GIT_COMMITTER_EMAIL": "t@example.org", "GIT_CONFIG_GLOBAL": os.DevNull, "GIT_CONFIG_SYSTEM": os.DevNull, trailerVariable: "Co-Authored-By: A <a@example.org>"} {
 		t.Setenv(k, v)

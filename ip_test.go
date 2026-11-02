@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"net/netip"
 	"strings"
@@ -246,9 +247,11 @@ func TestIPConfigValidate(t *testing.T) {
 		cfgOf("192.0.2.13", "255.255.255.252", "192.0.2.14"), // /30: two hosts
 	}
 	for _, cfg := range good {
-		if err := cfg.Validate(); err != nil {
-			t.Errorf("%s: %v", cfg, err)
-		}
+		t.Run(cfg.String(), func(t *testing.T) {
+			if err := cfg.Validate(); err != nil {
+				t.Errorf("%s: %v", cfg, err)
+			}
+		})
 	}
 	bad := []struct {
 		name string
@@ -312,9 +315,11 @@ func TestSetIPConfigWireLayoutAndReadBack(t *testing.T) {
 		t.Fatalf("SET carries %d TLVs, want %d: %+v", len(sets[0]), len(want), sets[0])
 	}
 	for i, w := range want {
-		if sets[0][i].Type != escptest.TLVType(w.Type) || !bytes.Equal(sets[0][i].Value, w.Value) {
-			t.Errorf("TLV %d = %+v, want %+v", i, sets[0][i], w)
-		}
+		t.Run(fmt.Sprintf("TLV %d", i), func(t *testing.T) {
+			if sets[0][i].Type != escptest.TLVType(w.Type) || !bytes.Equal(sets[0][i].Value, w.Value) {
+				t.Errorf("TLV %d = %+v, want %+v", i, sets[0][i], w)
+			}
+		})
 	}
 	info, err := c.Info(context.Background())
 	if err != nil || info.Netmask.String() != "255.255.0.0" || info.Gateway.String() != "127.0.0.2" {
@@ -417,15 +422,19 @@ func TestSetIPConfigWaitsUntilTheSwitchAnswersAtTheNewAddress(t *testing.T) {
 
 func TestParseIPv4(t *testing.T) {
 	for _, s := range []string{"192.0.2.13", "0.0.0.0", "255.255.255.0"} {
-		if a, err := ParseIPv4(s); err != nil || a.String() != s || !a.Is4() {
-			t.Errorf("ParseIPv4(%q) = %v, %v", s, a, err)
-		}
+		t.Run(s, func(t *testing.T) {
+			if a, err := ParseIPv4(s); err != nil || a.String() != s || !a.Is4() {
+				t.Errorf("ParseIPv4(%q) = %v, %v", s, a, err)
+			}
+		})
 	}
 	// Refused: names, IPv6 (also the IPv4-mapped form), zones, ports, short forms, spaces.
 	for _, s := range []string{"", "switch", "2001:db8::1", "::ffff:192.0.2.1", "fe80::1%en0", "192.0.2.13:80", "192.0.2", "192.0.2.256", " 192.0.2.13", "192.0.2.13/24"} {
-		if a, err := ParseIPv4(s); !errors.Is(err, ErrInvalid) || a.IsValid() {
-			t.Errorf("ParseIPv4(%q) = %v, %v; want the invalid address and ErrInvalid", s, a, err)
-		}
+		t.Run(s, func(t *testing.T) {
+			if a, err := ParseIPv4(s); !errors.Is(err, ErrInvalid) || a.IsValid() {
+				t.Errorf("ParseIPv4(%q) = %v, %v; want the invalid address and ErrInvalid", s, a, err)
+			}
+		})
 	}
 }
 
@@ -455,8 +464,10 @@ func TestThePauseBetweenProbesIsARealPauseShorterThanTheWait(t *testing.T) {
 func TestTheZeroLostReplyOutcomeIsNoneOfTheOutcomes(t *testing.T) {
 	var unset lostReplyOutcome
 	for _, o := range []lostReplyOutcome{lostReplyApplied, lostReplyUnchanged, lostReplyOtherDevice, lostReplyUnexpected} {
-		if o == unset {
-			t.Errorf("outcome %d is the zero value", o)
-		}
+		t.Run(fmt.Sprint(o), func(t *testing.T) {
+			if o == unset {
+				t.Errorf("outcome %d is the zero value", o)
+			}
+		})
 	}
 }

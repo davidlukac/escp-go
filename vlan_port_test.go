@@ -3,6 +3,7 @@ package escp
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 	"sync/atomic"
@@ -59,14 +60,18 @@ func TestSetPortBasedVLANWire(t *testing.T) {
 
 func TestPortVLANID(t *testing.T) {
 	for _, g := range []PortVLANID{1, 2, MaxPortVLANID} {
-		if err := g.Validate(); err != nil {
-			t.Errorf("id %d: %v", g, err)
-		}
+		t.Run(fmt.Sprint(g), func(t *testing.T) {
+			if err := g.Validate(); err != nil {
+				t.Errorf("id %d: %v", g, err)
+			}
+		})
 	}
 	for _, g := range []PortVLANID{-1, 0, MaxPortVLANID + 1} {
-		if err := g.Validate(); !errors.Is(err, ErrInvalid) {
-			t.Errorf("id %d: got %v, want ErrInvalid", g, err)
-		}
+		t.Run(fmt.Sprint(g), func(t *testing.T) {
+			if err := g.Validate(); !errors.Is(err, ErrInvalid) {
+				t.Errorf("id %d: got %v, want ErrInvalid", g, err)
+			}
+		})
 	}
 	if PortVLANID(12).String() != "12" {
 		t.Error("an id prints as its number")
@@ -115,10 +120,12 @@ func TestPortVLANLimit(t *testing.T) {
 		want          PortVLANLimit
 		known         bool
 	}{{8, 8, 8, true}, {8, 24, 24, true}, {32, 24, 32, true}, {0, 8, 8, true}, {8, 0, 8, true}, {0, 0, 0, false}} {
-		got := PortBasedVLAN{MaxGroups: c.groups}.GroupLimit(System{PortCount: c.ports})
-		if got != c.want || got.Known() != c.known {
-			t.Errorf("groups %d, ports %d: limit %d (known %t), want %d (known %t)", c.groups, c.ports, got, got.Known(), c.want, c.known)
-		}
+		t.Run(fmt.Sprint(c), func(t *testing.T) {
+			got := PortBasedVLAN{MaxGroups: c.groups}.GroupLimit(System{PortCount: c.ports})
+			if got != c.want || got.Known() != c.known {
+				t.Errorf("groups %d, ports %d: limit %d (known %t), want %d (known %t)", c.groups, c.ports, got, got.Known(), c.want, c.known)
+			}
+		})
 	}
 	if (PortBasedVLAN{MaxGroups: 8}).GroupLimit(System{PortCount: 24}).String() != "24" {
 		t.Error("a limit prints as its number")

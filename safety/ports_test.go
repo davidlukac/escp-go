@@ -2,6 +2,7 @@ package safety
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -133,9 +134,11 @@ func TestPortUseErrorMessages(t *testing.T) {
 		{&PortUseError{Port: 2, Reason: PortInLAG, LAG: 1}, "port 2 is a member of LAG 1"},
 	}
 	for _, tc := range cases {
-		if got := tc.err.Error(); got != tc.want {
-			t.Errorf("got %q, want %q", got, tc.want)
-		}
+		t.Run(tc.want, func(t *testing.T) {
+			if got := tc.err.Error(); got != tc.want {
+				t.Errorf("got %q, want %q", got, tc.want)
+			}
+		})
 	}
 }
 
@@ -153,8 +156,10 @@ func TestCheckPortsLeavesTheReadingAlone(t *testing.T) {
 func TestTheZeroPortReasonIsNoneOfTheReasons(t *testing.T) {
 	var unset PortReason
 	for _, r := range []PortReason{PortMissing, PortLinkUp, PortInLAG} {
-		if r == unset {
-			t.Errorf("reason %d is the zero value", r)
-		}
+		t.Run(fmt.Sprint(r), func(t *testing.T) {
+			if r == unset {
+				t.Errorf("reason %d is the zero value", r)
+			}
+		})
 	}
 }

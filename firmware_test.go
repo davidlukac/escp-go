@@ -24,10 +24,12 @@ func TestParseFirmware(t *testing.T) {
 		{"1.0.0 Build 20230218.", "20230218", true},
 	}
 	for _, tt := range tests {
-		got := ParseFirmware(tt.version)
-		if got.Build != tt.want || got.HasBuild() != tt.ok || got.String() != tt.version {
-			t.Errorf("ParseFirmware(%q) = build %q, has %t, string %q; want build %q, has %t, the string as it came", tt.version, got.Build, got.HasBuild(), got.String(), tt.want, tt.ok)
-		}
+		t.Run(tt.version, func(t *testing.T) {
+			got := ParseFirmware(tt.version)
+			if got.Build != tt.want || got.HasBuild() != tt.ok || got.String() != tt.version {
+				t.Errorf("ParseFirmware(%q) = build %q, has %t, string %q; want build %q, has %t, the string as it came", tt.version, got.Build, got.HasBuild(), got.String(), tt.want, tt.ok)
+			}
+		})
 	}
 }
 
@@ -49,9 +51,11 @@ func TestParseBuildDate(t *testing.T) {
 		t.Errorf("ParseBuildDate = %q, %v", got, err)
 	}
 	for _, in := range []string{"", "2023021", "202302189", "2025-07", "2023021a", " 20230218"} {
-		if _, err := ParseBuildDate(in); !errors.Is(err, ErrInvalid) {
-			t.Errorf("ParseBuildDate(%q): got %v, want ErrInvalid", in, err)
-		}
+		t.Run(in, func(t *testing.T) {
+			if _, err := ParseBuildDate(in); !errors.Is(err, ErrInvalid) {
+				t.Errorf("ParseBuildDate(%q): got %v, want ErrInvalid", in, err)
+			}
+		})
 	}
 }
 

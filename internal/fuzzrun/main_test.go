@@ -66,9 +66,11 @@ func TestEveryTargetOfEveryPackageRunsForTheDefaultTimeAndTheOutputNamesIt(t *te
 		}
 	}
 	for _, want := range []string{"== m FuzzA (30s)\n", "== m/wire FuzzC (30s)\n", "fuzzing FuzzB\n"} {
-		if !strings.Contains(out, want) {
-			t.Errorf("output lacks %q:\n%s", want, out)
-		}
+		t.Run(want, func(t *testing.T) {
+			if !strings.Contains(out, want) {
+				t.Errorf("output lacks %q:\n%s", want, out)
+			}
+		})
 	}
 }
 
@@ -122,11 +124,13 @@ func TestWhenThePackagesCannotBeListedNothingRuns(t *testing.T) {
 
 func TestAnythingButASecondsNumberIsAUsageError(t *testing.T) {
 	for _, args := range [][]string{{"x"}, {"0"}, {"-3"}, {"1.5"}, {"5", "6"}} {
-		tool := &fakeTool{pkgs: []string{"m"}, targetsOf: map[string][]string{"m": {"FuzzA"}}}
-		code, _, errOut := runWith(t, tool, args...)
-		if code != exitUsage || errOut == "" || len(tool.ran) != 0 {
-			t.Errorf("%v: code %d, stderr %q, ran %v; want a usage error and no run", args, code, errOut, tool.ran)
-		}
+		t.Run(fmt.Sprint(args), func(t *testing.T) {
+			tool := &fakeTool{pkgs: []string{"m"}, targetsOf: map[string][]string{"m": {"FuzzA"}}}
+			code, _, errOut := runWith(t, tool, args...)
+			if code != exitUsage || errOut == "" || len(tool.ran) != 0 {
+				t.Errorf("%v: code %d, stderr %q, ran %v; want a usage error and no run", args, code, errOut, tool.ran)
+			}
+		})
 	}
 }
 

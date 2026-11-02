@@ -3,6 +3,7 @@ package escp
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -45,9 +46,11 @@ func TestSetBandwidthWire(t *testing.T) {
 		t.Fatalf("egress wire: %+v", h[1])
 	}
 	for _, bad := range []Kbps{-64, 100, 2000000} {
-		if err := c.SetBandwidth(context.Background(), PortBandwidth{Port: 7, Ingress: bad, Egress: 0}); err == nil {
-			t.Errorf("rate %d must be rejected", bad)
-		}
+		t.Run(fmt.Sprint(bad), func(t *testing.T) {
+			if err := c.SetBandwidth(context.Background(), PortBandwidth{Port: 7, Ingress: bad, Egress: 0}); err == nil {
+				t.Errorf("rate %d must be rejected", bad)
+			}
+		})
 	}
 	if f.WriteCount() != 2 {
 		t.Fatal("rejected rates must not reach the switch")
@@ -64,9 +67,11 @@ func TestBandwidthValidationHappensBeforeAnythingIsSent(t *testing.T) {
 		"bad ingress":              func() error { return c.SetBandwidth(ctx, PortBandwidth{Port: 7, Ingress: 100, Egress: 64}) },
 		"bad egress after good in": func() error { return c.SetBandwidth(ctx, PortBandwidth{Port: 7, Ingress: 64, Egress: 100}) },
 	} {
-		if err := call(); err == nil {
-			t.Errorf("%s must be rejected", name)
-		}
+		t.Run(name, func(t *testing.T) {
+			if err := call(); err == nil {
+				t.Errorf("%s must be rejected", name)
+			}
+		})
 	}
 	if n := f.WriteCount(); n != 0 {
 		t.Fatalf("an invalid egress rate must stop the request before the ingress SET is sent, %d SET(s) reached the switch", n)

@@ -3,6 +3,7 @@ package escp
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -36,9 +37,11 @@ func TestPortPriorityValidate(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, bad := range []PortPriority{{Port: 0, Priority: 1}, {Port: 2, Priority: 0}, {Port: 2, Priority: 5}} {
-		if err := bad.Validate(); !errors.Is(err, ErrInvalid) {
-			t.Errorf("%+v: %v", bad, err)
-		}
+		t.Run(fmt.Sprint(bad), func(t *testing.T) {
+			if err := bad.Validate(); !errors.Is(err, ErrInvalid) {
+				t.Errorf("%+v: %v", bad, err)
+			}
+		})
 	}
 }
 
@@ -129,28 +132,34 @@ func TestQoSModeSpellingsAndCodes(t *testing.T) {
 		t.Fatalf("got %v", got)
 	}
 	for i, w := range want {
-		if got[i] != w.mode || int(w.mode) != w.code || w.mode.String() != w.name || w.mode.Validate() != nil {
-			t.Errorf("mode %d: %v (%d) %q valid=%v, want code %d name %q", i, got[i], int(got[i]), got[i], got[i].Validate() == nil, w.code, w.name)
-		}
-		if parsed, err := ParseQoSMode(w.name); err != nil || parsed != w.mode {
-			t.Errorf("ParseQoSMode(%q) = %v, %v", w.name, parsed, err)
-		}
+		t.Run(w.name, func(t *testing.T) {
+			if got[i] != w.mode || int(w.mode) != w.code || w.mode.String() != w.name || w.mode.Validate() != nil {
+				t.Errorf("mode %d: %v (%d) %q valid=%v, want code %d name %q", i, got[i], int(got[i]), got[i], got[i].Validate() == nil, w.code, w.name)
+			}
+			if parsed, err := ParseQoSMode(w.name); err != nil || parsed != w.mode {
+				t.Errorf("ParseQoSMode(%q) = %v, %v", w.name, parsed, err)
+			}
+		})
 	}
 }
 
 func TestQoSModeUnknownValues(t *testing.T) {
 	for _, bad := range []QoSMode{-1, 3, 255} {
-		if err := bad.Validate(); !errors.Is(err, ErrInvalid) {
-			t.Errorf("%d must not be valid: %v", int(bad), err)
-		}
+		t.Run(fmt.Sprint(bad), func(t *testing.T) {
+			if err := bad.Validate(); !errors.Is(err, ErrInvalid) {
+				t.Errorf("%d must not be valid: %v", int(bad), err)
+			}
+		})
 	}
 	if got := QoSMode(9).String(); got != "unknown(9)" {
 		t.Errorf("String of an unknown code = %q", got)
 	}
 	for _, name := range []string{"", "unknown(9)", "DSCP-802.1P", "dscp"} {
-		if _, err := ParseQoSMode(name); err == nil {
-			t.Errorf("ParseQoSMode(%q) succeeded", name)
-		}
+		t.Run(name, func(t *testing.T) {
+			if _, err := ParseQoSMode(name); err == nil {
+				t.Errorf("ParseQoSMode(%q) succeeded", name)
+			}
+		})
 	}
 }
 
@@ -160,9 +169,11 @@ func TestSetQoSModeRefusesUnknownModesWithoutSending(t *testing.T) {
 	c := dialFake(t, f, "secret")
 	n := f.WriteCount()
 	for _, bad := range []QoSMode{-1, 3, 256} {
-		if err := c.SetQoSMode(context.Background(), bad); err == nil {
-			t.Errorf("mode %d accepted", int(bad))
-		}
+		t.Run(fmt.Sprint(bad), func(t *testing.T) {
+			if err := c.SetQoSMode(context.Background(), bad); err == nil {
+				t.Errorf("mode %d accepted", int(bad))
+			}
+		})
 	}
 	if f.WriteCount() != n {
 		t.Fatal("a refused mode reached the switch")
@@ -171,9 +182,11 @@ func TestSetQoSModeRefusesUnknownModesWithoutSending(t *testing.T) {
 
 func TestPriorityBounds(t *testing.T) {
 	for p, valid := range map[Priority]bool{0: false, 1: true, 2: true, 3: true, 4: true, 5: false, -1: false} {
-		if err := p.Validate(); (err == nil) != valid || (err != nil && !errors.Is(err, ErrInvalid)) {
-			t.Errorf("Priority(%d).Validate() = %v, want valid=%v", int(p), err, valid)
-		}
+		t.Run(fmt.Sprint(p), func(t *testing.T) {
+			if err := p.Validate(); (err == nil) != valid || (err != nil && !errors.Is(err, ErrInvalid)) {
+				t.Errorf("Priority(%d).Validate() = %v, want valid=%v", int(p), err, valid)
+			}
+		})
 	}
 	if PriorityLowest != 1 || PriorityHighest != 4 {
 		t.Fatalf("bounds are %d..%d, the web UI shows 1..4", int(PriorityLowest), int(PriorityHighest))

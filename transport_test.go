@@ -379,9 +379,11 @@ func TestIcmpNoiseIsOnlyTheTwoNotices(t *testing.T) {
 		{os.ErrDeadlineExceeded, false},
 		{errors.New("other"), false},
 	} {
-		if got := icmpNoise(tc.err); got != tc.want {
-			t.Errorf("icmpNoise(%v) = %v, want %v", tc.err, got, tc.want)
-		}
+		t.Run(tc.err.Error(), func(t *testing.T) {
+			if got := icmpNoise(tc.err); got != tc.want {
+				t.Errorf("icmpNoise(%v) = %v, want %v", tc.err, got, tc.want)
+			}
+		})
 	}
 }
 

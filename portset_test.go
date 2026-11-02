@@ -2,20 +2,25 @@ package escp
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 )
 
 func TestPortIDValidate(t *testing.T) {
 	for _, p := range []PortID{1, 8, MaxPort} {
-		if err := p.Validate(); err != nil {
-			t.Errorf("port %d: %v", p, err)
-		}
+		t.Run(fmt.Sprint(p), func(t *testing.T) {
+			if err := p.Validate(); err != nil {
+				t.Errorf("port %d: %v", p, err)
+			}
+		})
 	}
 	for _, p := range []PortID{-1, 0, MaxPort + 1, 255} {
-		if err := p.Validate(); !errors.Is(err, ErrInvalid) {
-			t.Errorf("port %d: got %v, want ErrInvalid", p, err)
-		}
+		t.Run(fmt.Sprint(p), func(t *testing.T) {
+			if err := p.Validate(); !errors.Is(err, ErrInvalid) {
+				t.Errorf("port %d: got %v, want ErrInvalid", p, err)
+			}
+		})
 	}
 	if PortID(7).String() != "7" {
 		t.Error("a port prints as its number")
@@ -24,23 +29,29 @@ func TestPortIDValidate(t *testing.T) {
 
 func TestParsePortID(t *testing.T) {
 	for in, want := range map[string]PortID{"1": 1, "8": 8, "32": MaxPort} {
-		if got, err := ParsePortID(in); err != nil || got != want {
-			t.Errorf("ParsePortID(%q) = %d, %v; want %d", in, got, err, want)
-		}
+		t.Run(in, func(t *testing.T) {
+			if got, err := ParsePortID(in); err != nil || got != want {
+				t.Errorf("ParsePortID(%q) = %d, %v; want %d", in, got, err, want)
+			}
+		})
 	}
 	// one port, one spelling: a sign, a leading zero and anything that is not plain decimal digits are refused
 	for _, in := range []string{"", "x", "2.5", " 3", "3 ", "0", "-1", "33", "+3", "01", "003", "-0", "0x3", "1_0", "٣", "99999999999999999999"} {
-		if _, err := ParsePortID(in); !errors.Is(err, ErrInvalid) {
-			t.Errorf("ParsePortID(%q): got %v, want ErrInvalid", in, err)
-		}
+		t.Run(in, func(t *testing.T) {
+			if _, err := ParsePortID(in); !errors.Is(err, ErrInvalid) {
+				t.Errorf("ParsePortID(%q): got %v, want ErrInvalid", in, err)
+			}
+		})
 	}
 }
 
 func TestNewPortSetRefusesAPortOutsideTheMask(t *testing.T) {
 	for _, bad := range [][]PortID{{0}, {33}, {1, 2, 40}, {-3}} {
-		if s, err := NewPortSet(bad...); !errors.Is(err, ErrInvalid) || s != 0 {
-			t.Errorf("NewPortSet(%v) = %v, %v; want the empty set and ErrInvalid", bad, s, err)
-		}
+		t.Run(fmt.Sprint(bad), func(t *testing.T) {
+			if s, err := NewPortSet(bad...); !errors.Is(err, ErrInvalid) || s != 0 {
+				t.Errorf("NewPortSet(%v) = %v, %v; want the empty set and ErrInvalid", bad, s, err)
+			}
+		})
 	}
 	// Repeating a port is not an error and does not make it twice.
 	if s, err := NewPortSet(2, 2, 5, 2); err != nil || s.Len() != 2 || s.String() != "2,5" {
@@ -87,9 +98,11 @@ func TestPortSetOperations(t *testing.T) {
 		{"union with the empty set", a.Union(0), a},
 	}
 	for _, tc := range cases {
-		if tc.got != tc.want {
-			t.Errorf("%s: %v, want %v", tc.name, tc.got, tc.want)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.got != tc.want {
+				t.Errorf("%s: %v, want %v", tc.name, tc.got, tc.want)
+			}
+		})
 	}
 	if !a.Has(2) || a.Has(4) || a.Has(0) || a.Has(33) || a.Has(-1) {
 		t.Error("Has must be true only for members and false, not a panic, for ports outside the mask")

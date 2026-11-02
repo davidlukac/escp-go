@@ -188,9 +188,11 @@ func TestLoggerSeesTheRequestsAndRepliesAndNeverASecret(t *testing.T) {
 	// No value of any TLV is logged: not the password, not the user name, not the session key.
 	text := rec.text()
 	for name, secret := range map[string]string{"password": escptest.Password, "user name": escptest.Username, "session key": string(c.session)} {
-		if secret == "" || strings.Contains(text, secret) {
-			t.Errorf("the log contains the %s (or there was none to look for): %q", name, secret)
-		}
+		t.Run(name, func(t *testing.T) {
+			if secret == "" || strings.Contains(text, secret) {
+				t.Errorf("the log contains the %s (or there was none to look for): %q", name, secret)
+			}
+		})
 	}
 }
 
