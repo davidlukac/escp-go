@@ -5,6 +5,28 @@ version; a breaking change is called out as such. The history before 0.1.0 is th
 `internal/escp` of [terraform-provider-tplinkeasysmart](https://github.com/davidlukac/terraform-provider-tplinkeasysmart),
 whose commits this repository keeps.
 
+## 0.4.0
+
+- **Breaking changes**, made together before 1.0, from the third review of the library. Two change what existing code does (the impact classes and the encoding of values), the rest are renames and signatures. None changes wire bytes.
+
+  | 0.3.0 | 0.4.0 |
+  |---|---|
+  | `SetPort`, `SetPortMirror`, `SetPortBasedVLAN`, `SetDot1QVLAN` and `DeleteDot1QVLAN` declare `ImpactTraffic` | they declare **`ImpactManagement`**: a method that can cut the management path or the uplink with the right arguments (a port turned off or retuned, a mirror destination, VLAN membership) is Management whichever port it names, as the address, the VLAN mode, PVIDs, link aggregation and loop prevention already were. `ImpactTraffic` is now rate limits, storm control, QoS and IGMP; `ImpactCosmetic` is unchanged. **A front end that used `safety.MaxImpact(escp.ImpactTraffic)` to allow port settings or VLAN groups on free ports must raise the ceiling to `ImpactManagement` and keep `safety.PortGate`**; with the old ceiling those methods are refused with an `*ImpactError` |
+  | `MAC` encoded as `[0,0,94,0,83,1]`, `PortSet` as the bitmap number, `Firmware` as `{"Build":"…"}` (the version string was lost), `QoSMode` and `Impact` as numbers | they encode as text with `encoding/json` and the YAML and TOML libraries, and read back: `"00:00:5e:00:53:01"`, `"2,3,5"` (`"none"` for the empty set), the version string as the switch reported it, `"port-based"`, `"traffic"`. Anything that stored the old forms must read them with the old library or convert them |
+  | `RateStepKbps`, `MaxBandwidthKbps` (untyped) | `RateStep`, `MaxBandwidth`, both typed `Kbps` (comparing one with a bare `int64` needs a conversion) |
+  | `Impact.Valid()`, `QoSMode.Valid()`, `Priority.Valid()` (bool) | `Validate() error` (matches `ErrInvalid`), like every other input type |
+  | `VLANModeFrom(mtu MTUVLAN, portBased, dot1q bool)` | `VLANModeFrom(mtu MTUVLAN, portBased PortBasedVLAN, dot1q Dot1Q)` |
+  | `PortBasedVLAN.GroupLimit(portCount int)`, `NewPortVLANLimit(groups, ports int)` | `PortBasedVLAN.GroupLimit(sys System)`; `NewPortVLANLimit` is removed |
+  | `escptest`: `SystemSetBehaviour` | `SystemSetBehavior` (American English in exported names) |
+  | `escptest`: `Switch.Port()` | `Switch.UDPPort()` (it is a UDP port; `PortSetting` takes a switch port) |
+  | `escptest`: `ConfigFile()` | `BackupFile()` |
+  | `escptest`: `Faults.GetFn` | `Faults.OnGet` |
+
+- **Fixes:** `Config.Validate` and `Dial` refuse a `Host` that names no single switch: the unspecified address, a multicast group or the limited broadcast address (a write carries the password, so it would have gone to every device that listens), an IPv6 address, a `host:port`, a host with a space. `Kbps.Validate` and the session-key errors carry the `escp:` prefix the other errors have. A `BuildDate` that is empty (no build date) reads back from its text.
+- **New:** `Settings()`, the one table of the web UI pages the client reads and writes with the class of each write (the writers read their `Impact` from it; the README table and the guides' lists are generated from it); `MarshalText` and `UnmarshalText` on `MAC`, `PortSet`, `Firmware`, `QoSMode` and `Impact`, and a validated `UnmarshalText` on `Speed` and `VLANMode` (a name no port or switch has is refused); `Speed.Validate` and `VLANMode.Validate` (the sets `ParseSpeed` and `ParseVLANMode` accept); `ParseImpact`.
+- **Documentation:** American English throughout and a linter and a test that keep it; the runnable snippets of the README and the getting-started guide; the log attribute table lists all 27 attributes the code logs (a test fails otherwise); `docs/errors.md` and the lists of validators are checked or generated from the code; the guide says what is known about running `Discover` beside a client.
+- **Quality gates** (contributors, no API change): `forcetypeassert` and a checked `udp.AddrPort` instead of five unchecked type assertions; one place that binds the reply port; the mutation report is written (`build/` is created) and the programs are left out of the run; a test that the text is American English and holds nothing private to a workspace.
+
 ## 0.3.0
 
 - **Breaking changes**, made together before 1.0 so that consumers rename once (a consumer that does not use these names is not affected). None changes wire bytes. Rename with the table below.
