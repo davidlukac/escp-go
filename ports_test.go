@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -149,9 +150,11 @@ func TestSetPortRefusesFlowControlAtAFixedSpeed(t *testing.T) {
 				t.Fatalf("flow control at %s must be refused", speed)
 			}
 			for _, part := range []string{"port 5", "flow control needs speed auto or 1000Mbps-full", string(speed)} {
-				if !strings.Contains(err.Error(), part) {
-					t.Errorf("the refusal %q does not mention %q", err, part)
-				}
+				t.Run(part, func(t *testing.T) {
+					if !strings.Contains(err.Error(), part) {
+						t.Errorf("the refusal %q does not mention %q", err, part)
+					}
+				})
 			}
 			if sets := f.AllSets(); len(sets) != 0 {
 				t.Fatalf("the switch received %d write(s) despite the refusal: %v", len(sets), sets)
@@ -245,9 +248,11 @@ func TestSpeedCodes(t *testing.T) {
 		}
 	}
 	for _, bad := range []Speed{"warp", "", SpeedLinkDown} {
-		if _, err := bad.code(); err == nil {
-			t.Errorf("%q: expected an error, it cannot be configured", bad)
-		}
+		t.Run(fmt.Sprint(bad), func(t *testing.T) {
+			if _, err := bad.code(); err == nil {
+				t.Errorf("%q: expected an error, it cannot be configured", bad)
+			}
+		})
 	}
 }
 
@@ -275,9 +280,11 @@ func TestParseSpeed(t *testing.T) {
 		}
 	}
 	for _, bad := range []string{"warp", "", "link-down", "AUTO"} {
-		if _, err := ParseSpeed(bad); err == nil {
-			t.Errorf("ParseSpeed(%q) succeeded", bad)
-		}
+		t.Run(bad, func(t *testing.T) {
+			if _, err := ParseSpeed(bad); err == nil {
+				t.Errorf("ParseSpeed(%q) succeeded", bad)
+			}
+		})
 	}
 }
 

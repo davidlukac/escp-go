@@ -46,31 +46,35 @@ func TestConfigValidate(t *testing.T) {
 		{"the first host port above the range", Config{Host: "192.0.2.11", HostPort: 65536}, "HostPort 65536"},
 		{"an IPv6 broadcast address", Config{Host: "192.0.2.11", BroadcastAddr: netip.MustParseAddr("fe80::1")}, "BroadcastAddr fe80::1"},
 	} {
-		err := tc.cfg.Validate()
-		if tc.want == "" {
-			if err != nil {
-				t.Errorf("%s: %v", tc.name, err)
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.cfg.Validate()
+			if tc.want == "" {
+				if err != nil {
+					t.Errorf("%s: %v", tc.name, err)
+				}
+				return
 			}
-			continue
-		}
-		if !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), tc.want) {
-			t.Errorf("%s: %v, want ErrInvalid naming %q", tc.name, err, tc.want)
-		}
+			if !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), tc.want) {
+				t.Errorf("%s: %v, want ErrInvalid naming %q", tc.name, err, tc.want)
+			}
+		})
 	}
 }
 
 // Dial refuses a configuration that cannot work, with the same error Validate gives and before it
 // looks anything up: the host below would not resolve, so a lookup would say something else.
 func TestDialRefusesWhatValidateRefuses(t *testing.T) {
-	for _, cfg := range []Config{
+	for i, cfg := range []Config{
 		{},
 		{Host: "no-such-host.invalid", Timeout: -time.Second},
 		{Host: "no-such-host.invalid", HostPort: 99999},
 	} {
-		c, err := Dial(cfg)
-		if c != nil || !errors.Is(err, ErrInvalid) || err.Error() != cfg.Validate().Error() {
-			t.Errorf("Dial(%+v) = %v, %v; want ErrInvalid from Validate", cfg, c, err)
-		}
+		t.Run(fmt.Sprintf("configuration %d", i), func(t *testing.T) {
+			c, err := Dial(cfg)
+			if c != nil || !errors.Is(err, ErrInvalid) || err.Error() != cfg.Validate().Error() {
+				t.Errorf("Dial(%+v) = %v, %v; want ErrInvalid from Validate", cfg, c, err)
+			}
+		})
 	}
 }
 
@@ -106,13 +110,15 @@ func TestDialKeepsExplicitValues(t *testing.T) {
 // Zero selects the default, a negative value selects "no retry"; a positive one is kept.
 func TestDialRetriesSemantics(t *testing.T) {
 	for _, tc := range []struct{ in, want int }{{0, 2}, {NoRetries, 0}, {-7, 0}, {1, 1}, {5, 5}} {
-		c, err := Dial(Config{Host: "127.0.0.1", Retries: tc.in})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if c.cfg.Retries != tc.want {
-			t.Errorf("Retries %d became %d, want %d", tc.in, c.cfg.Retries, tc.want)
-		}
+		t.Run(fmt.Sprintf("retries %d", tc.in), func(t *testing.T) {
+			c, err := Dial(Config{Host: "127.0.0.1", Retries: tc.in})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if c.cfg.Retries != tc.want {
+				t.Errorf("Retries %d became %d, want %d", tc.in, c.cfg.Retries, tc.want)
+			}
+		})
 	}
 }
 
@@ -188,10 +194,12 @@ func TestBusyHostPortIsReportedOnFirstUse(t *testing.T) {
 		"LED":    func() error { _, err := c.LED(context.Background()); return err },
 		"SetLED": func() error { return c.SetLED(context.Background(), true) },
 	} {
-		err := call()
-		if err == nil || !strings.Contains(err.Error(), "binding UDP port") {
-			t.Errorf("%s: want a bind error mentioning the port, got %v", name, err)
-		}
+		t.Run(name, func(t *testing.T) {
+			err := call()
+			if err == nil || !strings.Contains(err.Error(), "binding UDP port") {
+				t.Errorf("%s: want a bind error mentioning the port, got %v", name, err)
+			}
+		})
 	}
 }
 
@@ -272,9 +280,11 @@ func TestMacHolding(t *testing.T) {
 		{"an interface without a hardware address", net.IPv4(192, 0, 2, 7), MAC{}},
 		{"an address no interface holds", net.IPv4(198, 51, 100, 1), MAC{}},
 	} {
-		if got := macHolding(tc.addr, ifs, addrs); got != tc.want {
-			t.Errorf("%s: %x, want %x", tc.name, got, tc.want)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			if got := macHolding(tc.addr, ifs, addrs); got != tc.want {
+				t.Errorf("%s: %x, want %x", tc.name, got, tc.want)
+			}
+		})
 	}
 }
 

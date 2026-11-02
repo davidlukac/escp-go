@@ -1,6 +1,7 @@
 package escp
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/davidlukac/escp-go/internal/wire"
@@ -20,12 +21,14 @@ func TestSequenceRangesAreDisjoint(t *testing.T) {
 		t.Errorf("the random inputs reach %d client and %d discovery numbers, want %d and %d (all of each range)", len(client), len(discovery), clientSeqSpace, discoverySeqSpace)
 	}
 	for seq := range discovery {
-		if client[seq] {
-			t.Fatalf("sequence number %d is drawn by both a client and a discovery", seq)
-		}
-		if seq < 1000 || seq > 1999 {
-			t.Fatalf("discovery sequence number %d is outside 1000-1999", seq)
-		}
+		t.Run(fmt.Sprint(seq), func(t *testing.T) {
+			if client[seq] {
+				t.Fatalf("sequence number %d is drawn by both a client and a discovery", seq)
+			}
+			if seq < 1000 || seq > 1999 {
+				t.Fatalf("discovery sequence number %d is outside 1000-1999", seq)
+			}
+		})
 	}
 }
 
@@ -61,8 +64,10 @@ func TestRequestSeqKeepsCountingAcrossBothRanges(t *testing.T) {
 		{"a discovery after a discovery", discoverySeqBase + 42, wire.OpDiscovery, discoverySeqBase + 43},
 		{"the discovery range wraps too", discoverySeqBase + clientSeqSpace - 1, wire.OpDiscovery, discoverySeqBase},
 	} {
-		if got := requestSeq(c.last, c.op); got != c.want {
-			t.Errorf("%s: requestSeq(%d, op %d) = %d, want %d", c.name, c.last, c.op, got, c.want)
-		}
+		t.Run(c.name, func(t *testing.T) {
+			if got := requestSeq(c.last, c.op); got != c.want {
+				t.Errorf("%s: requestSeq(%d, op %d) = %d, want %d", c.name, c.last, c.op, got, c.want)
+			}
+		})
 	}
 }

@@ -48,9 +48,11 @@ func TestSetLAGWire(t *testing.T) {
 		group LAGID
 		ports PortSet
 	}{{0, MustPortSet(1, 2)}, {3, MustPortSet(5, 6)}, {1, MustPortSet(4, 5)}, {2, MustPortSet(2, 3)}, {2, MustPortSet(6)}, {1, MustPortSet(1, 2, 3, 4, 5)}} {
-		if c.SetLAG(ctx, LAG{ID: bad.group, Ports: bad.ports}) == nil {
-			t.Errorf("LAG %d with ports %v must be rejected", bad.group, bad.ports)
-		}
+		t.Run(fmt.Sprint(bad), func(t *testing.T) {
+			if c.SetLAG(ctx, LAG{ID: bad.group, Ports: bad.ports}) == nil {
+				t.Errorf("LAG %d with ports %v must be rejected", bad.group, bad.ports)
+			}
+		})
 	}
 	if f.WriteCount() != n {
 		t.Fatal("rejected requests must not reach the switch")
@@ -142,14 +144,18 @@ func TestSetLAGRefusalNamesTheConflict(t *testing.T) {
 
 func TestLAGID(t *testing.T) {
 	for _, g := range []LAGID{1, LAGGroupCount} {
-		if err := g.Validate(); err != nil {
-			t.Errorf("group %d: %v", g, err)
-		}
+		t.Run(fmt.Sprint(g), func(t *testing.T) {
+			if err := g.Validate(); err != nil {
+				t.Errorf("group %d: %v", g, err)
+			}
+		})
 	}
 	for _, g := range []LAGID{-1, 0, LAGGroupCount + 1, 255} {
-		if err := g.Validate(); !errors.Is(err, ErrInvalid) {
-			t.Errorf("group %d: got %v, want ErrInvalid", g, err)
-		}
+		t.Run(fmt.Sprint(g), func(t *testing.T) {
+			if err := g.Validate(); !errors.Is(err, ErrInvalid) {
+				t.Errorf("group %d: got %v, want ErrInvalid", g, err)
+			}
+		})
 	}
 	if first, last := LAGID(1).Range(); first != 1 || last != 4 {
 		t.Errorf("group 1 owns ports %d-%d, want 1-4", first, last)

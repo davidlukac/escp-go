@@ -68,21 +68,23 @@ func TestValidatorsAndWritersAgree(t *testing.T) {
 		{"802.1Q VLAN: a port both ways", Dot1QVLAN{ID: 20, Tagged: ports(2), Untagged: ports(2)}.Validate, func() error { return c.SetDot1QVLAN(ctx, Dot1QVLAN{ID: 20, Tagged: ports(2), Untagged: ports(2)}) }, false},
 		{"802.1Q VLAN: no member", Dot1QVLAN{ID: 20}.Validate, func() error { return c.SetDot1QVLAN(ctx, Dot1QVLAN{ID: 20}) }, false},
 	} {
-		want := tc.validate()
-		if tc.valid {
-			if want != nil {
-				t.Errorf("%s: Validate = %v, want nil", tc.name, want)
+		t.Run(tc.name, func(t *testing.T) {
+			want := tc.validate()
+			if tc.valid {
+				if want != nil {
+					t.Errorf("%s: Validate = %v, want nil", tc.name, want)
+				}
+				return
 			}
-			continue
-		}
-		if !errors.Is(want, ErrInvalid) {
-			t.Errorf("%s: Validate = %v, want ErrInvalid", tc.name, want)
-			continue
-		}
-		before := f.WriteCount()
-		if got := tc.write(); got == nil || got.Error() != want.Error() || f.WriteCount() != before {
-			t.Errorf("%s: the writer gave %v after %d writes, want the error of Validate (%v) and no write", tc.name, got, f.WriteCount()-before, want)
-		}
+			if !errors.Is(want, ErrInvalid) {
+				t.Errorf("%s: Validate = %v, want ErrInvalid", tc.name, want)
+				return
+			}
+			before := f.WriteCount()
+			if got := tc.write(); got == nil || got.Error() != want.Error() || f.WriteCount() != before {
+				t.Errorf("%s: the writer gave %v after %d writes, want the error of Validate (%v) and no write", tc.name, got, f.WriteCount()-before, want)
+			}
+		})
 	}
 }
 
@@ -93,8 +95,10 @@ func TestParseVLANMode(t *testing.T) {
 		}
 	}
 	for _, name := range []string{"", "none", "MTU", "802.1Q", "port based", "bogus"} {
-		if got, err := ParseVLANMode(name); !errors.Is(err, ErrInvalid) || got != "" {
-			t.Errorf("ParseVLANMode(%q) = %q, %v; want an ErrInvalid and no mode", name, got, err)
-		}
+		t.Run(name, func(t *testing.T) {
+			if got, err := ParseVLANMode(name); !errors.Is(err, ErrInvalid) || got != "" {
+				t.Errorf("ParseVLANMode(%q) = %q, %v; want an ErrInvalid and no mode", name, got, err)
+			}
+		})
 	}
 }

@@ -15,6 +15,7 @@ For people who work on the library. Users want the [guides](README.md); the chec
 | `internal/mutationreport` | the job summary of a mutation run (a build tool) |
 | `internal/release` | cutting a version: the CHANGELOG entry, the checks, the tag (a build tool, `scripts/release.sh`) |
 | `internal/fuzzrun` | every fuzz target of the module for a number of seconds each (a build tool, `scripts/fuzz.sh`) |
+| `internal/subtests` | the check `make lint` runs for what golangci-lint cannot see: a table of cases in a test must run each case with `t.Run` |
 | `internal/pkgdoc` | the package documentation rendered the way pkg.go.dev does, as HTML and text (a build tool, `scripts/pkgdoc.sh`) |
 | `examples/discover` | a read-only example program |
 

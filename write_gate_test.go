@@ -3,6 +3,7 @@ package escp
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -347,17 +348,21 @@ func TestGateChangingItsOperationChangesNothingThatIsSent(t *testing.T) {
 
 func TestImpactValidateAcceptsExactlyTheThreeClasses(t *testing.T) {
 	for i, want := range map[Impact]bool{0: false, ImpactCosmetic: true, ImpactTraffic: true, ImpactManagement: true, ImpactManagement + 1: false, -1: false} {
-		if err := i.Validate(); (err == nil) != want || (err != nil && !errors.Is(err, ErrInvalid)) {
-			t.Errorf("Impact(%d).Validate() = %v, want valid=%v", int(i), err, want)
-		}
+		t.Run(fmt.Sprint(i), func(t *testing.T) {
+			if err := i.Validate(); (err == nil) != want || (err != nil && !errors.Is(err, ErrInvalid)) {
+				t.Errorf("Impact(%d).Validate() = %v, want valid=%v", int(i), err, want)
+			}
+		})
 	}
 }
 
 func TestImpactNames(t *testing.T) {
 	for impact, want := range map[Impact]string{ImpactCosmetic: "cosmetic", ImpactTraffic: "traffic", ImpactManagement: "management", 0: "unknown(0)", 7: "unknown(7)"} {
-		if got := impact.String(); got != want {
-			t.Errorf("Impact(%d) = %q, want %q", int(impact), got, want)
-		}
+		t.Run(fmt.Sprint(impact), func(t *testing.T) {
+			if got := impact.String(); got != want {
+				t.Errorf("Impact(%d) = %q, want %q", int(impact), got, want)
+			}
+		})
 	}
 	if ImpactCosmetic >= ImpactTraffic || ImpactTraffic >= ImpactManagement {
 		t.Fatal("the classes are ordered from harmless to able to cut the management path; gates compare them")

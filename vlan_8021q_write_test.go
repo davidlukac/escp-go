@@ -3,6 +3,7 @@ package escp
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -127,9 +128,11 @@ func TestSetPVIDsWire(t *testing.T) {
 		"pvid 4095":    {{Port: 4, PVID: 4095}},
 		"a port twice": {{Port: 4, PVID: 2}, {Port: 4, PVID: 3}},
 	} {
-		if c.SetPVIDs(ctx, bad) == nil {
-			t.Fatalf("%s must be rejected", name)
-		}
+		t.Run(name, func(t *testing.T) {
+			if c.SetPVIDs(ctx, bad) == nil {
+				t.Fatalf("%s must be rejected", name)
+			}
+		})
 	}
 	if f.WriteCount() != n {
 		t.Fatal("rejected requests must not reach the switch")
@@ -155,22 +158,28 @@ func TestPortPVIDValidate(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, bad := range []PortPVID{{Port: 0, PVID: 1}, {Port: 2, PVID: 0}} {
-		if err := bad.Validate(); !errors.Is(err, ErrInvalid) {
-			t.Errorf("%+v: %v", bad, err)
-		}
+		t.Run(fmt.Sprint(bad), func(t *testing.T) {
+			if err := bad.Validate(); !errors.Is(err, ErrInvalid) {
+				t.Errorf("%+v: %v", bad, err)
+			}
+		})
 	}
 }
 
 func TestVLANIDValidate(t *testing.T) {
 	for _, id := range []VLANID{MinVLANID, 100, MaxVLANID} {
-		if err := id.Validate(); err != nil {
-			t.Errorf("VLAN %d: %v", id, err)
-		}
+		t.Run(fmt.Sprint(id), func(t *testing.T) {
+			if err := id.Validate(); err != nil {
+				t.Errorf("VLAN %d: %v", id, err)
+			}
+		})
 	}
 	for _, id := range []VLANID{-1, 0, MaxVLANID + 1, 65535} {
-		if err := id.Validate(); !errors.Is(err, ErrInvalid) {
-			t.Errorf("VLAN %d: got %v, want ErrInvalid", id, err)
-		}
+		t.Run(fmt.Sprint(id), func(t *testing.T) {
+			if err := id.Validate(); !errors.Is(err, ErrInvalid) {
+				t.Errorf("VLAN %d: got %v, want ErrInvalid", id, err)
+			}
+		})
 	}
 	if VLANID(4094).String() != "4094" {
 		t.Error("a VLAN id prints as its number")
@@ -179,14 +188,18 @@ func TestVLANIDValidate(t *testing.T) {
 
 func TestVLANNameValidate(t *testing.T) {
 	for _, n := range []VLANName{"", "iot", "a-b_C9", "tenletters"} {
-		if err := n.Validate(); err != nil {
-			t.Errorf("%q: %v", n, err)
-		}
+		t.Run(fmt.Sprint(n), func(t *testing.T) {
+			if err := n.Validate(); err != nil {
+				t.Errorf("%q: %v", n, err)
+			}
+		})
 	}
 	for _, n := range []VLANName{"elevenchars", "a b", "dot.ted", "é"} {
-		if err := n.Validate(); !errors.Is(err, ErrInvalid) {
-			t.Errorf("%q: got %v, want ErrInvalid", n, err)
-		}
+		t.Run(fmt.Sprint(n), func(t *testing.T) {
+			if err := n.Validate(); !errors.Is(err, ErrInvalid) {
+				t.Errorf("%q: got %v, want ErrInvalid", n, err)
+			}
+		})
 	}
 }
 

@@ -18,6 +18,7 @@ test:
 LINT_GOOS := linux windows
 
 lint:
+	go run ./internal/subtests .
 	$(DEVTOOL) golangci-lint run ./...
 	$(DEVTOOL) golangci-lint run --build-tags live ./...
 	@bin="$$($(DEVTOOL) -n golangci-lint)"; for os in $(LINT_GOOS); do echo "golangci-lint run (GOOS=$$os)"; GOOS=$$os "$$bin" run ./... || exit 1; done
@@ -61,7 +62,7 @@ fuzz:
 # GOFLAGS=-count=1: gremlins sizes the timeout of a mutant from the time of its first test run, and a cached
 # result takes no time, so without it every mutant of a package whose tests ran before "times out".
 MUTATE := GOFLAGS=-count=1 $(DEVTOOL) gremlins unleash . --workers $(or $(WORKERS),4) --coverpkg ./... --output build/mutation.json \
-	-E '^escptest/' -E '^internal/coverpolicy/' -E '^internal/mutationreport/' -E '^internal/release/' -E '^internal/fuzzrun/' -E '^internal/pkgdoc/' -E '^examples/' \
+	-E '^escptest/' -E '^internal/coverpolicy/' -E '^internal/mutationreport/' -E '^internal/release/' -E '^internal/fuzzrun/' -E '^internal/pkgdoc/' -E '^internal/subtests/' -E '^examples/' \
 	$(if $(EFFICACY),--threshold-efficacy $(EFFICACY))
 
 # gremlins does not create the directory of its report: without it the run ends with "impossible to

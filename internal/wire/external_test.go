@@ -3,6 +3,7 @@ package wire_test
 import (
 	"bytes"
 	"encoding/hex"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -52,9 +53,11 @@ func TestUnmarshalRejectsPacketsThatLieAboutTheirStructure(t *testing.T) {
 
 func TestCString(t *testing.T) {
 	for in, want := range map[string]string{"abc\x00def": "abc", "abc": "abc", "": "", "\x00": ""} {
-		if got := wire.CString([]byte(in)); got != want {
-			t.Errorf("cstring(%q) = %q, want %q", in, got, want)
-		}
+		t.Run(in, func(t *testing.T) {
+			if got := wire.CString([]byte(in)); got != want {
+				t.Errorf("cstring(%q) = %q, want %q", in, got, want)
+			}
+		})
 	}
 }
 
@@ -78,9 +81,11 @@ func TestRSASessionTLVTrimsLeadingZeroWords(t *testing.T) {
 
 func TestOpNameNamesEveryOpAndNumbersTheRest(t *testing.T) {
 	for op, want := range map[byte]string{wire.OpDiscovery: "discovery", wire.OpGet: "get", wire.OpReply: "reply", wire.OpSet: "set", wire.OpSetReply: "set-reply", 9: "op-9"} {
-		if got := wire.OpName(op); got != want {
-			t.Errorf("OpName(%d) = %q, want %q", op, got, want)
-		}
+		t.Run(fmt.Sprint(op), func(t *testing.T) {
+			if got := wire.OpName(op); got != want {
+				t.Errorf("OpName(%d) = %q, want %q", op, got, want)
+			}
+		})
 	}
 }
 
@@ -106,9 +111,11 @@ func TestUnmarshalAcceptsThePacketsAtTheEdgeOfValidity(t *testing.T) {
 		{"a TLV without a value and no end marker", build(wire.OpReply, empty), 1},
 		{"a TLV that ends with the packet", build(wire.OpReply, []byte{0, 5, 0, 2, 9, 9}), 1},
 	} {
-		if _, tlvs, err := wire.Unmarshal(tc.pkt); err != nil || len(tlvs) != tc.tlvs {
-			t.Errorf("%s: %d TLVs, %v; want %d", tc.name, len(tlvs), err, tc.tlvs)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			if _, tlvs, err := wire.Unmarshal(tc.pkt); err != nil || len(tlvs) != tc.tlvs {
+				t.Errorf("%s: %d TLVs, %v; want %d", tc.name, len(tlvs), err, tc.tlvs)
+			}
+		})
 	}
 	if wire.LooksLikeHeader(build(wire.OpReply, end)[:wire.HeaderLen+len(end)-1]) {
 		t.Error("a packet one byte shorter than a header and an end marker is no packet")

@@ -2,6 +2,7 @@ package escp
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -19,9 +20,11 @@ func TestMirrorRejectsAnInvalidDestinationBeforeSending(t *testing.T) {
 		"destination 0":  {Enabled: true, Destination: 0, IngressPorts: MustPortSet(4)},
 		"destination 40": {Enabled: true, Destination: 40, IngressPorts: MustPortSet(4), EgressPorts: MustPortSet(5)},
 	} {
-		if err := c.SetPortMirror(ctx, m); err == nil {
-			t.Errorf("%s must be rejected", name)
-		}
+		t.Run(name, func(t *testing.T) {
+			if err := c.SetPortMirror(ctx, m); err == nil {
+				t.Errorf("%s must be rejected", name)
+			}
+		})
 	}
 	if n := f.WriteCount(); n != 0 {
 		t.Fatalf("%d SET(s) reached the switch", n)
@@ -73,9 +76,11 @@ func TestSetMirrorWire(t *testing.T) {
 		{Enabled: true, Destination: 0, IngressPorts: MustPortSet(1)},
 		{Destination: 7},
 	} {
-		if err := c.SetPortMirror(ctx, bad); err == nil {
-			t.Errorf("%+v must be rejected", bad)
-		}
+		t.Run(fmt.Sprint(bad), func(t *testing.T) {
+			if err := c.SetPortMirror(ctx, bad); err == nil {
+				t.Errorf("%+v must be rejected", bad)
+			}
+		})
 	}
 	if f.WriteCount() != n {
 		t.Fatal("rejected requests must not reach the switch")

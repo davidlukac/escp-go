@@ -3,6 +3,7 @@ package escp
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -106,15 +107,19 @@ func TestParseSystem(t *testing.T) {
 func TestParseSystemIgnoresValuesOfTheWrongLength(t *testing.T) {
 	autoSave := []wire.TLV{tlvHex(t, wire.TLVAutoSave, "01")}
 	for _, bad := range []string{"", "0808"} {
-		if s, err := parseSystem([]wire.TLV{tlvHex(t, wire.TLVPortCount, bad)}, autoSave); err == nil {
-			t.Errorf("a port count of %q bytes was accepted: %+v", bad, s)
-		}
+		t.Run(bad, func(t *testing.T) {
+			if s, err := parseSystem([]wire.TLV{tlvHex(t, wire.TLVPortCount, bad)}, autoSave); err == nil {
+				t.Errorf("a port count of %q bytes was accepted: %+v", bad, s)
+			}
+		})
 	}
 	portCount := []wire.TLV{tlvHex(t, wire.TLVPortCount, "08")}
 	for _, bad := range []string{"", "0101"} {
-		if s, err := parseSystem(portCount, []wire.TLV{tlvHex(t, wire.TLVAutoSave, bad)}); err == nil {
-			t.Errorf("an auto-save flag of %q bytes was accepted: %+v", bad, s)
-		}
+		t.Run(bad, func(t *testing.T) {
+			if s, err := parseSystem(portCount, []wire.TLV{tlvHex(t, wire.TLVAutoSave, bad)}); err == nil {
+				t.Errorf("an auto-save flag of %q bytes was accepted: %+v", bad, s)
+			}
+		})
 	}
 }
 
@@ -130,13 +135,17 @@ func TestHostnameValidateLengthBoundary(t *testing.T) {
 
 func TestHostnameValidate(t *testing.T) {
 	for _, ok := range []Hostname{"a", "TL-SG108E-01", "sw1"} {
-		if err := ok.Validate(); err != nil {
-			t.Errorf("%q should be valid: %v", ok, err)
-		}
+		t.Run(fmt.Sprint(ok), func(t *testing.T) {
+			if err := ok.Validate(); err != nil {
+				t.Errorf("%q should be valid: %v", ok, err)
+			}
+		})
 	}
 	for _, bad := range []Hostname{"", "-a", "a-", "has space", "under_score", "this-name-is-way-too-long-for-the-switch-0"} {
-		if err := bad.Validate(); err == nil {
-			t.Errorf("%q should be invalid", bad)
-		}
+		t.Run(fmt.Sprint(bad), func(t *testing.T) {
+			if err := bad.Validate(); err == nil {
+				t.Errorf("%q should be invalid", bad)
+			}
+		})
 	}
 }

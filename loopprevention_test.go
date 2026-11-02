@@ -20,8 +20,10 @@ func TestParseLoopPrevention(t *testing.T) {
 	}
 	// a value of the wrong length is not the flag: ignored, never read past its end
 	for _, bad := range []string{"", "0101"} {
-		if on, err := parseLoopPrevention([]wire.TLV{tlvHex(t, wire.TLVLoopPrevention, bad)}); err == nil {
-			t.Errorf("a flag of %q bytes was accepted: %v", bad, on)
-		}
+		t.Run(bad, func(t *testing.T) {
+			if on, err := parseLoopPrevention([]wire.TLV{tlvHex(t, wire.TLVLoopPrevention, bad)}); err == nil {
+				t.Errorf("a flag of %q bytes was accepted: %v", bad, on)
+			}
+		})
 	}
 }

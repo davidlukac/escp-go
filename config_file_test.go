@@ -36,9 +36,11 @@ func TestConfigFileNeverPrintsItsBytes(t *testing.T) {
 		"%#v":    fmt.Sprintf("%#v", f),
 		"struct": fmt.Sprintf("%+v", struct{ File ConfigFile }{f}),
 	} {
-		if strings.Contains(got, marker) || strings.Contains(got, fmt.Sprintf("%x", marker)) {
-			t.Errorf("%s leaks the file: %s", name, got)
-		}
+		t.Run(name, func(t *testing.T) {
+			if strings.Contains(got, marker) || strings.Contains(got, fmt.Sprintf("%x", marker)) {
+				t.Errorf("%s leaks the file: %s", name, got)
+			}
+		})
 	}
 	if got := f.String(); !strings.Contains(got, "20 bytes") || !strings.Contains(got, f.SHA256()) {
 		t.Errorf("String = %q, want the size and the hash", got)

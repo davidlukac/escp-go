@@ -3,6 +3,7 @@ package safety
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -119,9 +120,11 @@ func TestDryRun(t *testing.T) {
 	a := escp.Operation{Name: "SetPort", Ports: escp.MustPortSet(3), Impact: escp.ImpactTraffic}
 	b := escp.Operation{Name: "SetLED", Impact: escp.ImpactCosmetic}
 	for _, op := range []escp.Operation{a, b} {
-		if err := gate(ctx, nil, op); !errors.Is(err, ErrDryRun) {
-			t.Fatalf("a dry run refuses every write with ErrDryRun, got %v", err)
-		}
+		t.Run(fmt.Sprint(op), func(t *testing.T) {
+			if err := gate(ctx, nil, op); !errors.Is(err, ErrDryRun) {
+				t.Fatalf("a dry run refuses every write with ErrDryRun, got %v", err)
+			}
+		})
 	}
 	got := d.Operations()
 	if !reflect.DeepEqual(got, []escp.Operation{a, b}) {
@@ -154,13 +157,15 @@ func TestDryRunRecordsOnlyWhatTheEarlierGatesAllowed(t *testing.T) {
 // The firmware gate judges the firmware, whatever the operation is.
 func TestFirmwareGateIgnoresTheOperation(t *testing.T) {
 	for _, impact := range []escp.Impact{escp.ImpactCosmetic, escp.ImpactTraffic, escp.ImpactManagement, 0} {
-		op := escp.Operation{Name: "SetX", Impact: impact}
-		if err := FirmwareGate()(context.Background(), &infoSource{firmware: "1.0.0 Build 20250710 Rel.71093"}, op); err != nil {
-			t.Errorf("verified build, impact %v: %v", impact, err)
-		}
-		var fe *FirmwareError
-		if err := FirmwareGate()(context.Background(), &infoSource{firmware: "1.0.0 Build 20990101 Rel.1"}, op); !errors.As(err, &fe) {
-			t.Errorf("unverified build, impact %v: %v", impact, err)
-		}
+		t.Run(fmt.Sprint(impact), func(t *testing.T) {
+			op := escp.Operation{Name: "SetX", Impact: impact}
+			if err := FirmwareGate()(context.Background(), &infoSource{firmware: "1.0.0 Build 20250710 Rel.71093"}, op); err != nil {
+				t.Errorf("verified build, impact %v: %v", impact, err)
+			}
+			var fe *FirmwareError
+			if err := FirmwareGate()(context.Background(), &infoSource{firmware: "1.0.0 Build 20990101 Rel.1"}, op); !errors.As(err, &fe) {
+				t.Errorf("unverified build, impact %v: %v", impact, err)
+			}
+		})
 	}
 }

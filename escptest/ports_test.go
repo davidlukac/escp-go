@@ -268,8 +268,10 @@ func TestOnlyTheForbiddenErrorOfTheSystemIsTakenForAMarkerThatCannotBePlaced(t *
 		"some other error":   {errors.New("boom"), false},
 		"no error":           {nil, false},
 	} {
-		if got := markerForbidden(tc.err); got != tc.want {
-			t.Errorf("%s: markerForbidden = %v, want %v", name, got, tc.want)
-		}
+		t.Run(name, func(t *testing.T) {
+			if got := markerForbidden(tc.err); got != tc.want {
+				t.Errorf("%s: markerForbidden = %v, want %v", name, got, tc.want)
+			}
+		})
 	}
 }

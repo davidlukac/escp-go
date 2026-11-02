@@ -3,6 +3,7 @@ package safety
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -12,9 +13,11 @@ import (
 
 func TestCheckFirmware(t *testing.T) {
 	for _, v := range []string{"1.0.0 Build 20230218 Rel.50633", "1.0.0 Build 20250710 Rel.71093"} {
-		if err := CheckFirmware(escp.ParseFirmware(v)); err != nil {
-			t.Errorf("%q must be verified: %v", v, err)
-		}
+		t.Run(v, func(t *testing.T) {
+			if err := CheckFirmware(escp.ParseFirmware(v)); err != nil {
+				t.Errorf("%q must be verified: %v", v, err)
+			}
+		})
 	}
 	tests := []struct {
 		version, frag string
@@ -27,14 +30,16 @@ func TestCheckFirmware(t *testing.T) {
 		{"", "has no build date", FirmwareNoBuildDate, ""},
 	}
 	for _, tt := range tests {
-		err := CheckFirmware(escp.ParseFirmware(tt.version))
-		var fe *FirmwareError
-		if !errors.As(err, &fe) || fe.Reason != tt.reason || fe.Firmware.Build != tt.build || fe.Firmware != escp.ParseFirmware(tt.version) || !strings.Contains(err.Error(), tt.frag) {
-			t.Errorf("CheckFirmware(%q) = %#v, want reason %d build %q containing %q", tt.version, err, tt.reason, tt.build, tt.frag)
-		}
-		if !slices.Equal(fe.Verified, VerifiedFirmwareBuilds()) {
-			t.Errorf("CheckFirmware(%q) lists %v, want %v", tt.version, fe.Verified, VerifiedFirmwareBuilds())
-		}
+		t.Run(tt.version, func(t *testing.T) {
+			err := CheckFirmware(escp.ParseFirmware(tt.version))
+			var fe *FirmwareError
+			if !errors.As(err, &fe) || fe.Reason != tt.reason || fe.Firmware.Build != tt.build || fe.Firmware != escp.ParseFirmware(tt.version) || !strings.Contains(err.Error(), tt.frag) {
+				t.Errorf("CheckFirmware(%q) = %#v, want reason %d build %q containing %q", tt.version, err, tt.reason, tt.build, tt.frag)
+			}
+			if !slices.Equal(fe.Verified, VerifiedFirmwareBuilds()) {
+				t.Errorf("CheckFirmware(%q) lists %v, want %v", tt.version, fe.Verified, VerifiedFirmwareBuilds())
+			}
+		})
 	}
 }
 
@@ -80,16 +85,18 @@ func (s *infoSource) Info(context.Context) (escp.Info, error) {
 
 func TestFirmwareGateAllowsVerifiedBuildsAndReadsTheFirmwareOnce(t *testing.T) {
 	for _, version := range []string{"1.0.0 Build 20230218 Rel.50633", "1.0.0 Build 20250710 Rel.71093"} {
-		sw := &infoSource{firmware: version}
-		gate := FirmwareGate()
-		for range 3 {
-			if err := gate(context.Background(), sw, escp.Operation{}); err != nil {
-				t.Fatalf("%s: %v", version, err)
+		t.Run(version, func(t *testing.T) {
+			sw := &infoSource{firmware: version}
+			gate := FirmwareGate()
+			for range 3 {
+				if err := gate(context.Background(), sw, escp.Operation{}); err != nil {
+					t.Fatalf("%s: %v", version, err)
+				}
 			}
-		}
-		if sw.reads != 1 {
-			t.Fatalf("%s: want one firmware read for three writes, got %d", version, sw.reads)
-		}
+			if sw.reads != 1 {
+				t.Fatalf("%s: want one firmware read for three writes, got %d", version, sw.reads)
+			}
+		})
 	}
 }
 
@@ -146,8 +153,10 @@ func TestFirmwareGatesDoNotShareState(t *testing.T) {
 func TestTheZeroFirmwareReasonIsNoneOfTheReasons(t *testing.T) {
 	var unset FirmwareReason
 	for _, r := range []FirmwareReason{FirmwareUnreadable, FirmwareNoBuildDate, FirmwareUnverified} {
-		if r == unset {
-			t.Errorf("reason %d is the zero value", r)
-		}
+		t.Run(fmt.Sprint(r), func(t *testing.T) {
+			if r == unset {
+				t.Errorf("reason %d is the zero value", r)
+			}
+		})
 	}
 }

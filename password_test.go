@@ -28,12 +28,14 @@ func TestPasswordNeverPrints(t *testing.T) {
 		{"Config %#v", fmt.Sprintf("%#v", cfg)},
 		{"error", fmt.Errorf("dialing with %+v", cfg).Error()},
 	} {
-		if strings.Contains(tc.got, secretText) {
-			t.Errorf("%s leaks the password: %s", tc.name, tc.got)
-		}
-		if !strings.Contains(tc.got, "[redacted]") {
-			t.Errorf("%s = %q, want it to say [redacted]", tc.name, tc.got)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			if strings.Contains(tc.got, secretText) {
+				t.Errorf("%s leaks the password: %s", tc.name, tc.got)
+			}
+			if !strings.Contains(tc.got, "[redacted]") {
+				t.Errorf("%s = %q, want it to say [redacted]", tc.name, tc.got)
+			}
+		})
 	}
 }
 

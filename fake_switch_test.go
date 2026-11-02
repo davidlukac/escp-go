@@ -3,6 +3,7 @@ package escp
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/davidlukac/escp-go/escptest"
@@ -134,9 +135,11 @@ func TestFakeModelVLANModesAndDot1Q(t *testing.T) {
 	}
 	// Two VLANs whose ids share a leading byte must stay apart.
 	for _, v := range []Dot1QVLAN{{ID: 20, Name: "a", Untagged: MustPortSet(3)}, {ID: 21, Name: "b", Tagged: MustPortSet(4)}} {
-		if err := c.SetDot1QVLAN(ctx, v); err != nil {
-			t.Fatal(err)
-		}
+		t.Run(fmt.Sprintf("VLAN %d", v.ID), func(t *testing.T) {
+			if err := c.SetDot1QVLAN(ctx, v); err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 	q, err := c.Dot1Q(ctx)
 	if err != nil || len(q.VLANs) != 3 || q.MaxVLANs == 0 || len(q.PVIDs) != 8 {

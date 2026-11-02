@@ -3,6 +3,7 @@ package escp
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/netip"
 	"reflect"
 	"strings"
@@ -76,10 +77,12 @@ func TestEncodedValuesAreReadable(t *testing.T) {
 		{"Speed", Speed100Full, `"100Mbps-full"`},
 		{"VLANMode", VLANModeDot1Q, `"802.1q"`},
 	} {
-		got, err := json.Marshal(tc.value)
-		if err != nil || string(got) != tc.want {
-			t.Errorf("%s: got %s, %v, want %s", tc.name, got, err, tc.want)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := json.Marshal(tc.value)
+			if err != nil || string(got) != tc.want {
+				t.Errorf("%s: got %s, %v, want %s", tc.name, got, err, tc.want)
+			}
+		})
 	}
 }
 
@@ -101,10 +104,12 @@ func TestDecodingRefusesWhatIsNoValue(t *testing.T) {
 		{"a VLAN mode nobody knows", `"vxlan"`, new(VLANMode)},
 		{"a build date with letters", `"2023021a"`, new(BuildDate)},
 	} {
-		err := json.Unmarshal([]byte(tc.text), tc.into)
-		if err == nil || !strings.Contains(err.Error(), "escp:") {
-			t.Errorf("%s: got %v, want an escp error", tc.name, err)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			err := json.Unmarshal([]byte(tc.text), tc.into)
+			if err == nil || !strings.Contains(err.Error(), "escp:") {
+				t.Errorf("%s: got %v, want an escp error", tc.name, err)
+			}
+		})
 	}
 	if _, err := json.Marshal(QoSMode(9)); err == nil {
 		t.Error("QoSMode(9) was encoded")
@@ -147,11 +152,13 @@ func TestEveryNamedValueReadsBackFromItsText(t *testing.T) {
 		}
 	}
 	for _, i := range []Impact{ImpactCosmetic, ImpactTraffic, ImpactManagement} {
-		text, err := i.MarshalText()
-		var back Impact
-		if err != nil || back.UnmarshalText(text) != nil || back != i {
-			t.Errorf("impact %v: %q, %v", i, text, err)
-		}
+		t.Run(fmt.Sprint(i), func(t *testing.T) {
+			text, err := i.MarshalText()
+			var back Impact
+			if err != nil || back.UnmarshalText(text) != nil || back != i {
+				t.Errorf("impact %v: %q, %v", i, text, err)
+			}
+		})
 	}
 }
 
@@ -161,10 +168,12 @@ func TestPortSetTextForms(t *testing.T) {
 		text string
 		want PortSet
 	}{{"", 0}, {"none", 0}, {" 2 , 3 ", MustPortSet(2, 3)}, {"3,2,3", MustPortSet(2, 3)}, {"32", MustPortSet(32)}} {
-		var got PortSet
-		if err := got.UnmarshalText([]byte(tc.text)); err != nil || got != tc.want {
-			t.Errorf("%q: got %v, %v, want %v", tc.text, got, err, tc.want)
-		}
+		t.Run(tc.text, func(t *testing.T) {
+			var got PortSet
+			if err := got.UnmarshalText([]byte(tc.text)); err != nil || got != tc.want {
+				t.Errorf("%q: got %v, %v, want %v", tc.text, got, err, tc.want)
+			}
+		})
 	}
 	for bits := range PortSet(1 << 10) { // every set of the first ten ports
 		set := bits
@@ -185,9 +194,11 @@ func TestNamedValuesValidate(t *testing.T) {
 		}
 	}
 	for _, s := range []Speed{SpeedLinkDown, "", "warp"} {
-		if err := s.Validate(); !errors.Is(err, ErrInvalid) {
-			t.Errorf("speed %q: got %v, want ErrInvalid", s, err)
-		}
+		t.Run(fmt.Sprint(s), func(t *testing.T) {
+			if err := s.Validate(); !errors.Is(err, ErrInvalid) {
+				t.Errorf("speed %q: got %v, want ErrInvalid", s, err)
+			}
+		})
 	}
 	for _, m := range VLANModes() {
 		if err := m.Validate(); err != nil {
@@ -195,8 +206,10 @@ func TestNamedValuesValidate(t *testing.T) {
 		}
 	}
 	for _, m := range []VLANMode{VLANModeNone, "", "vxlan"} {
-		if err := m.Validate(); !errors.Is(err, ErrInvalid) {
-			t.Errorf("VLAN mode %q: got %v, want ErrInvalid", m, err)
-		}
+		t.Run(fmt.Sprint(m), func(t *testing.T) {
+			if err := m.Validate(); !errors.Is(err, ErrInvalid) {
+				t.Errorf("VLAN mode %q: got %v, want ErrInvalid", m, err)
+			}
+		})
 	}
 }

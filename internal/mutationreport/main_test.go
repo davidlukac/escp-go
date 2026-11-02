@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -68,9 +69,11 @@ func TestAMissingOrBrokenReportIsSaidAndNotAnError(t *testing.T) {
 
 func TestWrongArgumentsAreAUsageError(t *testing.T) {
 	for _, args := range [][]string{nil, {"a", "b"}} {
-		if code, _, errOut := runWith(t, args...); code != exitUsage || !strings.Contains(errOut, "usage") {
-			t.Errorf("%v: code %d, %q", args, code, errOut)
-		}
+		t.Run(fmt.Sprint(args), func(t *testing.T) {
+			if code, _, errOut := runWith(t, args...); code != exitUsage || !strings.Contains(errOut, "usage") {
+				t.Errorf("%v: code %d, %q", args, code, errOut)
+			}
+		})
 	}
 }
 
@@ -99,31 +102,33 @@ func TestTheBadgeColorFollowsTheBands(t *testing.T) {
 		{59, 41, "59.0%", "red"},
 		{0, 3, "0.0%", "red"},
 	} {
-		var r report
-		r.Files = make([]struct {
-			Name      string `json:"file_name"`
-			Mutations []struct {
-				Type   string `json:"type"`
-				Status string `json:"status"`
-				Line   int    `json:"line"`
-				Column int    `json:"column"`
-			} `json:"mutations"`
-		}, 1)
-		for i := range tc.killed + tc.lived {
-			status := statusKilled
-			if i >= tc.killed {
-				status = statusLived
+		t.Run(tc.message, func(t *testing.T) {
+			var r report
+			r.Files = make([]struct {
+				Name      string `json:"file_name"`
+				Mutations []struct {
+					Type   string `json:"type"`
+					Status string `json:"status"`
+					Line   int    `json:"line"`
+					Column int    `json:"column"`
+				} `json:"mutations"`
+			}, 1)
+			for i := range tc.killed + tc.lived {
+				status := statusKilled
+				if i >= tc.killed {
+					status = statusLived
+				}
+				r.Files[0].Mutations = append(r.Files[0].Mutations, struct {
+					Type   string `json:"type"`
+					Status string `json:"status"`
+					Line   int    `json:"line"`
+					Column int    `json:"column"`
+				}{Status: status})
 			}
-			r.Files[0].Mutations = append(r.Files[0].Mutations, struct {
-				Type   string `json:"type"`
-				Status string `json:"status"`
-				Line   int    `json:"line"`
-				Column int    `json:"column"`
-			}{Status: status})
-		}
-		if got := badgeOf(r); got.Message != tc.message || got.Color != tc.color {
-			t.Errorf("%d killed, %d survived: %s %s, want %s %s", tc.killed, tc.lived, got.Message, got.Color, tc.message, tc.color)
-		}
+			if got := badgeOf(r); got.Message != tc.message || got.Color != tc.color {
+				t.Errorf("%d killed, %d survived: %s %s, want %s %s", tc.killed, tc.lived, got.Message, got.Color, tc.message, tc.color)
+			}
+		})
 	}
 }
 
