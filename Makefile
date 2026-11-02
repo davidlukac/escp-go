@@ -86,6 +86,11 @@ compat-table:
 settings-docs:
 	go test . -run TestTheGeneratedTablesAreCurrent -update-docs
 
+# What the weekly workflow runs: the suite shuffled and repeated with the race detector, and the
+# leak test at 200 cycles (it takes a few minutes).
+soak:
+	ESCP_SOAK=200 go test -race -shuffle=on -count=3 ./...
+
 # Enable the repository's git hooks (pre-commit runs `make pre-commit`).
 hooks:
 	git config core.hooksPath .githooks
