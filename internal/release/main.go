@@ -17,6 +17,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -71,13 +72,7 @@ func (v version) String() string { return fmt.Sprintf("%d.%d.%d", v.major, v.min
 
 // newerThan reports whether v is a later version than o.
 func (v version) newerThan(o version) bool {
-	switch {
-	case v.major != o.major:
-		return v.major > o.major
-	case v.minor != o.minor:
-		return v.minor > o.minor
-	}
-	return v.patch > o.patch
+	return cmp.Or(cmp.Compare(v.major, o.major), cmp.Compare(v.minor, o.minor), cmp.Compare(v.patch, o.patch)) > 0
 }
 
 // insertEntry puts the entry for ver above the newest one, below the title and the introduction (at

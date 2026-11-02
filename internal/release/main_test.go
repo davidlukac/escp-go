@@ -82,6 +82,11 @@ func TestInsertEntry(t *testing.T) {
 	if err != nil || got != "# Changelog\n\nIntroduction.\n\n## 0.1.0\n\n- first\n" {
 		t.Errorf("first entry = %q, %v", got, err)
 	}
+	// the newest entry may be the very first thing in the file
+	got, err = insertEntry("\n## 0.1.0\n\n- one\n", "0.2.0", "two")
+	if err != nil || got != "\n## 0.2.0\n\n- two\n\n## 0.1.0\n\n- one\n" {
+		t.Errorf("entry above an entry at the top = %q, %v", got, err)
+	}
 	if _, err := insertEntry(changelogWithTwoVersions, "0.2.0", "again"); err == nil || !strings.Contains(err.Error(), "already has an entry '## 0.2.0'") {
 		t.Errorf("a version with an entry: %v", err)
 	}
