@@ -1,0 +1,54 @@
+# Weekly checks that need no commit to go wrong: a soak of the test suite and a scan for vulnerabilities
+# that were published since the last release.
+#
+#   * soak: the whole suite with the race detector, in a random order, three times, on every operating
+#     system CI covers, with the leak test running 200 cycles instead of 20 (ESCP_SOAK). It is where a
+#     test that depends on timing, an order between tests or a goroutine that is left behind shows up;
+#     a pull request's run seldom does.
+#   * vulnerabilities: govulncheck on the code and its dependencies. An advisory appears without any
+#     change of ours, so the check that runs on a push would not see it until the next one.
+#
+# `make soak` and `make vuln` reproduce both locally.
+name: Weekly checks
+
+on:
+  schedule:
+    - cron: "37 5 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: weekly-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  soak:
+    name: Soak (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+        with:
+          go-version: stable
+      - name: The suite, shuffled, three times, with the race detector
+        run: go test -race -shuffle=on -count=3 ./...
+        env:
+          ESCP_SOAK: "200"
+
+  vulnerabilities:
+    name: Vulnerabilities
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+        with:
+          go-version: stable
+      - run: make vuln

@@ -5,7 +5,7 @@
 # Dependabot bumps them there. `go tool` builds the pinned version on first use (cached afterwards).
 DEVTOOL := go tool -modfile=devtools/go.mod
 
-.PHONY: test lint vuln cover cover-html apidiff fuzz mutation mutation-diff pkgdoc pkgdoc-serve compat-table settings-docs hooks pre-commit
+.PHONY: test lint vuln cover cover-html apidiff fuzz mutation mutation-diff pkgdoc pkgdoc-serve compat-table settings-docs soak hooks pre-commit
 
 # Unit tests against the fake switch. No hardware is touched.
 test:
@@ -85,6 +85,11 @@ compat-table:
 # (settings.go); a test fails when they are stale.
 settings-docs:
 	go test . -run TestTheGeneratedTablesAreCurrent -update-docs
+
+# What the weekly workflow runs: the suite shuffled and repeated with the race detector, and the
+# leak test at 200 cycles (it takes a few minutes).
+soak:
+	ESCP_SOAK=200 go test -race -shuffle=on -count=3 ./...
 
 # Enable the repository's git hooks (pre-commit runs `make pre-commit`).
 hooks:
