@@ -5,6 +5,10 @@ version; a breaking change is called out as such. The history before 0.1.0 is th
 `internal/escp` of [terraform-provider-tplinkeasysmart](https://github.com/davidlukac/terraform-provider-tplinkeasysmart),
 whose commits this repository keeps.
 
+## 0.5.0
+
+- A failing socket and a wrong switch during a download are reported as what they are, Config.Retries is capped at MaxRetries, and the fake's ports are reserved across processes.
+
 ## 0.4.0
 
 - **Breaking changes**, made together before 1.0, from the third review of the library. Two change what existing code does (the impact classes and the encoding of values), the rest are renames and signatures. None changes wire bytes.
