@@ -11,9 +11,16 @@ DEVTOOL := go tool -modfile=devtools/go.mod
 test:
 	go test -race -count=1 ./...
 
+# The linter checks the files the build includes, so a file for another operating system (the Linux
+# sharing test, the Windows socket option) is only seen by a run on that system. CI runs on Linux,
+# macOS and Windows; the hook runs on one, so the others are linted here by setting GOOS (the tool
+# binary is built for this machine first: `go tool -n` prints its path).
+LINT_GOOS := linux windows
+
 lint:
 	$(DEVTOOL) golangci-lint run ./...
 	$(DEVTOOL) golangci-lint run --build-tags live ./...
+	@bin="$$($(DEVTOOL) -n golangci-lint)"; for os in $(LINT_GOOS); do echo "golangci-lint run (GOOS=$$os)"; GOOS=$$os "$$bin" run ./... || exit 1; done
 
 # Known vulnerabilities in the code and its dependencies.
 vuln:
