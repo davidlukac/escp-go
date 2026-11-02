@@ -10,6 +10,10 @@ import (
 	"github.com/davidlukac/escp-go/internal/udp"
 )
 
+// testMovePoll is the pause between probes while a test waits for a moved switch or a lease: the
+// production pause is half a second, which only makes tests slow.
+const testMovePoll = 20 * time.Millisecond
+
 // newBoundClient dials a client on a free local port and binds its socket
 // immediately, retrying with another port if something grabbed the first one
 // in the meantime. Once it returns, the port is held by the client, so two
@@ -19,7 +23,7 @@ func newBoundClient(t testing.TB, cfg Config, opts ...dialOption) *Client {
 	var lastErr error
 	for range 20 {
 		cfg.HostPort = escptest.FreeUDPPort(t)
-		c, err := dial(context.Background(), net.DefaultResolver, cfg, opts...)
+		c, err := dial(context.Background(), net.DefaultResolver, cfg, append([]dialOption{withMovePoll(testMovePoll)}, opts...)...)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -452,3 +452,29 @@ func TestDialContextGivesItsContextToTheLookup(t *testing.T) {
 		t.Fatalf("got %v, want context.Canceled", err)
 	}
 }
+
+// The waits that tests shorten (the pause between probes, the budget of the first contact) are
+// the production values unless a dial option sets them, and a client built by Dial has no option.
+func TestTheShortenedWaitsAreOnlyForTestsAndDefaultToTheProductionValues(t *testing.T) {
+	c, err := Dial(Config{Host: "192.0.2.1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := c.pollInterval(); got != ipMovePoll {
+		t.Errorf("poll = %v, want the production %v", got, ipMovePoll)
+	}
+	if got := c.firstContactBudget(); got != defaultFirstContactBudget {
+		t.Errorf("first-contact budget = %v, want the production %v", got, defaultFirstContactBudget)
+	}
+	short, err := dial(context.Background(), net.DefaultResolver, Config{Host: "192.0.2.1"},
+		withMovePoll(7*time.Millisecond), withFirstContact(9*time.Millisecond))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := short.pollInterval(); got != 7*time.Millisecond {
+		t.Errorf("poll = %v, want the 7ms the option set", got)
+	}
+	if got := short.firstContactBudget(); got != 9*time.Millisecond {
+		t.Errorf("first-contact budget = %v, want the 9ms the option set", got)
+	}
+}

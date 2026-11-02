@@ -24,7 +24,7 @@ func dialLeasing(t *testing.T, f *escptest.Switch, opts ...dialOption) (*Client,
 		c.locator = func(ctx context.Context, _ MAC) (Info, error) { *lookups++; return c.discoverOnce(ctx) }
 	}
 	c := newBoundClient(t, Config{Host: "127.0.0.1", MAC: MAC(escptest.DefaultMAC()), Username: "admin", Password: "secret",
-		Timeout: 150 * time.Millisecond, Retries: 1, SwitchPort: f.UDPPort(), BroadcastAddr: escptest.Loopback()},
+		Timeout: 80 * time.Millisecond, Retries: 1, SwitchPort: f.UDPPort(), BroadcastAddr: escptest.Loopback()},
 		append([]dialOption{withLoopback(), askTheFake}, opts...)...)
 	t.Cleanup(func() { c.Close() })
 	return c, lookups
