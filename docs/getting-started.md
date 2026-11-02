@@ -11,7 +11,7 @@ import (
 )
 ```
 
-The module needs Go 1.26 or later. Pin an exact version while it is 0.x ([CHANGELOG.md](../CHANGELOG.md) lists every change).
+The module needs Go 1.26.2 or later (1.26.0 and 1.26.1 can corrupt the stack in a UDP read on Windows, [golang/go#78041](https://github.com/golang/go/issues/78041)). Pin an exact version while it is 0.x ([CHANGELOG.md](../CHANGELOG.md) lists every change).
 
 > **The switch is real network equipment with no console.** A wrong write can cut the management path or the uplink, and recovery is a physical factory reset. Read [Writing safely](writing-safely.md) before the first write.
 

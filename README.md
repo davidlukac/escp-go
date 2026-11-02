@@ -23,7 +23,7 @@
 go get github.com/davidlukac/escp-go
 ```
 
-Go 1.26 or later. The module has one dependency, `golang.org/x/sys` (to share the reply port). It is tested on Linux, macOS and Windows against a fake switch; FreeBSD builds. Pin an exact version while the module is 0.x.
+Go 1.26.2 or later (1.26.0 and 1.26.1 can corrupt the stack in a UDP read on Windows, [golang/go#78041](https://github.com/golang/go/issues/78041)). The module has one dependency, `golang.org/x/sys` (to share the reply port). It is tested on Linux, macOS and Windows against a fake switch; FreeBSD builds. Pin an exact version while the module is 0.x.
 
 ## Quick start
 
