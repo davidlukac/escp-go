@@ -9,10 +9,10 @@ import (
 )
 
 // Share lets several sockets (several clients, Discover, other processes) bind the
-// reply port at once. Every socket sharing the port receives the replies, and each keeps
-// only those from its own switch. This was observed on macOS: clients for two switches
-// got all of theirs, and so did Discover next to a client. Whether a switch addresses its
-// replies to the broadcast address or to the host was not captured.
+// reply port at once. The switches address every reply to the limited broadcast address
+// (captured, see PROTOCOL.md), which every socket sharing the port receives, and each keeps
+// only the replies from its own switch. This was observed on macOS: clients for two switches
+// got all of theirs, and so did Discover next to a client.
 func Share(_, _ string, c syscall.RawConn) error {
 	var sockErr error
 	if err := c.Control(func(fd uintptr) { sockErr = setReuse(int(fd)) }); err != nil {

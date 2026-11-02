@@ -41,7 +41,7 @@ for _, p := range ports {
 
 ## Find switches
 
-`Discover` finds the switches on the local network without credentials or addresses. It listens on UDP port 29809, the port every client of the host shares (see above), so it can run next to a `Client`: on macOS it found both test switches three times out of three while a client was reading. Where the system gives a datagram to only one of the sockets that share a port, either of them could miss a reply (whether the switches address their replies to the broadcast address, which every sharing socket receives, or to the host, was not captured), so run `Discover` on its own when you can; a program that holds the port exclusively, such as an old Easy Smart utility, makes it fail to bind.
+`Discover` finds the switches on the local network without credentials or addresses. It listens on UDP port 29809, the port every client of the host shares (see above), so it can run next to a `Client`: the switches address every reply to the broadcast address 255.255.255.255 (captured for both test switches), which every socket sharing the port receives, and on macOS `Discover` found both switches three times out of three while a client was reading (a test shows a broadcast reaching every sharing socket on Linux; Windows is not verified). A program that holds the port exclusively, such as an old Easy Smart utility, makes it fail to bind.
 
 ```go
 switches, err := escp.Discover(ctx, escp.DiscoverOptions{Window: 2 * time.Second})
