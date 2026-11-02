@@ -29,7 +29,7 @@ func th(typ wire.TLVType, h string) wire.TLV {
 type readCase struct {
 	name     string
 	script   map[wire.TLVType][]wire.TLV
-	requests [][]wire.TLVType
+	requests [][]escptest.TLVType
 	call     func(*Client, context.Context) (any, error)
 	want     any
 	// bad is a script whose reply the parser must reject.
@@ -41,7 +41,7 @@ func readCases() []readCase {
 		{
 			name:     "Ports",
 			script:   map[wire.TLVType][]wire.TLV{wire.TLVPorts: {th(wire.TLVPorts, "01010101060000"), th(wire.TLVPorts, "03010001000000")}},
-			requests: [][]wire.TLVType{{wire.TLVPorts}},
+			requests: [][]escptest.TLVType{{escptest.TLVType(wire.TLVPorts)}},
 			call:     func(c *Client, ctx context.Context) (any, error) { return c.Ports(ctx) },
 			want: []Port{
 				{ID: 1, Enabled: true, LAG: 1, ConfiguredSpeed: "auto", ActualSpeed: "1000Mbps-full"},
@@ -52,7 +52,7 @@ func readCases() []readCase {
 		{
 			name:     "PortStats",
 			script:   map[wire.TLVType][]wire.TLV{wire.TLVPortStats: {th(wire.TLVPortStats, "0101061434f1b7000000002873fb8a00000000")}},
-			requests: [][]wire.TLVType{{wire.TLVPortStats}},
+			requests: [][]escptest.TLVType{{escptest.TLVType(wire.TLVPortStats)}},
 			call:     func(c *Client, ctx context.Context) (any, error) { return c.PortStats(ctx) },
 			want:     []PortStats{{ID: 1, Enabled: true, Link: "1000Mbps-full", TxGood: 0x1434f1b7, RxGood: 0x2873fb8a}},
 			bad:      map[wire.TLVType][]wire.TLV{wire.TLVPortStats: {{Type: wire.TLVPortStats, Value: []byte{1}}}},
@@ -60,7 +60,7 @@ func readCases() []readCase {
 		{
 			name:     "LAGs",
 			script:   map[wire.TLVType][]wire.TLV{wire.TLVLAG: {th(wire.TLVLAG, "0100000003"), th(wire.TLVLAG, "0200000000")}},
-			requests: [][]wire.TLVType{{wire.TLVLAG}},
+			requests: [][]escptest.TLVType{{escptest.TLVType(wire.TLVLAG)}},
 			call:     func(c *Client, ctx context.Context) (any, error) { return c.LAGs(ctx) },
 			want:     []LAG{{ID: 1, Ports: MustPortSet(1, 2)}, {ID: 2, Ports: 0}},
 			bad:      map[wire.TLVType][]wire.TLV{wire.TLVLAG: {{Type: wire.TLVLAG, Value: []byte{1}}}},
@@ -71,7 +71,7 @@ func readCases() []readCase {
 				wire.TLVIGMPEnabled: {th(wire.TLVIGMPEnabled, "01"), th(wire.TLVIGMPSuppression, "00")},
 				wire.TLVIGMPGroups:  {th(wire.TLVIGMPGroups, "effffffa000100000009")},
 			},
-			requests: [][]wire.TLVType{{wire.TLVIGMPEnabled}, {wire.TLVIGMPGroups}},
+			requests: [][]escptest.TLVType{{escptest.TLVType(wire.TLVIGMPEnabled)}, {escptest.TLVType(wire.TLVIGMPGroups)}},
 			call:     func(c *Client, ctx context.Context) (any, error) { return c.IGMP(ctx) },
 			want:     IGMP{Enabled: true, Groups: []IGMPGroup{{IP: netip.MustParseAddr("239.255.255.250"), VLAN: 1, Ports: MustPortSet(1, 4)}}},
 			bad: map[wire.TLVType][]wire.TLV{
@@ -82,7 +82,7 @@ func readCases() []readCase {
 		{
 			name:     "LoopPrevention",
 			script:   map[wire.TLVType][]wire.TLV{wire.TLVLoopPrevention: {th(wire.TLVLoopPrevention, "01")}},
-			requests: [][]wire.TLVType{{wire.TLVLoopPrevention}},
+			requests: [][]escptest.TLVType{{escptest.TLVType(wire.TLVLoopPrevention)}},
 			call:     func(c *Client, ctx context.Context) (any, error) { return c.LoopPrevention(ctx) },
 			want:     true,
 			bad:      map[wire.TLVType][]wire.TLV{wire.TLVLoopPrevention: nil},
@@ -90,7 +90,7 @@ func readCases() []readCase {
 		{
 			name:     "PortMirror",
 			script:   map[wire.TLVType][]wire.TLV{wire.TLVMirror: {th(wire.TLVMirror, "01080000000300000004")}},
-			requests: [][]wire.TLVType{{wire.TLVMirror}},
+			requests: [][]escptest.TLVType{{escptest.TLVType(wire.TLVMirror)}},
 			call:     func(c *Client, ctx context.Context) (any, error) { return c.PortMirror(ctx) },
 			want:     Mirror{Enabled: true, Destination: 8, IngressPorts: MustPortSet(1, 2), EgressPorts: MustPortSet(3)},
 			bad:      map[wire.TLVType][]wire.TLV{wire.TLVMirror: {{Type: wire.TLVMirror, Value: []byte{1, 2, 3}}}},
@@ -98,7 +98,7 @@ func readCases() []readCase {
 		{
 			name:     "MTUVLAN",
 			script:   map[wire.TLVType][]wire.TLV{wire.TLVVLANMTU: {th(wire.TLVVLANMTU, "0108")}},
-			requests: [][]wire.TLVType{{wire.TLVVLANMTU}},
+			requests: [][]escptest.TLVType{{escptest.TLVType(wire.TLVVLANMTU)}},
 			call:     func(c *Client, ctx context.Context) (any, error) { return c.MTUVLAN(ctx) },
 			want:     MTUVLAN{Enabled: true, UplinkPort: 8},
 			bad:      map[wire.TLVType][]wire.TLV{wire.TLVVLANMTU: nil},
@@ -107,7 +107,7 @@ func readCases() []readCase {
 			name: "PortBasedVLAN",
 			script: map[wire.TLVType][]wire.TLV{wire.TLVVLANPortBased: {
 				th(wire.TLVVLANPortBased, "01"), th(wire.TLVVLANPortBasedVID, "01000000ff"), th(wire.TLVVLANPortBasedMax, "08")}},
-			requests: [][]wire.TLVType{{wire.TLVVLANPortBased}},
+			requests: [][]escptest.TLVType{{escptest.TLVType(wire.TLVVLANPortBased)}},
 			call:     func(c *Client, ctx context.Context) (any, error) { return c.PortBasedVLAN(ctx) },
 			want:     PortBasedVLAN{Enabled: true, MaxGroups: 8, VLANs: []PortVLAN{{ID: 1, Ports: MustPortSet(1, 2, 3, 4, 5, 6, 7, 8)}}},
 			bad: map[wire.TLVType][]wire.TLV{wire.TLVVLANPortBased: {
@@ -119,7 +119,7 @@ func readCases() []readCase {
 				wire.TLVVLAN8021QVLAN: {th(wire.TLVVLAN8021Q, "00"), th(wire.TLVVLAN8021QMax, "20")},
 				wire.TLVVLAN8021QPVID: {th(wire.TLVVLAN8021QPVID, "010001")},
 			},
-			requests: [][]wire.TLVType{{wire.TLVVLAN8021QVLAN}, {wire.TLVVLAN8021QPVID}},
+			requests: [][]escptest.TLVType{{escptest.TLVType(wire.TLVVLAN8021QVLAN)}, {escptest.TLVType(wire.TLVVLAN8021QPVID)}},
 			call:     func(c *Client, ctx context.Context) (any, error) { return c.Dot1Q(ctx) },
 			want:     Dot1Q{MaxVLANs: 32, VLANs: []Dot1QVLAN{}, PVIDs: []PortPVID{{Port: 1, PVID: 1}}},
 			bad: map[wire.TLVType][]wire.TLV{
@@ -133,7 +133,7 @@ func readCases() []readCase {
 				wire.TLVQoSMode:     {th(wire.TLVQoSMode, "02")},
 				wire.TLVQoSPriority: {th(wire.TLVQoSPriority, "0100"), th(wire.TLVQoSPriority, "0203")},
 			},
-			requests: [][]wire.TLVType{{wire.TLVQoSMode}, {wire.TLVQoSPriority}},
+			requests: [][]escptest.TLVType{{escptest.TLVType(wire.TLVQoSMode)}, {escptest.TLVType(wire.TLVQoSPriority)}},
 			call:     func(c *Client, ctx context.Context) (any, error) { return c.QoS(ctx) },
 			want:     QoS{Mode: QoSDSCP8021p, Priorities: []PortPriority{{1, 1}, {2, 4}}},
 			bad: map[wire.TLVType][]wire.TLV{
@@ -147,7 +147,7 @@ func readCases() []readCase {
 				wire.TLVBandwidthIngress: {th(wire.TLVBandwidthIngress, "020000001000")},
 				wire.TLVBandwidthEgress:  {th(wire.TLVBandwidthEgress, "020000002000")},
 			},
-			requests: [][]wire.TLVType{{wire.TLVBandwidthIngress}, {wire.TLVBandwidthEgress}},
+			requests: [][]escptest.TLVType{{escptest.TLVType(wire.TLVBandwidthIngress)}, {escptest.TLVType(wire.TLVBandwidthEgress)}},
 			call:     func(c *Client, ctx context.Context) (any, error) { return c.Bandwidth(ctx) },
 			want:     []PortBandwidth{{Port: 2, Ingress: 0x1000, Egress: 0x2000}},
 			bad: map[wire.TLVType][]wire.TLV{
@@ -158,7 +158,7 @@ func readCases() []readCase {
 		{
 			name:     "StormControl",
 			script:   map[wire.TLVType][]wire.TLV{wire.TLVStormControl: {th(wire.TLVStormControl, "0200010100"+"00001388")}},
-			requests: [][]wire.TLVType{{wire.TLVStormControl}},
+			requests: [][]escptest.TLVType{{escptest.TLVType(wire.TLVStormControl)}},
 			call:     func(c *Client, ctx context.Context) (any, error) { return c.StormControl(ctx) },
 			want:     []PortStorm{{Port: 2, UnknownUnicast: true, Multicast: true, Rate: 0x1388, Enabled: true}},
 			bad:      map[wire.TLVType][]wire.TLV{wire.TLVStormControl: {{Type: wire.TLVStormControl, Value: []byte{1}}}},
@@ -169,7 +169,7 @@ func readCases() []readCase {
 				wire.TLVPortCount: {th(wire.TLVPortCount, "08")},
 				wire.TLVAutoSave:  {th(wire.TLVAutoSave, "01")},
 			},
-			requests: [][]wire.TLVType{{wire.TLVPortCount}, {wire.TLVAutoSave}},
+			requests: [][]escptest.TLVType{{escptest.TLVType(wire.TLVPortCount)}, {escptest.TLVType(wire.TLVAutoSave)}},
 			call:     func(c *Client, ctx context.Context) (any, error) { return c.System(ctx) },
 			want:     System{PortCount: 8, AutoSave: true},
 			bad: map[wire.TLVType][]wire.TLV{
@@ -184,30 +184,30 @@ func readCases() []readCase {
 // from a script.
 type scriptedGETs struct {
 	mu       sync.Mutex
-	requests [][]wire.TLVType
+	requests [][]escptest.TLVType
 }
 
-func (s *scriptedGETs) snapshot() [][]wire.TLVType {
+func (s *scriptedGETs) snapshot() [][]escptest.TLVType {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return append([][]wire.TLVType(nil), s.requests...)
+	return append([][]escptest.TLVType(nil), s.requests...)
 }
 
 // install makes the fake answer GETs from script. A request whose types equal
 // failOn is answered with failCode instead, or not at all when drop is set.
-func (s *scriptedGETs) install(f *escptest.Switch, script map[wire.TLVType][]wire.TLV, failOn []wire.TLVType, failCode int32, drop bool) {
+func (s *scriptedGETs) install(f *escptest.Switch, script map[wire.TLVType][]wire.TLV, failOn []escptest.TLVType, failCode int32, drop bool) {
 	f.Configure(func(f *escptest.Faults) {
-		f.OnGet = func(types []wire.TLVType) ([]escptest.Setting, int32, bool) {
+		f.OnGet = func(types []escptest.TLVType) ([]escptest.Setting, int32, bool) {
 			s.mu.Lock()
-			s.requests = append(s.requests, append([]wire.TLVType(nil), types...))
+			s.requests = append(s.requests, append([]escptest.TLVType(nil), types...))
 			s.mu.Unlock()
 			if failOn != nil && reflect.DeepEqual(types, failOn) {
 				return nil, failCode, drop
 			}
 			var out []escptest.Setting
 			for _, t := range types {
-				for _, x := range script[t] {
-					out = append(out, escptest.Setting{Type: x.Type, Value: x.Value})
+				for _, x := range script[wire.TLVType(t)] {
+					out = append(out, escptest.Setting{Type: escptest.TLVType(x.Type), Value: x.Value})
 				}
 			}
 			return out, 0, false

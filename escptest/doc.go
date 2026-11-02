@@ -7,7 +7,9 @@
 // MAC address is a [6]byte (an escp.MAC is assignable to it and the other way round, with no
 // conversion, because one of the two is an unnamed array type), a switch port is an int
 // (int(port) for an escp.PortID), an IPv4 address is a [4]byte, and the link speeds are its own
-// LinkSpeed constants. A typed wrapper would need a second package between the two, which the
+// LinkSpeed constants, and a protocol type is a TLVType, the fake's own integer type, written as the
+// number PROTOCOL.md lists (TLVType(4352)); no constants are exported, so the numbers have one home.
+// A typed wrapper would need a second package between the two, which the
 // consumers of this one (a handful of calls: Start, Username, Password, FreeUDPPort, Loopback,
 // EnableModel, SetMAC) do not pay for.
 //

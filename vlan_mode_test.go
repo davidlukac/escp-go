@@ -58,25 +58,25 @@ func scriptModes(f *escptest.Switch, mtu, portBased, dot1q bool, silentOn wire.T
 		return "00"
 	}
 	f.Configure(func(f *escptest.Faults) {
-		f.OnGet = func(types []wire.TLVType) ([]escptest.Setting, int32, bool) {
+		f.OnGet = func(types []escptest.TLVType) ([]escptest.Setting, int32, bool) {
 			var out []escptest.Setting
 			for _, typ := range types {
-				if typ == silentOn {
+				if wire.TLVType(typ) == silentOn {
 					return nil, 0, true
 				}
-				switch typ {
+				switch wire.TLVType(typ) {
 				case wire.TLVVLANMTU:
-					out = append(out, escptest.Setting{Type: wire.TLVVLANMTU, Value: []byte{map[bool]byte{true: 1}[mtu], 8}})
+					out = append(out, escptest.Setting{Type: escptest.TLVType(wire.TLVVLANMTU), Value: []byte{map[bool]byte{true: 1}[mtu], 8}})
 				case wire.TLVVLANPortBased:
 					for _, x := range []wire.TLV{th(wire.TLVVLANPortBased, flag(portBased)), th(wire.TLVVLANPortBasedVID, "01000000ff"), th(wire.TLVVLANPortBasedMax, "08")} {
-						out = append(out, escptest.Setting{Type: x.Type, Value: x.Value})
+						out = append(out, escptest.Setting{Type: escptest.TLVType(x.Type), Value: x.Value})
 					}
 				case wire.TLVVLAN8021QVLAN:
 					for _, x := range []wire.TLV{th(wire.TLVVLAN8021Q, flag(dot1q)), th(wire.TLVVLAN8021QMax, "20")} {
-						out = append(out, escptest.Setting{Type: x.Type, Value: x.Value})
+						out = append(out, escptest.Setting{Type: escptest.TLVType(x.Type), Value: x.Value})
 					}
 				case wire.TLVVLAN8021QPVID:
-					out = append(out, escptest.Setting{Type: wire.TLVVLAN8021QPVID, Value: []byte{1, 0, 1}})
+					out = append(out, escptest.Setting{Type: escptest.TLVType(wire.TLVVLAN8021QPVID), Value: []byte{1, 0, 1}})
 				}
 			}
 			return out, 0, false
@@ -134,9 +134,9 @@ func TestSetVLANModeWire(t *testing.T) {
 		set  VLANModeSetting
 		want escptest.Setting
 	}{
-		{"802.1Q", VLANModeSetting{Mode: VLANModeDot1Q}, escptest.Setting{Type: wire.TLVVLAN8021Q, Value: []byte{1}}},
-		{"port-based", VLANModeSetting{Mode: VLANModePortBased}, escptest.Setting{Type: wire.TLVVLANPortBased, Value: []byte{1}}},
-		{"MTU, uplink 3", VLANModeSetting{Mode: VLANModeMTU, UplinkPort: 3}, escptest.Setting{Type: wire.TLVVLANMTU, Value: []byte{1, 3}}},
+		{"802.1Q", VLANModeSetting{Mode: VLANModeDot1Q}, escptest.Setting{Type: escptest.TLVType(wire.TLVVLAN8021Q), Value: []byte{1}}},
+		{"port-based", VLANModeSetting{Mode: VLANModePortBased}, escptest.Setting{Type: escptest.TLVType(wire.TLVVLANPortBased), Value: []byte{1}}},
+		{"MTU, uplink 3", VLANModeSetting{Mode: VLANModeMTU, UplinkPort: 3}, escptest.Setting{Type: escptest.TLVType(wire.TLVVLANMTU), Value: []byte{1, 3}}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

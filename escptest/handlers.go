@@ -194,9 +194,9 @@ func (f *Switch) handleGet(r request) {
 	scripted := f.faults.OnGet
 	f.mu.Unlock()
 	if scripted != nil {
-		types := make([]wire.TLVType, len(r.tlvs))
+		types := make([]TLVType, len(r.tlvs))
 		for i, t := range r.tlvs {
-			types[i] = t.Type
+			types[i] = TLVType(t.Type)
 		}
 		settings, code, drop := scripted(types)
 		if !drop {

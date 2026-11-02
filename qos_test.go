@@ -46,7 +46,7 @@ func TestSetPortPrioritiesStopsWhenTheCurrentStateCannotBeRead(t *testing.T) {
 	f := escptest.Start(t)
 	c := dialFast(t, f, "secret")
 	f.Configure(func(f *escptest.Faults) {
-		f.OnGet = func([]wire.TLVType) ([]escptest.Setting, int32, bool) { return nil, 0, true }
+		f.OnGet = func([]escptest.TLVType) ([]escptest.Setting, int32, bool) { return nil, 0, true }
 	})
 	if err := c.SetPortPriorities(context.Background(), []PortPriority{{Port: 3, Priority: 2}}); !errors.Is(err, ErrNoReply) {
 		t.Fatalf("got %v", err)
@@ -86,7 +86,7 @@ func TestSetQoSWire(t *testing.T) {
 	if err := c.SetQoSMode(ctx, 1); err != nil {
 		t.Fatal(err)
 	}
-	if got := f.LastSet(); len(got) != 1 || got[0].Type != wire.TLVQoSMode || got[0].Value[0] != 1 {
+	if got := f.LastSet(); len(got) != 1 || got[0].Type != escptest.TLVType(wire.TLVQoSMode) || got[0].Value[0] != 1 {
 		t.Fatalf("mode wire: %+v", got)
 	}
 	if err := c.SetQoSMode(ctx, 7); err == nil {
@@ -104,7 +104,7 @@ func TestSetQoSWire(t *testing.T) {
 		if i == 2 {
 			want = 3 // port 3 -> priority 4 -> raw 3
 		}
-		if tl.Type != wire.TLVQoSPriority || tl.Value[0] != byte(i+1) || tl.Value[1] != want {
+		if tl.Type != escptest.TLVType(wire.TLVQoSPriority) || tl.Value[0] != byte(i+1) || tl.Value[1] != want {
 			t.Fatalf("entry %d: %+v", i, tl)
 		}
 	}

@@ -208,7 +208,7 @@ func TestEscptestWriteRecordsAreCopies(t *testing.T) {
 		t.Fatalf("two writes, got count %d and %d records", f.WriteCount(), len(f.AllSets()))
 	}
 	last := f.LastSet()
-	if len(last) != 1 || last[0].Type != wire.TLVLED || string(last[0].Value) != "\x01" {
+	if len(last) != 1 || last[0].Type != escptest.TLVType(wire.TLVLED) || string(last[0].Value) != "\x01" {
 		t.Fatalf("the last write was the LED on: %+v", last)
 	}
 	last[0].Value[0] = 9
