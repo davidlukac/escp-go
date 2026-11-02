@@ -20,7 +20,7 @@ import (
 type Client struct {
 	cfg  Config
 	mu   sync.Mutex
-	conn *net.UDPConn
+	conn datagramConn
 	dest *net.UDPAddr
 	// alsoFrom is a second address replies are accepted from while the switch is
 	// being moved to it (SetIPConfig); nil otherwise.

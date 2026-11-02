@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"net"
+	"os"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -241,8 +243,8 @@ func TestRecvWithACanceledContextReturnsImmediately(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	start := time.Now()
-	if _, ok := c.recv(ctx, time.Now().Add(5*time.Second)); ok {
-		t.Fatal("nothing was sent, so nothing can have been received")
+	if _, err := c.recv(ctx, time.Now().Add(5*time.Second)); !errors.Is(err, errSilent) {
+		t.Fatalf("nothing was sent, so nothing can have been received: got %v", err)
 	}
 	if took := time.Since(start); took > 2*time.Second { // the deadline is 5 s away
 		t.Fatalf("recv waited %v for a canceled call", took)
@@ -256,10 +258,129 @@ func TestRecvWithExpiredDeadlineReturnsImmediately(t *testing.T) {
 		t.Fatal(err)
 	}
 	start := time.Now()
-	if rep, ok := c.recv(context.Background(), time.Now().Add(-time.Second)); ok || rep.op != 0 || len(rep.tlvs) != 0 {
-		t.Fatalf("expected no reply, got %+v ok=%v", rep, ok)
+	if rep, err := c.recv(context.Background(), time.Now().Add(-time.Second)); !errors.Is(err, errSilent) || rep.op != 0 || len(rep.tlvs) != 0 {
+		t.Fatalf("expected no reply, got %+v, %v", rep, err)
 	}
 	if took := time.Since(start); took > 100*time.Millisecond {
 		t.Fatalf("recv blocked for %v although the deadline had passed", took)
+	}
+}
+
+// readFaultConn is a socket whose reads fail on request: right after a datagram has been sent
+// (so the clean-up read that precedes every send is not affected), the next read returns err, once
+// or, when sticky, for good.
+type readFaultConn struct {
+	datagramConn
+	err     error
+	sticky  bool
+	pending bool
+	failed  int // reads that returned err
+	healthy int // requests sent before the fault arms
+}
+
+func (r *readFaultConn) WriteToUDP(b []byte, addr *net.UDPAddr) (int, error) {
+	if r.healthy > 0 {
+		r.healthy--
+	} else {
+		r.pending = true
+	}
+	return r.datagramConn.WriteToUDP(b, addr)
+}
+
+func (r *readFaultConn) ReadFromUDP(b []byte) (int, *net.UDPAddr, error) {
+	if r.pending {
+		r.pending = r.sticky
+		r.failed++
+		return 0, nil, r.err
+	}
+	return r.datagramConn.ReadFromUDP(b)
+}
+
+// A socket that fails is reported as what it is, at once, and not as a switch that stays silent after
+// every retry.
+func TestASocketReadErrorIsReportedAsItIsAndNotRetried(t *testing.T) {
+	f := escptest.Start(t)
+	c := dialFake(t, f, "secret")
+	if err := c.open(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	broken := errors.New("the network went away")
+	conn := &readFaultConn{datagramConn: c.conn, err: &net.OpError{Op: "read", Net: "udp", Err: broken}, sticky: true}
+	c.conn = conn
+	_, err := c.Info(context.Background())
+	if !errors.Is(err, broken) || errors.Is(err, ErrNoReply) || !strings.Contains(err.Error(), "escp: receive") {
+		t.Fatalf("got %v, want the socket's own error behind %q", err, "escp: receive")
+	}
+	if conn.failed != 1 {
+		t.Fatalf("%d reads failed, want one: a failing socket ends the call and is not retried", conn.failed)
+	}
+}
+
+// The same holds while a reply is downloaded in fragments: the key exchange succeeds, the download fails.
+func TestASocketReadErrorDuringADownloadIsReportedAsItIs(t *testing.T) {
+	f := escptest.Start(t)
+	c := dialFake(t, f, "secret")
+	if _, err := c.Info(context.Background()); err != nil { // the switch's MAC is known: one packet per request
+		t.Fatal(err)
+	}
+	broken := errors.New("the network went away")
+	c.conn = &readFaultConn{datagramConn: c.conn, err: broken, sticky: true, healthy: 1}
+	if _, err := c.ConfigBackup(context.Background()); !errors.Is(err, broken) {
+		t.Fatalf("got %v, want the socket's own error", err)
+	}
+}
+
+// The notice of an earlier send that went to a closed port (ICMP port unreachable) is no answer and no
+// failure: the read goes on, and the reply that follows is taken.
+func TestAnIcmpNoticeInTheSocketDoesNotEndTheWait(t *testing.T) {
+	for name, noise := range map[string]error{
+		"ECONNREFUSED (Linux, macOS)": &net.OpError{Op: "read", Net: "udp", Err: os.NewSyscallError("recvfrom", syscall.ECONNREFUSED)},
+		"WSAECONNRESET (Windows)":     &net.OpError{Op: "read", Net: "udp", Err: os.NewSyscallError("wsarecvfrom", errWSAConnReset)},
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := escptest.Start(t)
+			c := dialFake(t, f, "secret")
+			if err := c.open(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+			c.conn = &readFaultConn{datagramConn: c.conn, err: noise}
+			if _, err := c.Info(context.Background()); err != nil {
+				t.Fatalf("Info = %v, want the reply that followed the notice", err)
+			}
+		})
+	}
+}
+
+// Another device answering in the middle of a download is a wrong switch, not a silent one.
+func TestAnotherDeviceAnsweringDuringADownloadIsAWrongSwitch(t *testing.T) {
+	f := escptest.Start(t)
+	c, _ := dialMAC(t, f, "127.0.0.1", wantMAC, nil)
+	if _, err := c.Info(context.Background()); err != nil { // the session exists, the identity is checked
+		t.Fatal(err)
+	}
+	f.SetMAC([6]byte(otherMAC)) // the address now belongs to another device
+	_, err := c.ConfigBackup(context.Background())
+	var wrong *WrongSwitchError
+	if !errors.Is(err, ErrWrongSwitch) || !errors.As(err, &wrong) || wrong.Got != otherMAC {
+		t.Fatalf("got %v, want ErrWrongSwitch naming %x", err, otherMAC)
+	}
+}
+
+func TestIcmpNoiseIsOnlyTheTwoNotices(t *testing.T) {
+	for _, tc := range []struct {
+		err  error
+		want bool
+	}{
+		{syscall.ECONNREFUSED, true},
+		{errWSAConnReset, true},
+		{&net.OpError{Err: os.NewSyscallError("recvfrom", syscall.ECONNREFUSED)}, true},
+		{syscall.EBADF, false},
+		{net.ErrClosed, false},
+		{os.ErrDeadlineExceeded, false},
+		{errors.New("other"), false},
+	} {
+		if got := icmpNoise(tc.err); got != tc.want {
+			t.Errorf("icmpNoise(%v) = %v, want %v", tc.err, got, tc.want)
+		}
 	}
 }
