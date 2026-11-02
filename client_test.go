@@ -175,7 +175,7 @@ func TestBusyHostPortIsReportedOnFirstUse(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer busy.Close()
-	port := busy.LocalAddr().(*net.UDPAddr).Port
+	port := localPort(t, busy)
 	c, err := Dial(Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 80 * time.Millisecond,
 		SwitchPort: f.UDPPort(), HostPort: port, BroadcastAddr: escptest.Loopback()})
 	if err != nil {
@@ -333,7 +333,7 @@ func TestBindReplyPortExplainsAPortThatIsTaken(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer holder.Close()
-	port := holder.LocalAddr().(*net.UDPAddr).Port
+	port := localPort(t, holder)
 	conn, err := bindReplyPort(context.Background(), port)
 	if err == nil {
 		conn.Close()

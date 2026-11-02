@@ -25,7 +25,11 @@ func TestSharingSocketsAllReceiveABroadcast(t *testing.T) {
 		t.Fatal(err)
 	}
 	socks = append(socks, first)
-	port := first.LocalAddr().(*net.UDPAddr).Port
+	firstAddr, err := AddrPort(first.LocalAddr())
+	if err != nil {
+		t.Fatal(err)
+	}
+	port := int(firstAddr.Port())
 	for range 2 {
 		c, err := lc.ListenPacket(t.Context(), "udp4", net.JoinHostPort("", strconv.Itoa(port)))
 		if err != nil {

@@ -2,10 +2,12 @@ package escp
 
 import (
 	"context"
+	"net"
 	"testing"
 	"time"
 
 	"github.com/davidlukac/escp-go/escptest"
+	"github.com/davidlukac/escp-go/internal/udp"
 )
 
 // newBoundClient dials a client on a free local port and binds its socket
@@ -50,4 +52,14 @@ func dialFast(t *testing.T, f *escptest.Switch, pass Password) *Client {
 	c.allowLoopback = true
 	t.Cleanup(func() { c.Close() })
 	return c
+}
+
+// localPort is the UDP port a socket is bound to.
+func localPort(t testing.TB, c interface{ LocalAddr() net.Addr }) int {
+	t.Helper()
+	ap, err := udp.AddrPort(c.LocalAddr())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return int(ap.Port())
 }

@@ -2,10 +2,11 @@ package main
 
 import (
 	"bytes"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
-	"strconv"
 	"strings"
 	"testing"
 )
@@ -17,12 +18,12 @@ func profileOf(blocks ...[5]any) string {
 	var b strings.Builder
 	b.WriteString("mode: atomic\n")
 	for _, x := range blocks {
-		b.WriteString(module + "/" + x[0].(string) + ":" + itoa(x[1]) + ".1," + itoa(x[2]) + ".2 " + itoa(x[3]) + " " + itoa(x[4]) + "\n")
+		b.WriteString(module + "/" + fmt.Sprint(x[0]) + ":" + itoa(x[1]) + ".1," + itoa(x[2]) + ".2 " + itoa(x[3]) + " " + itoa(x[4]) + "\n")
 	}
 	return b.String()
 }
 
-func itoa(v any) string { return strconv.Itoa(v.(int)) }
+func itoa(v any) string { return fmt.Sprint(v) }
 
 // project writes a module with the given files into a temporary directory and returns its root.
 func project(t *testing.T, files map[string]string) string {
@@ -370,5 +371,16 @@ func TestOnlyProcessEntryPointsAreExcludedFromThePolicy(t *testing.T) {
 	}
 	if marked == 0 {
 		t.Fatal("found no excluded function: the walk is looking in the wrong place")
+	}
+}
+
+type failingWriter struct{}
+
+func (failingWriter) Write([]byte) (int, error) { return 0, errors.New("closed") }
+
+// A badge that cannot be written is a failure of the command, not a silent success.
+func TestBadgeThatCannotBeWrittenFails(t *testing.T) {
+	if code := writeBadge(failingWriter{}, nil); code != exitUsage {
+		t.Fatalf("got exit code %d, want %d", code, exitUsage)
 	}
 }

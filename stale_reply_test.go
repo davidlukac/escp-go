@@ -27,7 +27,7 @@ func leaveInTheSocket(t *testing.T, c *Client, data []byte) {
 		t.Fatal(err)
 	}
 	defer other.Close()
-	if _, err := other.WriteToUDP(data, &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: c.conn.LocalAddr().(*net.UDPAddr).Port}); err != nil {
+	if _, err := other.WriteToUDP(data, &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: localPort(t, c.conn)}); err != nil {
 		t.Fatal(err)
 	}
 }

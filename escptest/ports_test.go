@@ -3,6 +3,8 @@ package escptest
 import (
 	"net"
 	"testing"
+
+	"github.com/davidlukac/escp-go/internal/udp"
 )
 
 // listenAt binds the loopback port the test names, standing in for a kernel that hands a released
@@ -33,8 +35,8 @@ func TestAPortHandedOutIsNotGivenAgain(t *testing.T) {
 	if got == first || calls != 2 {
 		t.Errorf("got port %d after %d tries, want a port other than %d on the second try", got, calls, first)
 	}
-	if bound := c.LocalAddr().(*net.UDPAddr).Port; bound != got {
-		t.Errorf("the reported port is %d, the socket is bound to %d", got, bound)
+	if bound, err := udp.AddrPort(c.LocalAddr()); err != nil || int(bound.Port()) != got {
+		t.Errorf("the reported port is %d, the socket is bound to %v (%v)", got, bound, err)
 	}
 }
 
@@ -60,7 +62,11 @@ func TestListenErrorIsReturned(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = blocker.Close() }() // best effort at the end of the test
-	port := blocker.LocalAddr().(*net.UDPAddr).Port
+	blockerAddr, err := udp.AddrPort(blocker.LocalAddr())
+	if err != nil {
+		t.Fatal(err)
+	}
+	port := int(blockerAddr.Port())
 	// binding a port that is in use fails; the error comes back and nothing is reserved for it
 	if _, _, err := listenUnreserved(listenAt(t, port)); err == nil {
 		t.Fatal("expected the bind error")

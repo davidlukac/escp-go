@@ -39,6 +39,10 @@ linters:
     - exhaustive
     - perfsprint
     - usestdlibvars
+    # Added after the third review: its findings were fixed, and these keep them fixed.
+    - forcetypeassert
+    - dupword
+    - errchkjson
   settings:
     misspell:
       # American spelling, as the Go standard library and godoc use it.

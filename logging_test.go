@@ -297,7 +297,7 @@ func TestLoggerFollowsAConfigurationDownload(t *testing.T) {
 			t.Fatal(err)
 		}
 		again := rec.named("configuration download not usable; repeating")
-		if len(again) != 1 || again[0].level != slog.LevelWarn || again[0].attrs["round"] != int64(1) || again[0].attrs["rounds"] != int64(2) || !strings.Contains(again[0].attrs["reason"].(string), "differ") {
+		if len(again) != 1 || again[0].level != slog.LevelWarn || again[0].attrs["round"] != int64(1) || again[0].attrs["rounds"] != int64(2) || !strings.Contains(fmt.Sprint(again[0].attrs["reason"]), "differ") {
 			t.Errorf("repeat lines = %+v, want one Warn for round 1 saying the downloads differ", again)
 		}
 	})
