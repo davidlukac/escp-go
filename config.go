@@ -22,6 +22,12 @@ const NoRetries = -1
 // defaultRetries is the number of additional attempts when Config.Retries is zero.
 const defaultRetries = 2
 
+// MaxRetries is the highest Config.Retries that Config.Validate and Dial accept. A switch that
+// stays silent holds a call for (Retries+1) x Timeout per request, so an unbounded value is a call
+// that does not return for days; ten additional attempts is already more than a switch that does
+// not answer the first three will ever answer.
+const MaxRetries = 10
+
 // Config configures a Client. Zero values select sensible defaults, except Host, which is
 // required. A Config holds the switch's password as a Password, which prints as [redacted], so a
 // Config can be logged or put in an error message; keep the text itself (Reveal) out of both.
@@ -42,7 +48,8 @@ type Config struct {
 	Password Password
 	Timeout  time.Duration // how long to wait for a reply per attempt, default 3s
 	// Retries is the number of additional attempts after the first when the switch stays
-	// silent: zero selects the default (2), NoRetries (any negative value) selects none.
+	// silent: zero selects the default (2), NoRetries (any negative value) selects none, and
+	// more than MaxRetries is refused.
 	// One request is therefore sent up to Retries+1 times, each waiting up to Timeout. A call
 	// that needs a session makes up to four such requests (the key exchange and the request,
 	// then both again if the switch stops answering mid-call), plus the discovery that learns
@@ -73,7 +80,7 @@ const maxUDPPort = 1<<16 - 1
 
 // Validate checks the configuration the way Dial does, before anything is resolved or sent: a switch
 // to talk to (Host or MAC; a Host that is no IPv6 address, no host:port and no address that reaches
-// more than one device), no negative Timeout, ports that are UDP ports and an IPv4 BroadcastAddr.
+// more than one device), no negative Timeout, no more than MaxRetries Retries, ports that are UDP ports and an IPv4 BroadcastAddr.
 // The zero value of every optional field is valid (it selects the default). The error matches
 // ErrInvalid.
 func (cfg Config) Validate() error {
@@ -87,6 +94,8 @@ func (cfg Config) Validate() error {
 		return invalidf("escp: Config needs a Host or a MAC to find the switch by")
 	case cfg.Timeout < 0:
 		return invalidf("escp: negative Timeout %v", cfg.Timeout)
+	case cfg.Retries > MaxRetries:
+		return invalidf("escp: Retries %d is above the limit of %d", cfg.Retries, MaxRetries)
 	case cfg.SwitchPort < 0 || cfg.SwitchPort > maxUDPPort:
 		return invalidf("escp: SwitchPort %d is not a UDP port (1 to %d, or 0 for %d)", cfg.SwitchPort, maxUDPPort, defaultSwitchPort)
 	case cfg.HostPort < 0 || cfg.HostPort > maxUDPPort:
