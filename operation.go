@@ -11,21 +11,18 @@ import "fmt"
 // uplink). That needs the ports: see Operation.Ports and the safety package.
 type Impact int
 
-// The impact classes, from harmless to able to cut the management path. The zero value is
-// not a class: a writer that forgot to declare one would be refused by every gate that
-// compares.
+// The impact classes, from harmless to able to cut the management path. Settings lists the methods
+// of each class. The zero value is not a class: a writer that forgot to declare one would be refused
+// by every gate that compares.
 const (
-	// ImpactCosmetic cannot affect traffic or the way the switch is reached (LED, device
-	// description).
+	// ImpactCosmetic cannot affect traffic or the way the switch is reached.
 	ImpactCosmetic Impact = iota + 1
 	// ImpactTraffic can slow or drop some of the traffic of the ports it names or of the whole
-	// switch, but takes no port, address or VLAN away: rate limits, storm control, QoS and
-	// IGMP snooping.
+	// switch, but takes no port, address or VLAN away.
 	ImpactTraffic
 	// ImpactManagement can cut the management path or the uplink, or leave the switch
-	// unreachable: its IP settings and DHCP, the VLAN mode, port-based and 802.1Q VLAN
-	// membership and PVIDs, port state and speed, link aggregation, port mirroring and loop
-	// prevention.
+	// unreachable, with the right arguments: an address or DHCP, VLAN membership, a port that is
+	// turned off or retuned, link aggregation, mirroring, loop prevention.
 	ImpactManagement
 )
 

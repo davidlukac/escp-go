@@ -158,7 +158,7 @@ func (c *Client) SetIPConfig(ctx context.Context, cfg IPConfig) error {
 	c.mu.Lock()
 	c.alsoFrom = net.IP(cfg.IP.AsSlice())
 	c.mu.Unlock()
-	sent, err := c.writeSystem(ctx, Operation{Name: "SetIPConfig", Impact: ImpactManagement}, info.Hostname, false, cfg)
+	sent, err := c.writeSystem(ctx, Operation{Name: "SetIPConfig", Impact: impactOf("SetIPConfig")}, info.Hostname, false, cfg)
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	var refused *RejectedError
