@@ -22,11 +22,13 @@ func (p PortID) Validate() error {
 	return nil
 }
 
-// ParsePortID reads a port number written in decimal; the port must be valid (Validate), and the
-// error then matches ErrInvalid.
+// ParsePortID reads a port number written in decimal, in its one canonical spelling: digits only,
+// without a sign or a leading zero ("3", not "+3" or "03"), so that one port has one text. The port
+// must be valid (Validate), and the error then matches ErrInvalid; any other text is refused with
+// an error that matches ErrInvalid too.
 func ParsePortID(s string) (PortID, error) {
 	n, err := strconv.Atoi(s)
-	if err != nil {
+	if err != nil || strconv.Itoa(n) != s {
 		return 0, invalidf("escp: %q is not a port number", s)
 	}
 	p := PortID(n)
