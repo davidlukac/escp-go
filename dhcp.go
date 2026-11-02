@@ -78,11 +78,11 @@ func (c *Client) awaitLease(ctx context.Context, before IPConfig, lost error) er
 				return c.follow(found)
 			}
 		}
-		c.log.DebugContext(ctx, "no lease reported yet; asking again", "poll", ipMovePoll.String())
+		c.log.DebugContext(ctx, "no lease reported yet; asking again", "poll", c.pollInterval().String())
 		select {
 		case <-ctx.Done():
 			return leaseNotConfirmed(before, last, seen, lost)
-		case <-time.After(ipMovePoll):
+		case <-time.After(c.pollInterval()):
 		}
 	}
 }

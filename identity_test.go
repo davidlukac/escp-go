@@ -21,20 +21,24 @@ var (
 	otherMAC = MAC{0x02, 0, 0, 0, 0, 0x77}
 )
 
+// testFirstContact is the time the address of a client pinned by MAC gets to answer the first
+// discovery in these tests; the production budget is a second and a half.
+const testFirstContact = 250 * time.Millisecond
+
 // dialMAC is a client for the fake that pins the identity to mac. host is "" for a client that
 // has to find the switch itself; locator stands in for the discovery probe and counts its calls.
-func dialMAC(t *testing.T, f *escptest.Switch, host string, mac MAC, locator func(MAC) (Info, error)) (*Client, *int) {
+func dialMAC(t *testing.T, f *escptest.Switch, host string, mac MAC, locator func(MAC) (Info, error), opts ...dialOption) (*Client, *int) {
 	t.Helper()
 	calls := new(int)
 	c := newBoundClient(t, Config{Host: host, MAC: mac, Username: "admin", Password: "secret", Timeout: 150 * time.Millisecond, Retries: NoRetries,
-		SwitchPort: f.UDPPort(), BroadcastAddr: escptest.Loopback()}, withLoopback(),
+		SwitchPort: f.UDPPort(), BroadcastAddr: escptest.Loopback()}, append([]dialOption{withLoopback(), withFirstContact(testFirstContact),
 		withLocator(func(_ context.Context, m MAC) (Info, error) {
 			*calls++
 			if locator == nil {
 				return Info{IP: netip.MustParseAddr("127.0.0.1"), MAC: m}, nil
 			}
 			return locator(m)
-		}))
+		})}, opts...)...)
 	t.Cleanup(func() { c.Close() })
 	return c, calls
 }

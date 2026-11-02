@@ -241,6 +241,7 @@ func TestReadMethodsReportEachFailingRequestStage(t *testing.T) {
 		for stage, failOn := range tc.requests {
 			stageName := tc.name + " request " + string(rune('1'+stage))
 			t.Run(stageName+" unanswered", func(t *testing.T) {
+				t.Parallel() // waits out the retries and asserts silence, so a loaded machine cannot fail it
 				f := escptest.Start(t)
 				c := dialFast(t, f, "secret")
 				var log scriptedGETs

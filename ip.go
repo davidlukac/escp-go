@@ -245,6 +245,14 @@ func (c *Client) settleLostReply(ctx context.Context, mac MAC, before, want IPCo
 	}
 }
 
+// pollInterval is the pause between the probes of a wait for a moved switch or a lease.
+func (c *Client) pollInterval() time.Duration {
+	if c.movePoll > 0 {
+		return c.movePoll
+	}
+	return ipMovePoll
+}
+
 // awaitAddress probes the new address until the switch reports it, because
 // the first packets can fail while the neighbor caches of the network catch up
 // (for example "host is down" from an earlier unanswered ARP). Callers hold c.mu.
@@ -259,11 +267,11 @@ func (c *Client) awaitAddress(ctx context.Context, want IPConfig) error {
 		if info, err := c.discover(ctx); err == nil && info.IP == want.IP && !info.DHCP {
 			return nil
 		}
-		c.log.DebugContext(ctx, "the switch is not at the new address yet; asking again", "want", want.IP.String(), "poll", ipMovePoll.String())
+		c.log.DebugContext(ctx, "the switch is not at the new address yet; asking again", "want", want.IP.String(), "poll", c.pollInterval().String())
 		select {
 		case <-ctx.Done():
 			return fmt.Errorf("%w (%s)", ErrMoveUnconfirmed, want.IP)
-		case <-time.After(ipMovePoll):
+		case <-time.After(c.pollInterval()):
 		}
 	}
 }

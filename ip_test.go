@@ -27,7 +27,7 @@ var (
 func TestSetIPConfigSucceedsWhenTheReplyIsLostButTheSwitchMoved(t *testing.T) {
 	f := escptest.Start(t)
 	f.Configure(func(f *escptest.Faults) { f.OnSystemSet = escptest.SystemSetLeaves })
-	c := dialFake(t, f, "secret")
+	c := dialFast(t, f, "secret")
 	if err := c.SetIPConfig(context.Background(), lostReplyWanted); err != nil {
 		t.Fatalf("the switch has the new settings, so the call must succeed: %v", err)
 	}
@@ -401,13 +401,14 @@ func TestAcceptsRepliesFromTheNewAddressWhileMoving(t *testing.T) {
 func TestSetIPConfigWaitsUntilTheSwitchAnswersAtTheNewAddress(t *testing.T) {
 	f := escptest.Start(t)
 	f.Configure(func(f *escptest.Faults) { f.StaleAfterSet = 2 }) // two probes still see the old address
-	c := dialFake(t, f, "secret")
-	start := time.Now()
+	log, rec := newLogRecorder()
+	c := dialLogged(t, f, "secret", log)
 	if err := c.SetIPConfig(context.Background(), cfgOf("127.0.0.1", "255.255.0.0", "127.0.0.2")); err != nil {
 		t.Fatal(err)
 	}
-	if time.Since(start) < ipMovePoll {
-		t.Fatalf("SetIPConfig returned after %s: it must keep probing until the switch reports the new address", time.Since(start))
+	// the first probe still saw the old address, so it paused and probed again before the switch answered
+	if got := rec.named("the switch is not at the new address yet; asking again"); len(got) == 0 {
+		t.Fatal("SetIPConfig returned without asking again: it must keep probing until the switch reports the new address")
 	}
 	if info, err := c.Info(context.Background()); err != nil || info.Netmask.String() != "255.255.0.0" {
 		t.Fatalf("after the move: %+v err=%v", info, err)

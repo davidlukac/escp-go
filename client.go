@@ -50,6 +50,12 @@ type Client struct {
 type seams struct {
 	// moveWait overrides ipMoveWait; zero means the default.
 	moveWait time.Duration
+	// movePoll overrides ipMovePoll, the pause between probes while waiting for a switch to move
+	// or to lease an address; zero means the default.
+	movePoll time.Duration
+	// firstContact overrides firstContactBudget, the time the configured address gets to answer
+	// the first discovery of a client pinned by MAC; zero means the default.
+	firstContact time.Duration
 	// allowLoopback lets a test move a fake switch on 127.0.0.0/8.
 	allowLoopback bool
 	// locator finds a switch by MAC address; the default is Locate on the interfaces of this host.
@@ -64,6 +70,12 @@ func withLoopback() dialOption { return func(c *Client) { c.allowLoopback = true
 
 // withMoveWait shortens the wait for a switch that was told to move.
 func withMoveWait(d time.Duration) dialOption { return func(c *Client) { c.moveWait = d } }
+
+// withMovePoll shortens the pause between the probes of that wait.
+func withMovePoll(d time.Duration) dialOption { return func(c *Client) { c.movePoll = d } }
+
+// withFirstContact shortens the time the configured address gets to answer the first discovery.
+func withFirstContact(d time.Duration) dialOption { return func(c *Client) { c.firstContact = d } }
 
 // withLocator replaces the lookup of a switch by its MAC address.
 func withLocator(f func(ctx context.Context, mac MAC) (Info, error)) dialOption {
