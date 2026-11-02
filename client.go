@@ -27,7 +27,7 @@ type Client struct {
 	// being moved to it (SetIPConfig); nil otherwise.
 	alsoFrom net.IP
 
-	hostMAC, swMAC [6]byte
+	hostMAC, swMAC MAC
 	haveSwMAC      bool
 	seq            uint16
 	session        []byte
@@ -199,10 +199,10 @@ func bindReplyPort(ctx context.Context, port int) (*net.UDPConn, error) {
 const discardPort = 9
 
 // localMAC returns the MAC of the interface used to reach dst, or zero.
-func localMAC(dst net.IP) [6]byte {
+func localMAC(dst net.IP) MAC {
 	probe, err := net.DialUDP("udp4", nil, &net.UDPAddr{IP: dst, Port: discardPort})
 	if err != nil {
-		return [6]byte{}
+		return MAC{}
 	}
 	defer func() { _ = probe.Close() }() // best-effort: the probe socket only reveals the local address
 	ifs, _ := net.Interfaces()
@@ -220,7 +220,7 @@ func localIP(c net.Conn) net.IP {
 // macHolding returns the hardware address of the first interface of ifs that has a six-byte hardware
 // address and holds addr among the addresses addrs lists for it; zero when there is none. An interface
 // whose addresses cannot be listed is skipped.
-func macHolding(addr net.IP, ifs []net.Interface, addrs func(net.Interface) ([]net.Addr, error)) [6]byte {
+func macHolding(addr net.IP, ifs []net.Interface, addrs func(net.Interface) ([]net.Addr, error)) MAC {
 	for _, ifc := range ifs {
 		if len(ifc.HardwareAddr) != macLen {
 			continue
@@ -231,11 +231,11 @@ func macHolding(addr net.IP, ifs []net.Interface, addrs func(net.Interface) ([]n
 		}
 		for _, a := range list {
 			if ipn, ok := a.(*net.IPNet); ok && ipn.IP.Equal(addr) {
-				return [6]byte(ifc.HardwareAddr)
+				return MAC(ifc.HardwareAddr)
 			}
 		}
 	}
-	return [6]byte{}
+	return MAC{}
 }
 
 // hostLocator is the lookup a client uses: Locate on the interfaces of this host, logging to the

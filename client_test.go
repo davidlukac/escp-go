@@ -197,12 +197,12 @@ func TestBusyHostPortIsReportedOnFirstUse(t *testing.T) {
 
 func TestLocalMAC(t *testing.T) {
 	t.Run("loopback has no hardware address", func(t *testing.T) {
-		if got := localMAC(net.IPv4(127, 0, 0, 1)); got != [6]byte{} {
+		if got := localMAC(net.IPv4(127, 0, 0, 1)); got != (MAC{}) {
 			t.Fatalf("got %x, want zero", got)
 		}
 	})
 	t.Run("destination that cannot be dialed", func(t *testing.T) {
-		if got := localMAC(net.ParseIP("::1")); got != [6]byte{} {
+		if got := localMAC(net.ParseIP("::1")); got != (MAC{}) {
 			t.Fatalf("got %x, want zero", got)
 		}
 	})
@@ -218,7 +218,7 @@ func TestLocalMAC(t *testing.T) {
 				if !ok || ipn.IP.To4() == nil || ipn.IP.IsLoopback() {
 					continue
 				}
-				var want [6]byte
+				var want MAC
 				copy(want[:], ifc.HardwareAddr)
 				if got := localMAC(ipn.IP); got != want {
 					t.Fatalf("localMAC(%s) = %x, want %x of %s", ipn.IP, got, want, ifc.Name)
@@ -264,13 +264,13 @@ func TestMacHolding(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		addr net.IP
-		want [6]byte
+		want MAC
 	}{
-		{"an address of the first interface", net.IPv4(192, 0, 2, 1), [6]byte(macA)},
-		{"an address of a later interface", net.IPv4(192, 0, 2, 2), [6]byte(macB)},
-		{"an address that is not a network address", net.IPv4(192, 0, 2, 3), [6]byte{}},
-		{"an interface without a hardware address", net.IPv4(192, 0, 2, 7), [6]byte{}},
-		{"an address no interface holds", net.IPv4(198, 51, 100, 1), [6]byte{}},
+		{"an address of the first interface", net.IPv4(192, 0, 2, 1), MAC(macA)},
+		{"an address of a later interface", net.IPv4(192, 0, 2, 2), MAC(macB)},
+		{"an address that is not a network address", net.IPv4(192, 0, 2, 3), MAC{}},
+		{"an interface without a hardware address", net.IPv4(192, 0, 2, 7), MAC{}},
+		{"an address no interface holds", net.IPv4(198, 51, 100, 1), MAC{}},
 	} {
 		if got := macHolding(tc.addr, ifs, addrs); got != tc.want {
 			t.Errorf("%s: %x, want %x", tc.name, got, tc.want)
