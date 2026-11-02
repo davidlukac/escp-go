@@ -2,13 +2,45 @@ package escp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
+	"os"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/davidlukac/escp-go/internal/wire"
 )
+
+// datagramConn is the part of the UDP socket that the client uses. It is a *net.UDPConn; tests wrap
+// one to make a read fail.
+type datagramConn interface {
+	ReadFromUDP(b []byte) (int, *net.UDPAddr, error)
+	WriteToUDP(b []byte, addr *net.UDPAddr) (int, error)
+	SetReadDeadline(t time.Time) error
+	LocalAddr() net.Addr
+	Close() error
+}
+
+var _ datagramConn = (*net.UDPConn)(nil)
+
+// errSilent is what recv reports when no acceptable reply arrived before the deadline (or the
+// call was canceled): the retry logic's cue, never returned to a caller.
+var errSilent = errors.New("escp: no reply yet")
+
+// errWSAConnReset is the Windows socket error WSAECONNRESET (10054). An unconnected UDP socket reports
+// it from a read after a datagram it sent was answered with ICMP "port unreachable"; it says
+// nothing about the reply being waited for (Go issue 5834). Linux and macOS report the same ICMP
+// message as ECONNREFUSED to a connected socket, which this one is not; it is skipped here as well,
+// so that a later change of the socket cannot turn a notice into a failure.
+const errWSAConnReset syscall.Errno = 10054
+
+// icmpNoise reports whether a read error is only that notice of an earlier send, and the read
+// should go on.
+func icmpNoise(err error) bool {
+	return errors.Is(err, syscall.ECONNREFUSED) || errors.Is(err, errWSAConnReset)
+}
 
 // maxDatagram is the receive buffer size; ESCP packets are well below it.
 const maxDatagram = 4096
@@ -86,24 +118,31 @@ func (c *Client) accept(from *net.UDPAddr, data []byte) (reply, bool) {
 	return reply{op: h.Op, err: ReplyCode(h.ErrCode), tlvs: t, fragment: h.Fragment}, true
 }
 
-// recv reads packets until one is an acceptable reply to the current request
-// or the deadline passes.
-func (c *Client) recv(ctx context.Context, deadline time.Time) (reply, bool) {
+// recv reads packets until one is an acceptable reply to the current request. It returns errSilent
+// when the deadline passes first (or the call is canceled), the WrongSwitchError when another
+// device answers in place of the switch (waiting longer or resending will not change that), and a
+// read error of the socket itself as it is: a failing socket is not a silent switch.
+func (c *Client) recv(ctx context.Context, deadline time.Time) (reply, error) {
 	buf := make([]byte, maxDatagram)
 	for time.Now().Before(deadline) && ctx.Err() == nil {
 		_ = c.conn.SetReadDeadline(deadline)
 		n, from, err := c.conn.ReadFromUDP(buf)
-		if err != nil {
-			return reply{}, false
+		switch {
+		case errors.Is(err, os.ErrDeadlineExceeded):
+			return reply{}, errSilent
+		case err != nil && icmpNoise(err):
+			continue
+		case err != nil:
+			return reply{}, fmt.Errorf("escp: receive: %w", err)
 		}
 		if rep, ok := c.accept(from, buf[:n]); ok {
-			return rep, true
+			return rep, nil
 		}
 		if c.wrong != nil {
-			return reply{}, false // another device answers: waiting longer or resending will not change that
+			return reply{}, c.wrong
 		}
 	}
-	return reply{}, false
+	return reply{}, errSilent
 }
 
 // interruptOnDone makes a read that is waiting for a reply return when ctx is done, instead of
@@ -206,12 +245,13 @@ func (c *Client) exchange(ctx context.Context, op byte, tlvs []wire.TLV, static 
 			return reply{}, err
 		}
 		c.log.DebugContext(ctx, "request sent", "op", wire.OpName(op), "seq", c.seq, "attempt", attempt+1, "tlvs", tlvTypes(tlvs), "bytes", tlvBytes(tlvs))
-		if rep, ok := c.recv(ctx, c.attemptDeadline(ctx)); ok {
+		rep, err := c.recv(ctx, c.attemptDeadline(ctx))
+		if err == nil {
 			c.log.DebugContext(ctx, "reply received", "op", wire.OpName(rep.op), "seq", c.seq, "error_code", int(rep.err), "tlvs", tlvTypes(rep.tlvs), "bytes", tlvBytes(rep.tlvs))
 			return rep, nil
 		}
-		if c.wrong != nil {
-			return reply{}, c.wrong
+		if !errors.Is(err, errSilent) {
+			return reply{}, err
 		}
 		if err := expired(ctx); err != nil {
 			return reply{}, err
@@ -229,6 +269,7 @@ func (c *Client) exchange(ctx context.Context, op byte, tlvs []wire.TLV, static 
 func (c *Client) exchangeFragments(ctx context.Context, op byte, tlvs []wire.TLV, typ wire.TLVType) ([][]byte, error) {
 	// Callers hold c.mu and run inside withSession, so the socket is open.
 	defer c.interruptOnDone(ctx)()
+	c.wrong = nil
 	for attempt := 0; attempt <= c.cfg.Retries; attempt++ {
 		if err := expired(ctx); err != nil {
 			return nil, err
@@ -265,9 +306,12 @@ type fragments struct {
 func (c *Client) collectFragments(ctx context.Context, typ wire.TLVType) (fragments, error) {
 	var got fragments
 	for {
-		rep, ok := c.recv(ctx, c.attemptDeadline(ctx))
-		if !ok {
+		rep, err := c.recv(ctx, c.attemptDeadline(ctx))
+		if errors.Is(err, errSilent) {
 			return got, nil
+		}
+		if err != nil {
+			return got, err
 		}
 		if rep.err != 0 {
 			return got, &RejectedError{Code: rep.err}
