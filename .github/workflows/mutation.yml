@@ -108,7 +108,7 @@ jobs:
           git commit -m "chore: mutation score $(jq -r .message mutation.json)"
           # the coverage job writes to the same branch (another file): on a rejected push, take its commit
           # in and push again
-          for attempt in 1 2 3; do
+          for _ in 1 2 3; do
             git push origin badges && exit 0
             git pull --rebase origin badges
           done
