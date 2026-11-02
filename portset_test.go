@@ -28,7 +28,8 @@ func TestParsePortID(t *testing.T) {
 			t.Errorf("ParsePortID(%q) = %d, %v; want %d", in, got, err, want)
 		}
 	}
-	for _, in := range []string{"", "x", "2.5", " 3", "0", "-1", "33"} {
+	// one port, one spelling: a sign, a leading zero and anything that is not plain decimal digits are refused
+	for _, in := range []string{"", "x", "2.5", " 3", "3 ", "0", "-1", "33", "+3", "01", "003", "-0", "0x3", "1_0", "٣", "99999999999999999999"} {
 		if _, err := ParsePortID(in); !errors.Is(err, ErrInvalid) {
 			t.Errorf("ParsePortID(%q): got %v, want ErrInvalid", in, err)
 		}
