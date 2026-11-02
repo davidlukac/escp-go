@@ -2,6 +2,7 @@ package escptest
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -9,6 +10,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 
 	"github.com/davidlukac/escp-go/internal/udp"
@@ -157,12 +159,26 @@ func TestHelperReservingPorts(t *testing.T) {
 // A port whose TCP number somebody else listens on is another process's reservation (or something
 // unrelated); the search moves on to a port that is free in both.
 func TestAPortThatAnotherProcessHoldsIsSkipped(t *testing.T) {
-	other, err := net.Listen("tcp4", "127.0.0.1:0") // stands in for another process's marker
+	// a port that is free for UDP, and the same TCP number held by a listener that stands in for
+	// another process's marker (the system may forbid that TCP number: the test cannot run then)
+	probe, err := listenLoopback()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = other.Close() }()     // best effort at the end of the test
-	held := other.Addr().(*net.TCPAddr).Port //nolint:forcetypeassert // a TCP listener has a TCP address
+	ap, err := udp.AddrPort(probe.LocalAddr())
+	if err != nil {
+		t.Fatal(err)
+	}
+	held := int(ap.Port())
+	_ = probe.Close() // best effort: only the number is kept
+	other, err := net.Listen("tcp4", net.JoinHostPort("127.0.0.1", strconv.Itoa(held)))
+	if markerForbidden(err) {
+		t.Skipf("the system forbids the TCP port %d that this test needs to hold: %v", held, err)
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = other.Close() }() // best effort at the end of the test
 	calls := 0
 	listen := func() (*net.UDPConn, error) {
 		calls++
@@ -187,5 +203,73 @@ func TestTheReasonForNotFindingAPortIsKept(t *testing.T) {
 	_, _, err := listenUnreserved(listenAt(t, held))
 	if err == nil || !strings.Contains(err.Error(), "listen tcp4 127.0.0.1:") {
 		t.Fatalf("got %v, want the failed TCP listen of the marker in the message", err)
+	}
+}
+
+// forbidden is the error a Windows socket gives for a port it will not bind (WSAEACCES, 10013,
+// written out here so that a wrong number in the code is caught).
+func forbidden() error {
+	return &net.OpError{Op: "listen", Net: "tcp4", Err: os.NewSyscallError("bind", syscall.Errno(10013))}
+}
+
+// markerWith makes reserve use listen for the test and puts the real one back.
+func markerWith(t *testing.T, listen func(port int) (net.Listener, error)) {
+	t.Helper()
+	saved := listenMarker
+	listenMarker = listen
+	t.Cleanup(func() { listenMarker = saved })
+}
+
+// Where the system forbids the TCP number the port is handed out without a marker, and this
+// process still never hands it out twice.
+func TestAPortThatCannotBeMarkedIsHandedOutOnceHere(t *testing.T) {
+	markerWith(t, func(int) (net.Listener, error) { return nil, forbidden() })
+	c, first, err := listenUnreserved(listenLoopback)
+	if err != nil {
+		t.Fatalf("a port the system forbids to mark was not handed out: %v", err)
+	}
+	_ = c.Close() // best effort at the end of the test
+	calls := 0
+	listen := func() (*net.UDPConn, error) {
+		calls++
+		if calls == 1 {
+			return listenAt(t, first)() // the kernel offers the port just handed out first
+		}
+		return listenLoopback()
+	}
+	c, got, err := listenUnreserved(listen)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = c.Close() }() // best effort at the end of the test
+	if got == first || calls != 2 {
+		t.Errorf("got port %d after %d tries, want a port other than %d on the second try", got, calls, first)
+	}
+}
+
+// Any other failure of the marker is a port that somebody holds: it is skipped, and the search
+// gives up with the reason when every try fails.
+func TestAPortWhoseMarkerFailsForAnotherReasonIsSkipped(t *testing.T) {
+	markerWith(t, func(int) (net.Listener, error) { return nil, syscall.EADDRINUSE })
+	_, _, err := listenUnreserved(listenLoopback)
+	if !errors.Is(err, syscall.EADDRINUSE) || !strings.Contains(err.Error(), "no unreserved UDP port after 100 tries") {
+		t.Fatalf("got %v, want the search to give up with the reason", err)
+	}
+}
+
+func TestOnlyTheForbiddenErrorOfTheSystemIsTakenForAMarkerThatCannotBePlaced(t *testing.T) {
+	for name, tc := range map[string]struct {
+		err  error
+		want bool
+	}{
+		"the Windows socket error, wrapped as the net package does": {forbidden(), true},
+		"address in use":     {&net.OpError{Err: os.NewSyscallError("bind", syscall.EADDRINUSE)}, false},
+		"permission on Unix": {&net.OpError{Err: os.NewSyscallError("bind", syscall.EACCES)}, false},
+		"some other error":   {errors.New("boom"), false},
+		"no error":           {nil, false},
+	} {
+		if got := markerForbidden(tc.err); got != tc.want {
+			t.Errorf("%s: markerForbidden = %v, want %v", name, got, tc.want)
+		}
 	}
 }
