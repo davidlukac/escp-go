@@ -51,8 +51,14 @@ func (t execTool) packages(ctx context.Context) ([]string, error) {
 }
 
 // serve runs the pkgsite pinned in devtools/go.mod on the port, for the module in the current directory.
+// It starts the built program itself and not "go tool pkgsite": ending that go command would leave
+// pkgsite running (and holding the port) as an orphan.
 func (t execTool) serve(ctx context.Context, port int, out io.Writer) error {
-	cmd := t.command(ctx, "go", "tool", "-modfile=devtools/go.mod", "pkgsite", "-http", "localhost:"+strconv.Itoa(port), ".")
+	bin, err := t.command(ctx, "go", "tool", "-modfile=devtools/go.mod", "-n", "pkgsite").Output()
+	if err != nil {
+		return fmt.Errorf("locating pkgsite: %w", err)
+	}
+	cmd := t.command(ctx, strings.TrimSpace(string(bin)), "-http", "localhost:"+strconv.Itoa(port), ".")
 	cmd.Stdout, cmd.Stderr = out, out
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("pkgsite: %w", err)

@@ -309,6 +309,12 @@ func helperProcess(mode string, args []string) int {
 	switch mode {
 	case "echo":
 		fmt.Println(strings.Join(args, " "))
+	case "pkgsite": // "go tool -n pkgsite" names the program; the program reports how it was started
+		if args[0] == "go" {
+			fmt.Println("/fake/bin/pkgsite")
+		} else {
+			fmt.Println(strings.Join(args, " "))
+		}
 	case "module":
 		fmt.Println("example.org/m")
 	case "packages":
@@ -341,10 +347,10 @@ func TestTheGoToolNamesTheModuleAndItsPackages(t *testing.T) {
 
 func TestPkgsiteIsStartedFromTheModulePinnedInDevtoolsOnTheGivenPort(t *testing.T) {
 	var out bytes.Buffer
-	if err := (execTool{command: helperCommand("echo")}).serve(context.Background(), 8089, &out); err != nil {
+	if err := (execTool{command: helperCommand("pkgsite")}).serve(context.Background(), 8089, &out); err != nil {
 		t.Fatal(err)
 	}
-	want := "go tool -modfile=devtools/go.mod pkgsite -http localhost:8089 .\n"
+	want := "/fake/bin/pkgsite -http localhost:8089 .\n"
 	if out.String() != want {
 		t.Errorf("started as %q, want %q", out.String(), want)
 	}
@@ -360,8 +366,24 @@ func TestAFailingGoToolIsReported(t *testing.T) {
 		t.Error("a failing go list was not reported")
 	}
 	var out bytes.Buffer
-	if err := tool.serve(ctx, 1, &out); err == nil || !strings.Contains(out.String(), "boom") {
-		t.Errorf("a failing pkgsite: err %v, output %q; want the error and the output", err, out.String())
+	if err := tool.serve(ctx, 1, &out); err == nil || !strings.Contains(err.Error(), "locating pkgsite") {
+		t.Errorf("a go tool that cannot name pkgsite: err %v; want it said", err)
+	}
+}
+
+// A pkgsite that fails once started is reported with its exit status and what it printed.
+func TestAPkgsiteThatFailsWhenStartedIsReportedWithItsOutput(t *testing.T) {
+	failAfterLocating := func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		mode := "pkgsite"
+		if name != "go" {
+			mode = "fail"
+		}
+		return helperCommand(mode)(ctx, name, args...)
+	}
+	var out bytes.Buffer
+	err := execTool{command: failAfterLocating}.serve(context.Background(), 1, &out)
+	if err == nil || !strings.Contains(err.Error(), "pkgsite: exit status 3") || !strings.Contains(out.String(), "boom") {
+		t.Errorf("err %v, output %q; want the exit status and the output", err, out.String())
 	}
 }
 
