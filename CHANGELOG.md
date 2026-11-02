@@ -5,6 +5,21 @@ version; a breaking change is called out as such. The history before 0.1.0 is th
 `internal/escp` of [terraform-provider-tplinkeasysmart](https://github.com/davidlukac/terraform-provider-tplinkeasysmart),
 whose commits this repository keeps.
 
+## 0.5.0
+
+- **Behavior changes** (no signature changes; `make apidiff` reports one addition, `MaxRetries`):
+
+  | 0.4.0 | 0.5.0 |
+  |---|---|
+  | `Config.Retries` of any size validated (`Retries: 1000000` with the 3 s timeout holds a call for a month when a switch stays silent) | more than **`MaxRetries` (10)** is refused by `Config.Validate` and `Dial`, with an error that matches `ErrInvalid`. Zero still selects the default, a negative value still selects none |
+  | a socket read that failed (other than a timeout) ended as `ErrNoReply` after all the retries | it is returned at once as itself, wrapped as `escp: receive: …` (`errors.Is` and `errors.As` reach the cause). ICMP notices on the socket (`ECONNREFUSED`, and `WSAECONNRESET` on Windows, where a UDP socket reports them: [golang/go#5834](https://github.com/golang/go/issues/5834)) are skipped, not treated as failures |
+  | another device answering during the download of the configuration file ended as `ErrNoReply` | it is `ErrWrongSwitch`, like in every other request |
+  | the module required Go 1.26.0 | it requires **Go 1.26.2**: 1.26.0 and 1.26.1 can corrupt the stack in a UDP read on Windows ([golang/go#78041](https://github.com/golang/go/issues/78041)), which crashed a CI job once |
+
+- **Fixes in `escptest`:** the ports it hands out (`FreeUDPPort`, the fake's own) are also reserved across processes, with a TCP listener on the same port number that is held until the process exits. `go test` runs the test binaries of several packages at once, and two of them could be given the same "free" port (`bind: address already in use`). `escptest/switch.go` is split into files by concern (no change to the API), and the documentation says why its values are plain (`[6]byte`, `int`): a MAC is assignable to `escp.MAC` both ways, and a test keeps it so.
+- **Documentation:** every reply captured from the two switches (discovery, key exchange, a read; both firmware builds) is addressed to 255.255.255.255 from port 29808, so `Discover` beside a `Client` is safe where broadcasts reach every socket that shares the port (observed on macOS, covered by a test on Linux, not verified on Windows; replies to writes were not captured). The guides, `PROTOCOL.md` and `SECURITY.md` say so.
+- **Pipeline** (contributors, no API change): the release script is a Go program (`internal/release`, no Python), and the commit trailer comes from `RELEASE_COMMIT_TRAILER`; `actionlint` is pinned in `devtools` and runs in the pre-commit hook when workflow files change; the mutation runs bypass the test cache (a cached baseline made nearly every mutant "time out").
+
 ## 0.4.0
 
 - **Breaking changes**, made together before 1.0, from the third review of the library. Two change what existing code does (the impact classes and the encoding of values), the rest are renames and signatures. None changes wire bytes.
