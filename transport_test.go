@@ -384,3 +384,68 @@ func TestIcmpNoiseIsOnlyTheTwoNotices(t *testing.T) {
 		}
 	}
 }
+
+// repliesConn hands out the datagrams it was given, one per read, and reports silence after them.
+type repliesConn struct {
+	datagramConn
+	from  *net.UDPAddr
+	left  [][]byte
+	reads int
+}
+
+func (r *repliesConn) SetReadDeadline(time.Time) error { return nil }
+
+func (r *repliesConn) ReadFromUDP(b []byte) (int, *net.UDPAddr, error) {
+	r.reads++
+	if len(r.left) == 0 {
+		return 0, nil, os.ErrDeadlineExceeded
+	}
+	n := copy(b, r.left[0])
+	r.left = r.left[1:]
+	return n, r.from, nil
+}
+
+// A reassembled reply may be exactly maxFragmentedReply bytes: the limit refuses more, not as
+// much. The packets are 1 KiB of the wanted TLV each, so 64 of them are the limit to the byte.
+func TestAFragmentedReplyOfExactlyTheLimitIsAcceptedAndOneByteMoreIsRefused(t *testing.T) {
+	const chunk = 1024
+	const typ = wire.TLVType(768)
+	for _, tc := range []struct {
+		name     string
+		lastSize int
+		wantErr  error
+		wantSize int
+	}{
+		{"exactly the limit", chunk, nil, maxFragmentedReply},
+		{"one byte more", chunk + 1, ErrReplyTooLarge, maxFragmentedReply + 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c, err := Dial(Config{Host: "127.0.0.1", SwitchPort: 1})
+			if err != nil {
+				t.Fatal(err)
+			}
+			c.seq = 7
+			conn := &repliesConn{from: &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 1}}
+			packets := maxFragmentedReply / chunk
+			for i := range packets {
+				size, more := chunk, uint16(1)
+				if i == packets-1 {
+					size, more = tc.lastSize, 0 // the last packet carries no fragment flag
+				}
+				pkt := wire.Marshal(wire.Header{Op: wire.OpReply, Seq: c.seq, Fragment: more}, []wire.TLV{{Type: typ, Value: make([]byte, size)}})
+				conn.left = append(conn.left, wire.RC4Static(pkt))
+			}
+			c.conn = conn
+			got, err := c.collectFragments(context.Background(), typ)
+			if !errors.Is(err, tc.wantErr) {
+				t.Fatalf("error %v, want %v", err, tc.wantErr)
+			}
+			if tc.wantErr == nil && (!got.complete || got.bytes != tc.wantSize) {
+				t.Errorf("complete=%v after %d bytes, want a complete reply of %d", got.complete, got.bytes, tc.wantSize)
+			}
+			if tc.wantErr != nil && got.bytes != tc.wantSize {
+				t.Errorf("refused after %d bytes, want %d", got.bytes, tc.wantSize)
+			}
+		})
+	}
+}
