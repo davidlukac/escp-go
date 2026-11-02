@@ -3,7 +3,13 @@
 // used outside tests.
 //
 // It imports only the wire codec, never the client, so the escp package's own tests can use it
-// without an import cycle.
+// without an import cycle. The price is that its values are plain ones, not the client's types: a
+// MAC address is a [6]byte (an escp.MAC is assignable to it and the other way round, with no
+// conversion, because one of the two is an unnamed array type), a switch port is an int
+// (int(port) for an escp.PortID), an IPv4 address is a [4]byte, and the link speeds are its own
+// LinkSpeed constants. A typed wrapper would need a second package between the two, which the
+// consumers of this one (a handful of calls: Start, Username, Password, FreeUDPPort, Loopback,
+// EnableModel, SetMAC) do not pay for.
 //
 // # What it does
 //
