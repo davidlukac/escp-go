@@ -12,7 +12,7 @@ How a version of the library is cut and published. Maintainers only.
 
 ## Cutting a version
 
-1. On a branch: `scripts/release.sh X.Y.Z "what changed for users"` adds the `CHANGELOG.md` entry, runs `make cover lint vuln` and commits only the CHANGELOG. For a release that changes how a setting is written to a switch, also run the live tests (`go test -tags live`, see the README) on a test switch and say so in the PR.
+1. On a branch: `scripts/release.sh X.Y.Z "what changed for users"` adds the `CHANGELOG.md` entry, runs `make cover lint vuln` and commits only the CHANGELOG (a small Go program, `internal/release`, which the script runs; it adds a trailer to the commit only when `RELEASE_COMMIT_TRAILER` holds one, for example `Co-Authored-By: Name <name@example.org>`). For a release that changes how a setting is written to a switch, also run the live tests (`go test -tags live`, see the README) on a test switch and say so in the PR.
 2. Open the PR, wait for CI, squash merge.
 3. On `main`, once merged and pulled: `scripts/release.sh --tag X.Y.Z` tags the merge commit locally. Push **that one tag** (a maintainer decides: the push is what publishes).
 4. The tag push starts `release.yml`, which does the rest: it checks that the tag is a version on `main`, re-runs `make cover lint vuln` on the tagged tree, creates the GitHub release with the CHANGELOG section as its notes, waits until `proxy.golang.org` serves the version, installs it in a fresh module and builds a program against `escp`, `safety` and `escptest`, and asks pkg.go.dev to index it. Watch it: `gh run watch`. To repeat it for an existing tag: `gh workflow run release.yml -f tag=vX.Y.Z` (every step is safe to repeat).
