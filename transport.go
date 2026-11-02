@@ -31,8 +31,9 @@ var errSilent = errors.New("escp: no reply yet")
 
 // errWSAConnReset is the Windows socket error WSAECONNRESET (10054). An unconnected UDP socket reports
 // it from a read after a datagram it sent was answered with ICMP "port unreachable"; it says
-// nothing about the reply being waited for. Other systems report the same ICMP message as
-// ECONNREFUSED, and only when asked to.
+// nothing about the reply being waited for (Go issue 5834). Linux and macOS report the same ICMP
+// message as ECONNREFUSED to a connected socket, which this one is not; it is skipped here as well,
+// so that a later change of the socket cannot turn a notice into a failure.
 const errWSAConnReset syscall.Errno = 10054
 
 // icmpNoise reports whether a read error is only that notice of an earlier send, and the read
