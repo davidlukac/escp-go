@@ -108,8 +108,7 @@ func TestWriteGateRefusalSendsNothingForAnyWriteMethod(t *testing.T) {
 			var consulted int
 			c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 300 * time.Millisecond,
 				SwitchPort: f.UDPPort(), BroadcastAddr: escptest.Loopback(),
-				WriteGate: func(context.Context, Reader, Operation) error { consulted++; return errGateRefused }})
-			c.allowLoopback = true
+				WriteGate: func(context.Context, Reader, Operation) error { consulted++; return errGateRefused }}, withLoopback())
 			t.Cleanup(func() { c.Close() })
 			if err := call(context.Background(), c); !errors.Is(err, errGateRefused) {
 				t.Fatalf("got %v, want the gate's error", err)
@@ -137,8 +136,7 @@ func TestWriteGateThatAllowsLetsEveryWriteMethodThrough(t *testing.T) {
 			f.EnableModel(nil) // the pre-write read of the other limiter needs a switch that answers
 			c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 300 * time.Millisecond,
 				SwitchPort: f.UDPPort(), BroadcastAddr: escptest.Loopback(),
-				WriteGate: func(context.Context, Reader, Operation) error { return nil }})
-			c.allowLoopback = true
+				WriteGate: func(context.Context, Reader, Operation) error { return nil }}, withLoopback())
 			t.Cleanup(func() { c.Close() })
 			if err := call(context.Background(), c); err != nil {
 				t.Fatalf("an allowed write failed: %v", err)
@@ -253,8 +251,7 @@ func operationsOf(t *testing.T, call func(context.Context, *Client) error) []Ope
 	var seen []Operation
 	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 300 * time.Millisecond,
 		SwitchPort: f.UDPPort(), BroadcastAddr: escptest.Loopback(),
-		WriteGate: func(_ context.Context, _ Reader, op Operation) error { seen = append(seen, op); return nil }})
-	c.allowLoopback = true
+		WriteGate: func(_ context.Context, _ Reader, op Operation) error { seen = append(seen, op); return nil }}, withLoopback())
 	t.Cleanup(func() { c.Close() })
 	if err := call(context.Background(), c); err != nil {
 		t.Fatal(err)

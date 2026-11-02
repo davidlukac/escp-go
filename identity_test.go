@@ -25,17 +25,16 @@ var (
 // has to find the switch itself; locator stands in for the discovery probe and counts its calls.
 func dialMAC(t *testing.T, f *escptest.Switch, host string, mac MAC, locator func(MAC) (Info, error)) (*Client, *int) {
 	t.Helper()
-	c := newBoundClient(t, Config{Host: host, MAC: mac, Username: "admin", Password: "secret", Timeout: 150 * time.Millisecond, Retries: NoRetries,
-		SwitchPort: f.UDPPort(), BroadcastAddr: escptest.Loopback()})
-	c.allowLoopback = true
 	calls := new(int)
-	c.locator = func(_ context.Context, m MAC) (Info, error) {
-		*calls++
-		if locator == nil {
-			return Info{IP: netip.MustParseAddr("127.0.0.1"), MAC: m}, nil
-		}
-		return locator(m)
-	}
+	c := newBoundClient(t, Config{Host: host, MAC: mac, Username: "admin", Password: "secret", Timeout: 150 * time.Millisecond, Retries: NoRetries,
+		SwitchPort: f.UDPPort(), BroadcastAddr: escptest.Loopback()}, withLoopback(),
+		withLocator(func(_ context.Context, m MAC) (Info, error) {
+			*calls++
+			if locator == nil {
+				return Info{IP: netip.MustParseAddr("127.0.0.1"), MAC: m}, nil
+			}
+			return locator(m)
+		}))
 	t.Cleanup(func() { c.Close() })
 	return c, calls
 }

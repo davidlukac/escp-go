@@ -17,13 +17,15 @@ import (
 // dialLeasing is a client for the fake that pins its MAC and looks the switch up by asking the fake
 // itself (the fake cannot be found by a broadcast on this host). The returned counter is the number
 // of lookups.
-func dialLeasing(t *testing.T, f *escptest.Switch) (*Client, *int) {
+func dialLeasing(t *testing.T, f *escptest.Switch, opts ...dialOption) (*Client, *int) {
 	t.Helper()
-	c := newBoundClient(t, Config{Host: "127.0.0.1", MAC: MAC(escptest.DefaultMAC()), Username: "admin", Password: "secret",
-		Timeout: 150 * time.Millisecond, Retries: 1, SwitchPort: f.UDPPort(), BroadcastAddr: escptest.Loopback()})
-	c.allowLoopback = true
 	lookups := new(int)
-	c.locator = func(ctx context.Context, _ MAC) (Info, error) { *lookups++; return c.discoverOnce(ctx) }
+	askTheFake := func(c *Client) { // the lookup needs the client, which does not exist yet
+		c.locator = func(ctx context.Context, _ MAC) (Info, error) { *lookups++; return c.discoverOnce(ctx) }
+	}
+	c := newBoundClient(t, Config{Host: "127.0.0.1", MAC: MAC(escptest.DefaultMAC()), Username: "admin", Password: "secret",
+		Timeout: 150 * time.Millisecond, Retries: 1, SwitchPort: f.UDPPort(), BroadcastAddr: escptest.Loopback()},
+		append([]dialOption{withLoopback(), askTheFake}, opts...)...)
 	t.Cleanup(func() { c.Close() })
 	return c, lookups
 }
@@ -112,8 +114,7 @@ func TestEnableDHCPSucceedsWhenTheReplyIsLostButTheSwitchLeases(t *testing.T) {
 func TestEnableDHCPReportsAWriteThatWasNotApplied(t *testing.T) {
 	f := escptest.Start(t)
 	f.Configure(func(f *escptest.Faults) { f.DropSets = true })
-	c, _ := dialLeasing(t, f)
-	c.moveWait = 400 * time.Millisecond
+	c, _ := dialLeasing(t, f, withMoveWait(400*time.Millisecond))
 	err := c.EnableDHCP(context.Background())
 	if !errors.Is(err, ErrNoReply) || errors.Is(err, ErrMoveUnconfirmed) || !strings.Contains(err.Error(), "not switched on") {
 		t.Fatalf("want ErrNoReply saying DHCP was not switched on, got %v", err)
@@ -125,11 +126,9 @@ func TestEnableDHCPReportsAWriteThatWasNotApplied(t *testing.T) {
 
 func TestEnableDHCPReportsASwitchThatAnswersButDoesNotLease(t *testing.T) {
 	f := escptest.Start(t)
-	c, _ := dialLeasing(t, f)
-	c.moveWait = 400 * time.Millisecond
-	c.locator = func(ctx context.Context, _ MAC) (Info, error) {
-		return Info{MAC: c.cfg.MAC, IP: netip.MustParseAddr("127.0.0.1"), Netmask: netip.MustParseAddr("255.255.255.0"), Gateway: netip.MustParseAddr("127.0.0.254")}, nil
-	}
+	c, _ := dialLeasing(t, f, withMoveWait(400*time.Millisecond), withLocator(func(context.Context, MAC) (Info, error) {
+		return Info{MAC: MAC(escptest.DefaultMAC()), IP: netip.MustParseAddr("127.0.0.1"), Netmask: netip.MustParseAddr("255.255.255.0"), Gateway: netip.MustParseAddr("127.0.0.254")}, nil
+	}))
 	err := c.EnableDHCP(context.Background())
 	if !errors.Is(err, ErrMoveUnconfirmed) || !strings.Contains(err.Error(), "DHCP off") {
 		t.Fatalf("want ErrMoveUnconfirmed saying DHCP is off, got %v", err)
@@ -139,8 +138,7 @@ func TestEnableDHCPReportsASwitchThatAnswersButDoesNotLease(t *testing.T) {
 func TestEnableDHCPReportsASwitchThatCannotBeFound(t *testing.T) {
 	f := escptest.Start(t)
 	f.Configure(func(f *escptest.Faults) { f.OnSystemSet = escptest.SystemSetVanishes })
-	c, _ := dialLeasing(t, f)
-	c.moveWait = 400 * time.Millisecond
+	c, _ := dialLeasing(t, f, withMoveWait(400*time.Millisecond))
 	err := c.EnableDHCP(context.Background())
 	if !errors.Is(err, ErrMoveUnconfirmed) || !strings.Contains(err.Error(), "nobody with the configured MAC answers") {
 		t.Fatalf("want ErrMoveUnconfirmed saying nobody answers, got %v", err)
@@ -225,11 +223,9 @@ func TestEnableDHCPWritesNothingWhenTheSwitchCannotBeReadFirst(t *testing.T) {
 // A reply that says DHCP is on but carries no usable address is not a lease yet.
 func TestEnableDHCPKeepsWaitingForAUsableLease(t *testing.T) {
 	f := escptest.Start(t)
-	c, _ := dialLeasing(t, f)
-	c.moveWait = 400 * time.Millisecond
-	c.locator = func(context.Context, MAC) (Info, error) {
-		return Info{MAC: c.cfg.MAC, DHCP: true}, nil
-	}
+	c, _ := dialLeasing(t, f, withMoveWait(400*time.Millisecond), withLocator(func(context.Context, MAC) (Info, error) {
+		return Info{MAC: MAC(escptest.DefaultMAC()), DHCP: true}, nil
+	}))
 	err := c.EnableDHCP(context.Background())
 	if !errors.Is(err, ErrMoveUnconfirmed) || !strings.Contains(err.Error(), "DHCP on") {
 		t.Fatalf("want ErrMoveUnconfirmed saying DHCP is on without an address, got %v", err)

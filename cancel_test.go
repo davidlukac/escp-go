@@ -51,8 +51,7 @@ func TestCancellationBetweenTwoWritesStopsTheSecond(t *testing.T) {
 				cancel()
 			}
 			return nil
-		}})
-	c.allowLoopback = true
+		}}, withLoopback())
 	t.Cleanup(func() { c.Close() })
 	err := c.SetBandwidth(ctx, PortBandwidth{Port: 2, Ingress: 64, Egress: 64})
 	if !errors.Is(err, context.Canceled) {
@@ -68,8 +67,7 @@ func TestCancellationInterruptsTheWaitForAReply(t *testing.T) {
 	f := escptest.Start(t)
 	f.Mute()
 	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 20 * time.Second,
-		SwitchPort: f.UDPPort(), BroadcastAddr: escptest.Loopback()})
-	c.allowLoopback = true
+		SwitchPort: f.UDPPort(), BroadcastAddr: escptest.Loopback()}, withLoopback())
 	t.Cleanup(func() { c.Close() })
 	ctx, cancel := context.WithCancel(context.Background())
 	time.AfterFunc(100*time.Millisecond, cancel)

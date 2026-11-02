@@ -127,8 +127,7 @@ func TestNoRetriesSendsEachRequestOnce(t *testing.T) {
 			f := escptest.Start(t)
 			f.DropFirst(2) // both datagrams of the first attempt are lost
 			c := newBoundClient(t, Config{Host: "127.0.0.1", Timeout: 80 * time.Millisecond, Retries: tc.retries,
-				SwitchPort: f.UDPPort(), BroadcastAddr: escptest.Loopback()})
-			c.allowLoopback = true
+				SwitchPort: f.UDPPort(), BroadcastAddr: escptest.Loopback()}, withLoopback())
 			t.Cleanup(func() { c.Close() })
 			_, err := c.Info(context.Background())
 			if !errors.Is(err, tc.wantErr) { // errors.Is(nil, nil) is true

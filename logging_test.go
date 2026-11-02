@@ -125,8 +125,7 @@ func dialLogged(t *testing.T, f *escptest.Switch, pass Password, log *slog.Logge
 	for _, m := range mutate {
 		m(&cfg)
 	}
-	c := newBoundClient(t, cfg)
-	c.allowLoopback = true
+	c := newBoundClient(t, cfg, withLoopback())
 	t.Cleanup(func() { c.Close() })
 	return c
 }

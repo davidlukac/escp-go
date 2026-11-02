@@ -26,10 +26,6 @@ type Client struct {
 	// alsoFrom is a second address replies are accepted from while the switch is
 	// being moved to it (SetIPConfig); nil otherwise.
 	alsoFrom net.IP
-	// moveWait overrides ipMoveWait (tests); zero means the default.
-	moveWait time.Duration
-	// allowLoopback lets tests move a fake switch on 127.0.0.0/8 (tests only).
-	allowLoopback bool
 
 	hostMAC, swMAC [6]byte
 	haveSwMAC      bool
@@ -43,10 +39,35 @@ type Client struct {
 	groupLimit PortVLANLimit
 	// wrong is the device that answered the request in flight with a MAC other than Config.MAC.
 	wrong *WrongSwitchError
-	// locator finds a switch by MAC address; tests replace it.
-	locator func(ctx context.Context, mac MAC) (Info, error)
+	// seams are the knobs only tests turn; Dial sets them to their defaults.
+	seams
 	// log is Config.Logger, or a logger that discards, with the switch's host and MAC attached.
 	log *slog.Logger
+}
+
+// seams are what the tests of the client replace or shorten, kept apart from the state it needs to
+// work. A test sets them through a dialOption, or directly when the value needs the client itself.
+type seams struct {
+	// moveWait overrides ipMoveWait; zero means the default.
+	moveWait time.Duration
+	// allowLoopback lets a test move a fake switch on 127.0.0.0/8.
+	allowLoopback bool
+	// locator finds a switch by MAC address; the default is Locate on the interfaces of this host.
+	locator func(ctx context.Context, mac MAC) (Info, error)
+}
+
+// dialOption changes how dial builds a client; only tests use it.
+type dialOption func(*Client)
+
+// withLoopback lets the client move a switch that lives on 127.0.0.0/8.
+func withLoopback() dialOption { return func(c *Client) { c.allowLoopback = true } }
+
+// withMoveWait shortens the wait for a switch that was told to move.
+func withMoveWait(d time.Duration) dialOption { return func(c *Client) { c.moveWait = d } }
+
+// withLocator replaces the lookup of a switch by its MAC address.
+func withLocator(f func(ctx context.Context, mac MAC) (Info, error)) dialOption {
+	return func(c *Client) { c.locator = f }
 }
 
 // Dial prepares a client for the switch at cfg.Host, which must be an IPv4 address or a
@@ -93,7 +114,7 @@ func resolveIPv4(ctx context.Context, r ipLookuper, host string) (net.IP, error)
 // errNoIPv4 is the cause of a host name that resolves, but not to an IPv4 address.
 var errNoIPv4 = errors.New("no IPv4 address")
 
-func dial(ctx context.Context, r ipLookuper, cfg Config) (*Client, error) {
+func dial(ctx context.Context, r ipLookuper, cfg Config, opts ...dialOption) (*Client, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
@@ -132,6 +153,9 @@ func dial(ctx context.Context, r ipLookuper, cfg Config) (*Client, error) {
 	var n [2]byte
 	_, _ = rand.Read(n[:])
 	c.seq = startSeq(n)
+	for _, o := range opts {
+		o(c)
+	}
 	return c, nil
 }
 

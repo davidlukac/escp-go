@@ -191,8 +191,7 @@ func TestSetIPConfigDoesNotClaimTheWriteWasNotAppliedWhenCanceled(t *testing.T) 
 	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 5 * time.Second,
 		SwitchPort: f.UDPPort(), BroadcastAddr: escptest.Loopback(),
 		// the gate lets the write go, then the caller gives up before it is sent
-		WriteGate: func(context.Context, Reader, Operation) error { cancel(); return nil }})
-	c.allowLoopback = true
+		WriteGate: func(context.Context, Reader, Operation) error { cancel(); return nil }}, withLoopback())
 	t.Cleanup(func() { c.Close() })
 	err := c.SetIPConfig(ctx, lostReplyWanted)
 	// The probe sees the old settings, but the call ended before the switch had to answer, so
@@ -224,8 +223,7 @@ func TestSetIPConfigDoesNotProbeAfterARefusal(t *testing.T) {
 		f := escptest.Start(t)
 		c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 300 * time.Millisecond,
 			SwitchPort: f.UDPPort(), BroadcastAddr: escptest.Loopback(),
-			WriteGate: func(context.Context, Reader, Operation) error { return errGateRefused }})
-		c.allowLoopback = true
+			WriteGate: func(context.Context, Reader, Operation) error { return errGateRefused }}, withLoopback())
 		t.Cleanup(func() { c.Close() })
 		if err := c.SetIPConfig(context.Background(), lostReplyWanted); err != errGateRefused { //nolint:errorlint // the contract is the gate's error unchanged
 			t.Fatalf("the gate's error must come back unchanged, got %v", err)
@@ -373,8 +371,7 @@ func TestSetIPConfigErrorsDoNotMoveTheClient(t *testing.T) {
 
 func TestSetIPConfigReportsAnUnconfirmedMove(t *testing.T) {
 	f := escptest.Start(t)
-	c := dialFast(t, f, "secret")
-	c.moveWait = 300 * time.Millisecond
+	c := dialFast(t, f, "secret", withMoveWait(300*time.Millisecond))
 	// 127.0.0.2 is where the client looks after the write; the fake stays at 127.0.0.1.
 	err := c.SetIPConfig(context.Background(), cfgOf("127.0.0.2", "255.255.255.0", "127.0.0.3"))
 	if !errors.Is(err, ErrMoveUnconfirmed) {
