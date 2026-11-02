@@ -140,3 +140,14 @@ func TestFirmwareGatesDoNotShareState(t *testing.T) {
 		t.Fatal("the second gate must check its own switch")
 	}
 }
+
+// The zero value of a reason is no reason: a FirmwareError built without one cannot pass for a
+// refusal of a particular kind.
+func TestTheZeroFirmwareReasonIsNoneOfTheReasons(t *testing.T) {
+	var unset FirmwareReason
+	for _, r := range []FirmwareReason{FirmwareUnreadable, FirmwareNoBuildDate, FirmwareUnverified} {
+		if r == unset {
+			t.Errorf("reason %d is the zero value", r)
+		}
+	}
+}

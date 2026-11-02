@@ -441,3 +441,21 @@ func TestAnAddressTheReplyDidNotCarryIsNotZero(t *testing.T) {
 		t.Fatalf("a gateway of 0.0.0.0 means none and is usable: %v, %v", cfg, err)
 	}
 }
+
+// The pause between the probes of a wait is a real pause, and shorter than the wait it serves: a
+// zero pause would make the wait a busy loop that floods the switch with discovery probes.
+func TestThePauseBetweenProbesIsARealPauseShorterThanTheWait(t *testing.T) {
+	if ipMovePoll <= 0 || ipMovePoll >= ipMoveWait || ipMovePoll >= leaseWait {
+		t.Fatalf("poll %v, move wait %v, lease wait %v: want 0 < poll < both waits", ipMovePoll, ipMoveWait, leaseWait)
+	}
+}
+
+// The zero value of an outcome is no outcome: a result that was never set cannot pass for one.
+func TestTheZeroLostReplyOutcomeIsNoneOfTheOutcomes(t *testing.T) {
+	var unset lostReplyOutcome
+	for _, o := range []lostReplyOutcome{lostReplyApplied, lostReplyUnchanged, lostReplyOtherDevice, lostReplyUnexpected} {
+		if o == unset {
+			t.Errorf("outcome %d is the zero value", o)
+		}
+	}
+}

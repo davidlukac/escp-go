@@ -148,3 +148,13 @@ func TestCheckPortsLeavesTheReadingAlone(t *testing.T) {
 		t.Fatal("the reading was modified")
 	}
 }
+
+// The zero value of a reason is no reason, as for firmware checks.
+func TestTheZeroPortReasonIsNoneOfTheReasons(t *testing.T) {
+	var unset PortReason
+	for _, r := range []PortReason{PortMissing, PortLinkUp, PortInLAG} {
+		if r == unset {
+			t.Errorf("reason %d is the zero value", r)
+		}
+	}
+}

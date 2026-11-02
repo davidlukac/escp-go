@@ -68,3 +68,13 @@ func TestRSASessionTLV(t *testing.T) {
 		t.Fatalf("rsa tlv mismatch: got %x want %x", got, want)
 	}
 }
+
+// A ciphertext of zero (the key 0, which encrypts to 0) is one word of zero, never none: the count
+// stops at one however many leading words are zero.
+func TestRSASessionTLVOfAZeroCiphertextKeepsOneWord(t *testing.T) {
+	want := make([]byte, rsaTLVLen)
+	want[1] = 1
+	if got := RSASessionTLV(make([]byte, 8)); !bytes.Equal(got, want) {
+		t.Fatalf("got %x, want %x", got, want)
+	}
+}

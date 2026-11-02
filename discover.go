@@ -255,7 +255,7 @@ func collectReplies(ctx context.Context, env discoverEnv, probes []probe, window
 // refuses does not hide the switches on the others.
 func sendProbes(conn *net.UDPConn, env discoverEnv, probes []probe, seq uint16) error {
 	var lastErr error
-	sent := 0
+	delivered := false
 	for _, p := range probes {
 		pkt := wire.RC4Static(wire.Marshal(wire.Header{Op: wire.OpDiscovery, HostMAC: p.mac, Seq: seq}, nil))
 		var err error
@@ -268,9 +268,9 @@ func sendProbes(conn *net.UDPConn, env discoverEnv, probes []probe, seq uint16) 
 			lastErr = err
 			continue
 		}
-		sent++
+		delivered = true
 	}
-	if sent == 0 {
+	if !delivered {
 		return fmt.Errorf("escp: sending the discovery probe: %w", lastErr)
 	}
 	return nil

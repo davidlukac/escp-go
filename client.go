@@ -122,10 +122,10 @@ func dial(ctx context.Context, r ipLookuper, cfg Config, opts ...dialOption) (*C
 		cfg.Timeout = 3 * time.Second
 	}
 	switch {
-	case cfg.Retries == 0:
-		cfg.Retries = defaultRetries
 	case cfg.Retries < 0:
 		cfg.Retries = 0
+	case cfg.Retries == 0:
+		cfg.Retries = defaultRetries
 	}
 	if cfg.SwitchPort == 0 {
 		cfg.SwitchPort = defaultSwitchPort

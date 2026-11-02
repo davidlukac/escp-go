@@ -53,12 +53,12 @@ func (c *Client) ensureSession(ctx context.Context) error {
 // withSession runs fn with an established session, re-establishing it once if
 // the switch stops answering (session expired or switch rebooted).
 func (c *Client) withSession(ctx context.Context, fn func() error) error {
-	for attempt := 0; ; attempt++ {
+	for retried := false; ; retried = true {
 		if err := c.ensureSession(ctx); err != nil {
 			return err
 		}
 		err := fn()
-		if errors.Is(err, ErrNoReply) && attempt == 0 {
+		if errors.Is(err, ErrNoReply) && !retried {
 			c.session = nil
 			c.log.WarnContext(ctx, "no reply; opening a new session", "lookup_by_mac", !c.cfg.MAC.IsZero())
 			if !c.cfg.MAC.IsZero() {
