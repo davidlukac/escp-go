@@ -39,7 +39,7 @@ func TestSetPortBasedVLANWire(t *testing.T) {
 	if err := c.SetPortBasedVLAN(ctx, PortVLAN{ID: 2, Ports: MustPortSet(6, 7)}); err != nil {
 		t.Fatal(err)
 	}
-	if got := f.LastSet(); got[0].Type != wire.TLVVLANPortBasedVID || !reflect.DeepEqual(got[0].Value, []byte{2, 0, 0, 0, 0x60}) {
+	if got := f.LastSet(); got[0].Type != escptest.TLVType(wire.TLVVLANPortBasedVID) || !reflect.DeepEqual(got[0].Value, []byte{2, 0, 0, 0, 0x60}) {
 		t.Fatalf("wire %+v", got)
 	}
 	if err := c.SetPortBasedVLAN(ctx, PortVLAN{ID: 2, Ports: 0}); err != nil {
@@ -140,17 +140,17 @@ func TestPortBasedVLANGroup(t *testing.T) {
 
 // scriptedPortBased answers the port-based VLAN state with a maximum of groups (none when nil) and
 // the given port count, and counts the reads of the state.
-func scriptedPortBased(groups []byte, ports byte, reads *atomic.Int32) func([]wire.TLVType) ([]escptest.Setting, int32, bool) {
-	return func(types []wire.TLVType) ([]escptest.Setting, int32, bool) {
+func scriptedPortBased(groups []byte, ports byte, reads *atomic.Int32) func([]escptest.TLVType) ([]escptest.Setting, int32, bool) {
+	return func(types []escptest.TLVType) ([]escptest.Setting, int32, bool) {
 		for _, ty := range types {
-			switch ty {
+			switch wire.TLVType(ty) {
 			case wire.TLVPortCount:
-				return []escptest.Setting{{Type: wire.TLVPortCount, Value: []byte{ports}}}, 0, false
+				return []escptest.Setting{{Type: escptest.TLVType(wire.TLVPortCount), Value: []byte{ports}}}, 0, false
 			case wire.TLVVLANPortBased:
 				reads.Add(1)
-				out := []escptest.Setting{{Type: wire.TLVVLANPortBased, Value: []byte{1}}, {Type: wire.TLVVLANPortBasedVID, Value: []byte{1, 0, 0, 0, 0xff}}}
+				out := []escptest.Setting{{Type: escptest.TLVType(wire.TLVVLANPortBased), Value: []byte{1}}, {Type: escptest.TLVType(wire.TLVVLANPortBasedVID), Value: []byte{1, 0, 0, 0, 0xff}}}
 				if groups != nil {
-					out = append(out, escptest.Setting{Type: wire.TLVVLANPortBasedMax, Value: groups})
+					out = append(out, escptest.Setting{Type: escptest.TLVType(wire.TLVVLANPortBasedMax), Value: groups})
 				}
 				return out, 0, false
 			}
@@ -202,7 +202,7 @@ func TestSetPortBasedVLANRefusesAGroupTheSwitchDoesNotHave(t *testing.T) {
 func TestSetPortBasedVLANFailsWhenTheGroupLimitCannotBeRead(t *testing.T) {
 	f := escptest.Start(t)
 	f.Configure(func(f *escptest.Faults) {
-		f.OnGet = func(types []wire.TLVType) ([]escptest.Setting, int32, bool) { return nil, 1, false } // the switch refuses every read
+		f.OnGet = func(types []escptest.TLVType) ([]escptest.Setting, int32, bool) { return nil, 1, false } // the switch refuses every read
 	})
 	c := dialFake(t, f, "secret")
 	err := c.SetPortBasedVLAN(context.Background(), PortVLAN{ID: 2, Ports: MustPortSet(2)})
@@ -217,10 +217,10 @@ func TestSetPortBasedVLANFailsWhenTheGroupLimitCannotBeRead(t *testing.T) {
 func TestSetPortBasedVLANFailsWhenThePortCountCannotBeRead(t *testing.T) {
 	f := escptest.Start(t)
 	f.Configure(func(f *escptest.Faults) {
-		f.OnGet = func(types []wire.TLVType) ([]escptest.Setting, int32, bool) {
+		f.OnGet = func(types []escptest.TLVType) ([]escptest.Setting, int32, bool) {
 			for _, ty := range types {
-				if ty == wire.TLVVLANPortBased { // the state reads fine
-					return []escptest.Setting{{Type: wire.TLVVLANPortBased, Value: []byte{1}}, {Type: wire.TLVVLANPortBasedMax, Value: []byte{8}}}, 0, false
+				if wire.TLVType(ty) == wire.TLVVLANPortBased { // the state reads fine
+					return []escptest.Setting{{Type: escptest.TLVType(wire.TLVVLANPortBased), Value: []byte{1}}, {Type: escptest.TLVType(wire.TLVVLANPortBasedMax), Value: []byte{8}}}, 0, false
 				}
 			}
 			return nil, 1, false // the port count is refused

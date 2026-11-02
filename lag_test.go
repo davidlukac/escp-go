@@ -34,7 +34,7 @@ func TestSetLAGWire(t *testing.T) {
 	if err := c.SetLAG(ctx, LAG{ID: 2, Ports: MustPortSet(6, 7)}); err != nil {
 		t.Fatal(err)
 	}
-	if got := f.LastSet(); got[0].Type != wire.TLVLAG || !reflect.DeepEqual(got[0].Value, []byte{2, 0, 0, 0, 0x60}) {
+	if got := f.LastSet(); got[0].Type != escptest.TLVType(wire.TLVLAG) || !reflect.DeepEqual(got[0].Value, []byte{2, 0, 0, 0, 0x60}) {
 		t.Fatalf("wire %+v", got)
 	}
 	if err := c.SetLAG(ctx, LAG{ID: 2, Ports: 0}); err != nil {

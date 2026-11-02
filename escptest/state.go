@@ -21,7 +21,7 @@ func (f *Switch) EnableState(seed ...Setting) {
 	// The real switch answers a request for the IGMP state with report suppression as well.
 	f.bundles = map[wire.TLVType][]wire.TLVType{wire.TLVIGMPEnabled: {wire.TLVIGMPSuppression}}
 	for _, s := range seed {
-		f.store[s.Type] = append([]byte(nil), s.Value...)
+		f.store[wire.TLVType(s.Type)] = append([]byte(nil), s.Value...)
 	}
 }
 
@@ -36,7 +36,7 @@ type Setting struct {
 func toTLVs(in []Setting) []wire.TLV {
 	out := make([]wire.TLV, len(in))
 	for i, s := range in {
-		out[i] = wire.TLV{Type: s.Type, Value: s.Value}
+		out[i] = wire.TLV{Type: wire.TLVType(s.Type), Value: s.Value}
 	}
 	return out
 }
@@ -44,7 +44,7 @@ func toTLVs(in []Setting) []wire.TLV {
 func toSettings(in []wire.TLV) []Setting {
 	out := make([]Setting, len(in))
 	for i, t := range in {
-		out[i] = Setting{Type: t.Type, Value: append([]byte(nil), t.Value...)}
+		out[i] = Setting{Type: TLVType(t.Type), Value: append([]byte(nil), t.Value...)}
 	}
 	return out
 }
@@ -135,9 +135,10 @@ func DecryptSessionKey(v []byte) []byte {
 func (f *Switch) EnableRows(typ TLVType, rows ...[]byte) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.rows[typ] = nil
+	key := wire.TLVType(typ)
+	f.rows[key] = nil
 	for _, r := range rows {
-		f.rows[typ] = append(f.rows[typ], append([]byte(nil), r...))
+		f.rows[key] = append(f.rows[key], append([]byte(nil), r...))
 	}
 }
 

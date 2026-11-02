@@ -93,18 +93,18 @@ func TestDryRunOfAWriteThatReadsFirst(t *testing.T) {
 func TestPortGateThroughTheRealClient(t *testing.T) {
 	f := escptest.Start(t)
 	f.Configure(func(f *escptest.Faults) {
-		f.OnGet = func(types []wire.TLVType) ([]escptest.Setting, int32, bool) {
+		f.OnGet = func(types []escptest.TLVType) ([]escptest.Setting, int32, bool) {
 			var out []escptest.Setting
 			for _, typ := range types {
-				switch typ {
+				switch wire.TLVType(typ) {
 				case wire.TLVPorts: // port 1 is the linked uplink in LAG 1, port 3 is free
 					out = append(out,
-						escptest.Setting{Type: wire.TLVPorts, Value: []byte{1, 1, 1, 1, 6, 0, 0}},
-						escptest.Setting{Type: wire.TLVPorts, Value: []byte{3, 1, 0, 1, 0, 0, 0}})
+						escptest.Setting{Type: escptest.TLVType(wire.TLVPorts), Value: []byte{1, 1, 1, 1, 6, 0, 0}},
+						escptest.Setting{Type: escptest.TLVType(wire.TLVPorts), Value: []byte{3, 1, 0, 1, 0, 0, 0}})
 				case wire.TLVLAG: // LAG 1 = ports 1 and 2
-					out = append(out, escptest.Setting{Type: wire.TLVLAG, Value: []byte{1, 0, 0, 0, 3}})
+					out = append(out, escptest.Setting{Type: escptest.TLVType(wire.TLVLAG), Value: []byte{1, 0, 0, 0, 3}})
 				case wire.TLVPortCount:
-					out = append(out, escptest.Setting{Type: wire.TLVPortCount, Value: []byte{8}})
+					out = append(out, escptest.Setting{Type: escptest.TLVType(wire.TLVPortCount), Value: []byte{8}})
 				}
 			}
 			return out, 0, false

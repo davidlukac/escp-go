@@ -2,6 +2,8 @@ package escptest_test
 
 import (
 	"context"
+	"slices"
+	"sync"
 	"testing"
 
 	"github.com/davidlukac/escp-go"
@@ -32,5 +34,38 @@ func TestAnEscpMACGoesIntoTheFakeAndTheClientReadsItBack(t *testing.T) {
 	}
 	if info.MAC != want {
 		t.Errorf("the client read %v, want %v", info.MAC, want)
+	}
+}
+
+// The numbers of PROTOCOL.md are the language of the fake's scripts: a test outside the module has
+// no constants for them (the type is the fake's own and exports none) and writes TLVType(12), the LED
+// page. What the client asks for arrives as that number, and a reply scripted under it is the one
+// the client reads.
+func TestAScriptedReplyIsAddressedByTheNumberOfPROTOCOLMD(t *testing.T) {
+	const ledType = escptest.TLVType(12)
+	sw := escptest.Start(t)
+	var mu sync.Mutex
+	var asked []escptest.TLVType
+	sw.Configure(func(f *escptest.Faults) {
+		f.OnGet = func(types []escptest.TLVType) ([]escptest.Setting, int32, bool) {
+			mu.Lock()
+			defer mu.Unlock()
+			asked = append(asked, types...)
+			return []escptest.Setting{{Type: ledType, Value: []byte{1}}}, 0, false
+		}
+	})
+	c := dial(sw)
+	defer func() { _ = c.Close() }() // best effort at the end of the test
+	on, err := c.LED(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !on {
+		t.Error("the LED reply scripted under TLVType(12) was not the one the client read")
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if !slices.Contains(asked, ledType) {
+		t.Errorf("the script was asked for %v, want it to include TLVType(12)", asked)
 	}
 }

@@ -136,7 +136,7 @@ func TestTheMACInTheDiscoveryReplyIsCheckedToo(t *testing.T) {
 	// the header carries the wanted MAC but the description names another device
 	f := escptest.Start(t)
 	f.Configure(func(f *escptest.Faults) {
-		f.DiscoverReply = []escptest.Setting{{Type: wire.TLVMAC, Value: otherMAC[:]}, {Type: wire.TLVIP, Value: []byte{127, 0, 0, 1}}}
+		f.DiscoverReply = []escptest.Setting{{Type: escptest.TLVType(wire.TLVMAC), Value: otherMAC[:]}, {Type: escptest.TLVType(wire.TLVIP), Value: []byte{127, 0, 0, 1}}}
 	})
 	c, _ := dialMAC(t, f, "127.0.0.1", wantMAC, nil)
 	if _, err := c.Info(context.Background()); !errors.Is(err, ErrWrongSwitch) {

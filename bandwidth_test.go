@@ -38,10 +38,10 @@ func TestSetBandwidthWire(t *testing.T) {
 	if len(h) != 2 {
 		t.Fatalf("want 2 SETs (ingress, egress), got %d", len(h))
 	}
-	if h[0][0].Type != wire.TLVBandwidthIngress || !reflect.DeepEqual(h[0][0].Value, []byte{7, 1, 0, 0, 4, 0}) {
+	if h[0][0].Type != escptest.TLVType(wire.TLVBandwidthIngress) || !reflect.DeepEqual(h[0][0].Value, []byte{7, 1, 0, 0, 4, 0}) {
 		t.Fatalf("ingress wire: %+v", h[0])
 	}
-	if h[1][0].Type != wire.TLVBandwidthEgress || !reflect.DeepEqual(h[1][0].Value, []byte{7, 0, 0, 0, 0, 0}) {
+	if h[1][0].Type != escptest.TLVType(wire.TLVBandwidthEgress) || !reflect.DeepEqual(h[1][0].Value, []byte{7, 0, 0, 0, 0, 0}) {
 		t.Fatalf("egress wire: %+v", h[1])
 	}
 	for _, bad := range []Kbps{-64, 100, 2000000} {
@@ -94,7 +94,7 @@ func TestBandwidthPartialFailureIsReportedAndNotHidden(t *testing.T) {
 		if err := c.SetBandwidth(context.Background(), PortBandwidth{Port: 7, Ingress: 64, Egress: 64}); !errors.Is(err, ErrRejected) {
 			t.Fatalf("got %v", err)
 		}
-		if h := f.AllSets(); len(h) != 1 || h[0][0].Type != wire.TLVBandwidthIngress {
+		if h := f.AllSets(); len(h) != 1 || h[0][0].Type != escptest.TLVType(wire.TLVBandwidthIngress) {
 			t.Fatalf("exactly the ingress SET should have been applied: %+v", h)
 		}
 	})

@@ -47,7 +47,7 @@ func TestEnableDHCPAsksForALeaseAndFollowsIt(t *testing.T) {
 		t.Fatalf("SET carries %d TLVs, want %d: %+v", len(sets[0]), len(want), sets[0])
 	}
 	for i, w := range want {
-		if sets[0][i].Type != w.Type || !bytes.Equal(sets[0][i].Value, w.Value) {
+		if sets[0][i].Type != escptest.TLVType(w.Type) || !bytes.Equal(sets[0][i].Value, w.Value) {
 			t.Errorf("TLV %d = %+v, want %+v", i, sets[0][i], w)
 		}
 	}
@@ -190,7 +190,7 @@ func TestSetIPConfigTurnsDHCPOff(t *testing.T) {
 		t.Fatalf("after DHCP off: %+v err=%v", info, err)
 	}
 	last := f.LastSet()
-	if len(last) < 2 || last[1].Type != wire.TLVDHCP || last[1].Value[0] != 0 {
+	if len(last) < 2 || last[1].Type != escptest.TLVType(wire.TLVDHCP) || last[1].Value[0] != 0 {
 		t.Fatalf("the write must carry the flag off: %+v", last)
 	}
 }
@@ -211,7 +211,7 @@ func TestEnableDHCPWritesNothingWhenTheSwitchCannotBeReadFirst(t *testing.T) {
 	f = escptest.Start(t)
 	defaultMAC := escptest.DefaultMAC()
 	f.Configure(func(f *escptest.Faults) {
-		f.DiscoverReply = []escptest.Setting{{Type: wire.TLVMAC, Value: defaultMAC[:]}} // no addresses
+		f.DiscoverReply = []escptest.Setting{{Type: escptest.TLVType(wire.TLVMAC), Value: defaultMAC[:]}} // no addresses
 	})
 	c, _ = dialLeasing(t, f)
 	if err := c.EnableDHCP(context.Background()); err == nil || !strings.Contains(err.Error(), "unusable IP configuration") {

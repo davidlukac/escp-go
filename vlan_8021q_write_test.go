@@ -86,14 +86,14 @@ func TestSetDot1QVLANWire(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := f.LastSet()
-	if len(got) != 1 || got[0].Type != wire.TLVVLAN8021QVLAN || !reflect.DeepEqual(got[0].Value, []byte{0, 2, 0, 0, 0, 0x18, 0, 0, 0, 0, 'i', 'o', 't', 0}) {
+	if len(got) != 1 || got[0].Type != escptest.TLVType(wire.TLVVLAN8021QVLAN) || !reflect.DeepEqual(got[0].Value, []byte{0, 2, 0, 0, 0, 0x18, 0, 0, 0, 0, 'i', 'o', 't', 0}) {
 		t.Fatalf("wire %+v", got)
 	}
 	if err := c.DeleteDot1QVLAN(ctx, 2); err != nil {
 		t.Fatal(err)
 	}
 	got = f.LastSet()
-	if len(got) != 1 || got[0].Type != wire.TLVVLAN8021QVLAN || !reflect.DeepEqual(got[0].Value, []byte{0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0}) {
+	if len(got) != 1 || got[0].Type != escptest.TLVType(wire.TLVVLAN8021QVLAN) || !reflect.DeepEqual(got[0].Value, []byte{0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0}) {
 		t.Fatalf("delete wire %+v", got)
 	}
 	n := f.WriteCount()
@@ -114,7 +114,7 @@ func TestSetPVIDsWire(t *testing.T) {
 	}
 	got := f.LastSet()
 	// One TLV per port, in port order, each port (1 byte) and pvid (2 bytes, big endian).
-	want := []escptest.Setting{{Type: wire.TLVVLAN8021QPVID, Value: []byte{4, 0, 2}}, {Type: wire.TLVVLAN8021QPVID, Value: []byte{5, 1, 0x2c}}}
+	want := []escptest.Setting{{Type: escptest.TLVType(wire.TLVVLAN8021QPVID), Value: []byte{4, 0, 2}}, {Type: escptest.TLVType(wire.TLVVLAN8021QPVID), Value: []byte{5, 1, 0x2c}}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("wire %+v, want %+v", got, want)
 	}

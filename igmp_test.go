@@ -56,8 +56,8 @@ func TestSetIGMPWire(t *testing.T) {
 				t.Fatal(err)
 			}
 			want := []escptest.Setting{
-				{Type: wire.TLVIGMPEnabled, Value: []byte{tc.wantState}},
-				{Type: wire.TLVIGMPSuppression, Value: []byte{tc.wantSupp}},
+				{Type: escptest.TLVType(wire.TLVIGMPEnabled), Value: []byte{tc.wantState}},
+				{Type: escptest.TLVType(wire.TLVIGMPSuppression), Value: []byte{tc.wantSupp}},
 			}
 			if got := f.LastSet(); !reflect.DeepEqual(got, want) {
 				t.Fatalf("wire %+v, want %+v", got, want)

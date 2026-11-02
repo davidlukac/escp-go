@@ -77,7 +77,7 @@ func TestSetStormWire(t *testing.T) {
 	}
 	got := f.LastSet()
 	want := []byte{7, 1, 0, 1, 1, 0, 0, 4, 0}
-	if len(got) != 1 || got[0].Type != wire.TLVStormControl || !reflect.DeepEqual(got[0].Value, want) {
+	if len(got) != 1 || got[0].Type != escptest.TLVType(wire.TLVStormControl) || !reflect.DeepEqual(got[0].Value, want) {
 		t.Fatalf("wire %+v, want %v", got, want)
 	}
 	if err := c.SetStormControl(ctx, StormConfig{Port: 7, UnknownUnicast: false, Multicast: false, Broadcast: false, Rate: 0}); err != nil {

@@ -96,11 +96,13 @@ func (f *Switch) Close() error { return f.conn.Close() }
 // UDPPort is the UDP port the switch listens on; give it to the client as its switch port.
 func (f *Switch) UDPPort() int { return f.port }
 
-// TLVType is the type number of a Setting: the numbers of PROTOCOL.md. It is named here so that a
-// test outside the escp module can write the func literals the fake takes (Faults.OnGet) without
-// importing the client's internals; a plain number is a valid TLVType wherever a constant is
-// expected.
-type TLVType = wire.TLVType
+// TLVType is the protocol type number of a Setting: one of the numbers of PROTOCOL.md (4352 for the
+// IGMP snooping page, for example). No constants are exported, because the numbers are protocol
+// facts that PROTOCOL.md keeps in one place, and a second list here would drift from it: a test
+// writes the number it scripts, as in TLVType(4352), and a plain constant is a valid TLVType wherever
+// one is expected. The type is the fake's own, so a test outside the escp module can write the func
+// literals the fake takes (Faults.OnGet) without importing the client's internals.
+type TLVType int16
 
 func (f *Switch) serve() {
 	buf := make([]byte, 4096)

@@ -54,17 +54,17 @@ const (
 // exclusive, and a port left in none returns to VLAN 1.
 func (f *Switch) EnableModel(links map[int]LinkSpeed) {
 	f.EnableState(
-		Setting{Type: wire.TLVIGMPEnabled, Value: []byte{1}},
-		Setting{Type: wire.TLVIGMPGroups},
-		Setting{Type: wire.TLVIGMPSuppression, Value: []byte{0}},
-		Setting{Type: wire.TLVLoopPrevention, Value: []byte{1}},
-		Setting{Type: wire.TLVQoSMode, Value: []byte{qosModeDSCP}},
-		Setting{Type: wire.TLVMirror, Value: make([]byte, mirrorLen)},
-		Setting{Type: wire.TLVVLANPortBased, Value: []byte{1}},
-		Setting{Type: wire.TLVVLANPortBasedMax, Value: []byte{modelPortCount}},
-		Setting{Type: wire.TLVVLANMTU, Value: []byte{0, 1}},
-		Setting{Type: wire.TLVVLAN8021Q, Value: []byte{0}},
-		Setting{Type: wire.TLVVLAN8021QMax, Value: []byte{maxDot1QVLANs}},
+		Setting{Type: TLVType(wire.TLVIGMPEnabled), Value: []byte{1}},
+		Setting{Type: TLVType(wire.TLVIGMPGroups)},
+		Setting{Type: TLVType(wire.TLVIGMPSuppression), Value: []byte{0}},
+		Setting{Type: TLVType(wire.TLVLoopPrevention), Value: []byte{1}},
+		Setting{Type: TLVType(wire.TLVQoSMode), Value: []byte{qosModeDSCP}},
+		Setting{Type: TLVType(wire.TLVMirror), Value: make([]byte, mirrorLen)},
+		Setting{Type: TLVType(wire.TLVVLANPortBased), Value: []byte{1}},
+		Setting{Type: TLVType(wire.TLVVLANPortBasedMax), Value: []byte{modelPortCount}},
+		Setting{Type: TLVType(wire.TLVVLANMTU), Value: []byte{0, 1}},
+		Setting{Type: TLVType(wire.TLVVLAN8021Q), Value: []byte{0}},
+		Setting{Type: TLVType(wire.TLVVLAN8021QMax), Value: []byte{maxDot1QVLANs}},
 	)
 	f.mu.Lock()
 	f.bundles[wire.TLVVLAN8021QVLAN] = []wire.TLVType{wire.TLVVLAN8021Q, wire.TLVVLAN8021QMax}
@@ -82,12 +82,12 @@ func (f *Switch) EnableModel(links map[int]LinkSpeed) {
 		bwOut = append(bwOut, append([]byte{byte(p)}, make([]byte, rateRowLen-1)...))
 		storm = append(storm, append([]byte{byte(p)}, make([]byte, stormRowLen-1)...))
 	}
-	f.EnableRows(wire.TLVPorts, ports...)
-	f.EnableRows(wire.TLVQoSPriority, prio...)
-	f.EnableRows(wire.TLVBandwidthIngress, bwIn...)
-	f.EnableRows(wire.TLVBandwidthEgress, bwOut...)
-	f.EnableRows(wire.TLVStormControl, storm...)
-	f.EnableRows(wire.TLVLAG, make([]byte, 5), make([]byte, 5))
+	f.EnableRows(TLVType(wire.TLVPorts), ports...)
+	f.EnableRows(TLVType(wire.TLVQoSPriority), prio...)
+	f.EnableRows(TLVType(wire.TLVBandwidthIngress), bwIn...)
+	f.EnableRows(TLVType(wire.TLVBandwidthEgress), bwOut...)
+	f.EnableRows(TLVType(wire.TLVStormControl), storm...)
+	f.EnableRows(TLVType(wire.TLVLAG), make([]byte, 5), make([]byte, 5))
 	f.mu.Lock()
 	f.rows[wire.TLVLAG][0][0], f.rows[wire.TLVLAG][1][0] = 1, 2
 	f.mu.Unlock()
@@ -95,13 +95,13 @@ func (f *Switch) EnableModel(links map[int]LinkSpeed) {
 	for p := 1; p <= modelPortCount; p++ {
 		pvids = append(pvids, []byte{byte(p), 0, defaultVLAN})
 	}
-	f.EnableRows(wire.TLVVLAN8021QPVID, pvids...)
+	f.EnableRows(TLVType(wire.TLVVLAN8021QPVID), pvids...)
 	// VLAN 1: every port a member, none tagged, named Default.
 	vlan1 := binary.BigEndian.AppendUint16(nil, defaultVLAN)
 	vlan1 = binary.BigEndian.AppendUint32(vlan1, 1<<modelPortCount-1)
 	vlan1 = binary.BigEndian.AppendUint32(vlan1, 0)
-	f.EnableRows(wire.TLVVLAN8021QVLAN, append(vlan1, "Default\x00"...))
-	f.EnableRows(wire.TLVVLANPortBasedVID, binary.BigEndian.AppendUint32([]byte{defaultVLAN}, 1<<modelPortCount-1))
+	f.EnableRows(TLVType(wire.TLVVLAN8021QVLAN), append(vlan1, "Default\x00"...))
+	f.EnableRows(TLVType(wire.TLVVLANPortBasedVID), binary.BigEndian.AppendUint32([]byte{defaultVLAN}, 1<<modelPortCount-1))
 }
 
 // portsOf returns the ports named by a 4-byte mask.

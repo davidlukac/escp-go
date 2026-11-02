@@ -36,10 +36,10 @@ func TestSetHostnameRefusesToWriteWithoutAUsableIPConfiguration(t *testing.T) {
 		}
 	})
 	bad := map[string][]escptest.Setting{
-		"missing IP":      {{Type: wire.TLVNetmask, Value: []byte{255, 255, 255, 0}}, {Type: wire.TLVGateway, Value: []byte{10, 0, 0, 1}}},
-		"missing netmask": {{Type: wire.TLVIP, Value: []byte{10, 0, 0, 5}}, {Type: wire.TLVGateway, Value: []byte{10, 0, 0, 1}}},
-		"missing gateway": {{Type: wire.TLVIP, Value: []byte{10, 0, 0, 5}}, {Type: wire.TLVNetmask, Value: []byte{255, 255, 255, 0}}},
-		"malformed IP":    {{Type: wire.TLVIP, Value: []byte{10, 0, 5}}, {Type: wire.TLVNetmask, Value: []byte{255, 255, 255, 0}}, {Type: wire.TLVGateway, Value: []byte{10, 0, 0, 1}}},
+		"missing IP":      {{Type: escptest.TLVType(wire.TLVNetmask), Value: []byte{255, 255, 255, 0}}, {Type: escptest.TLVType(wire.TLVGateway), Value: []byte{10, 0, 0, 1}}},
+		"missing netmask": {{Type: escptest.TLVType(wire.TLVIP), Value: []byte{10, 0, 0, 5}}, {Type: escptest.TLVType(wire.TLVGateway), Value: []byte{10, 0, 0, 1}}},
+		"missing gateway": {{Type: escptest.TLVType(wire.TLVIP), Value: []byte{10, 0, 0, 5}}, {Type: escptest.TLVType(wire.TLVNetmask), Value: []byte{255, 255, 255, 0}}},
+		"malformed IP":    {{Type: escptest.TLVType(wire.TLVIP), Value: []byte{10, 0, 5}}, {Type: escptest.TLVType(wire.TLVNetmask), Value: []byte{255, 255, 255, 0}}, {Type: escptest.TLVType(wire.TLVGateway), Value: []byte{10, 0, 0, 1}}},
 	}
 	for name, tlvs := range bad {
 		t.Run(name, func(t *testing.T) {
@@ -60,7 +60,7 @@ func TestSetHostnameRefusesToWriteWithoutAUsableIPConfiguration(t *testing.T) {
 func TestSetHostnameRefusesUnusableIPConfiguration(t *testing.T) {
 	f := escptest.Start(t)
 	f.Configure(func(f *escptest.Faults) {
-		f.DiscoverReply = []escptest.Setting{{Type: wire.TLVModel, Value: []byte("TL-SG108E\x00")}, {Type: wire.TLVHostname, Value: []byte("TL-SG108E-fake\x00")}, {Type: wire.TLVMAC, Value: []byte{0x00, 0x00, 0x5e, 0x00, 0x53, 0x02}}}
+		f.DiscoverReply = []escptest.Setting{{Type: escptest.TLVType(wire.TLVModel), Value: []byte("TL-SG108E\x00")}, {Type: escptest.TLVType(wire.TLVHostname), Value: []byte("TL-SG108E-fake\x00")}, {Type: escptest.TLVType(wire.TLVMAC), Value: []byte{0x00, 0x00, 0x5e, 0x00, 0x53, 0x02}}}
 	})
 	c := dialFake(t, f, "secret")
 	err := c.SetHostname(context.Background(), "sw01")
