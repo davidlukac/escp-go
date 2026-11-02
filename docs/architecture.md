@@ -13,6 +13,9 @@ For people who work on the library. Users want the [guides](README.md); the chec
 | `internal/udp` | sharing the reply port between sockets, per operating system |
 | `internal/coverpolicy` | the coverage policy checker and the badge (a build tool, not part of the API) |
 | `internal/mutationreport` | the job summary of a mutation run (a build tool) |
+| `internal/release` | cutting a version: the CHANGELOG entry, the checks, the tag (a build tool, `scripts/release.sh`) |
+| `internal/fuzzrun` | every fuzz target of the module for a number of seconds each (a build tool, `scripts/fuzz.sh`) |
+| `internal/pkgdoc` | the package documentation rendered the way pkg.go.dev does, as HTML and text (a build tool, `scripts/pkgdoc.sh`) |
 | `examples/discover` | a read-only example program |
 
 The module path is the repository's, `github.com/davidlukac/escp-go`, so the import paths are that, `.../escp-go/safety` and `.../escp-go/escptest`; the packages themselves are named `escp`, `safety` and `escptest`, and the documentation calls them that.
