@@ -441,3 +441,15 @@ func TestDialContextRefusesWhatDialRefuses(t *testing.T) {
 		t.Errorf("an IPv6 host: got %v, want ErrInvalid", err)
 	}
 }
+
+// DialContext hands its context to the lookup: a name looked up under a context that has ended is
+// reported as the context's error, not resolved. The context is already canceled, so nothing is sent
+// to a resolver.
+func TestDialContextGivesItsContextToTheLookup(t *testing.T) {
+	done, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := DialContext(done, Config{Host: "sw.example"})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("got %v, want context.Canceled", err)
+	}
+}
