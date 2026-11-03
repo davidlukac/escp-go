@@ -41,8 +41,10 @@ func TestAPortHandedOutIsNotGivenAgain(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = c.Close() }() // best effort at the end of the test
-	if got == first || calls != 2 {
-		t.Errorf("got port %d after %d tries, want a port other than %d on the second try", got, calls, first)
+	// The port handed out first is refused, so a second try was needed; more than two is fine, because
+	// the kernel may draw a port that another test of the package was given.
+	if got == first || calls < 2 {
+		t.Errorf("got port %d after %d tries, want a port other than %d after at least two tries", got, calls, first)
 	}
 	if bound, err := udp.AddrPort(c.LocalAddr()); err != nil || int(bound.Port()) != got {
 		t.Errorf("the reported port is %d, the socket is bound to %v (%v)", got, bound, err)
@@ -242,8 +244,10 @@ func TestAPortThatCannotBeMarkedIsHandedOutOnceHere(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = c.Close() }() // best effort at the end of the test
-	if got == first || calls != 2 {
-		t.Errorf("got port %d after %d tries, want a port other than %d on the second try", got, calls, first)
+	// The port handed out first is refused, so a second try was needed; more than two is fine, because
+	// the kernel may draw a port that another test of the package was given.
+	if got == first || calls < 2 {
+		t.Errorf("got port %d after %d tries, want a port other than %d after at least two tries", got, calls, first)
 	}
 }
 
