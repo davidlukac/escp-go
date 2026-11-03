@@ -153,9 +153,7 @@ func (c *Client) SetPortBasedVLAN(ctx context.Context, group PortVLAN) error {
 // and of the port count; if one fails, so does the write, with that error. The caller has checked
 // the id's own range (PortVLAN.Validate) before anything is read.
 func (c *Client) requirePortVLANGroup(ctx context.Context, id PortVLANID) error {
-	c.mu.Lock()
-	limit := c.groupLimit
-	c.mu.Unlock()
+	limit := PortVLANLimit(c.groupLimit.Load())
 	if !limit.Known() { // not read yet: a read always yields a known limit, as the port count must be reported
 		v, err := c.PortBasedVLAN(ctx)
 		if err != nil {
@@ -166,9 +164,7 @@ func (c *Client) requirePortVLANGroup(ctx context.Context, id PortVLANID) error 
 			return err
 		}
 		limit = v.GroupLimit(System{PortCount: ports})
-		c.mu.Lock()
-		c.groupLimit = limit
-		c.mu.Unlock()
+		c.groupLimit.Store(int64(limit))
 	}
 	return limit.Check(id)
 }

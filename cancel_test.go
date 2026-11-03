@@ -3,6 +3,8 @@ package escp
 import (
 	"context"
 	"errors"
+	"net"
+	"sync"
 	"testing"
 	"time"
 
@@ -103,5 +105,98 @@ func TestExchangeFragmentsSendsNothingForACanceledCall(t *testing.T) {
 	}
 	if n := f.Received() - before; n != 1 {
 		t.Fatalf("the canceled exchange sent datagrams: %d arrived since, want only the later read's 1", n)
+	}
+}
+
+// blockingConn holds the first read until release is closed, which keeps the call that made it
+// inside the client, holding its lock, for as long as a test needs.
+type blockingConn struct {
+	datagramConn
+	entered chan struct{}
+	release chan struct{}
+	once    sync.Once
+}
+
+func (b *blockingConn) ReadFromUDP(buf []byte) (int, *net.UDPAddr, error) {
+	b.once.Do(func() { close(b.entered) })
+	<-b.release
+	return b.datagramConn.ReadFromUDP(buf)
+}
+
+// A call that has to wait for another call on the same client gives up when its own context ends,
+// without having sent anything, and the call it waited for is not disturbed.
+func TestACallThatWaitsForTheClientStopsWhenItsContextEnds(t *testing.T) {
+	for name, call := range map[string]func(context.Context, *Client) error{
+		"read":   func(ctx context.Context, c *Client) error { _, err := c.LED(ctx); return err },
+		"info":   func(ctx context.Context, c *Client) error { _, err := c.Info(ctx); return err },
+		"write":  func(ctx context.Context, c *Client) error { return c.SetLED(ctx, false) },
+		"backup": func(ctx context.Context, c *Client) error { _, err := c.ConfigBackup(ctx); return err },
+		"ports": func(ctx context.Context, c *Client) error {
+			return c.SetPort(ctx, PortConfig{ID: 2, Enabled: true, Speed: SpeedAuto})
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := escptest.Start(t)
+			f.EnableModel(nil)
+			c := dialFake(t, f, "secret")
+			if _, err := c.LED(context.Background()); err != nil { // opens the socket and the session
+				t.Fatal(err)
+			}
+			hold := &blockingConn{datagramConn: c.conn, entered: make(chan struct{}), release: make(chan struct{})}
+			c.conn = hold
+			holder := make(chan error, 1)
+			go func() { _, err := c.LED(context.Background()); holder <- err }()
+			<-hold.entered // the holder is inside the client and has the lock
+			written := f.WriteCount()
+
+			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+			defer cancel()
+			waiter := make(chan error, 1)
+			go func() { waiter <- call(ctx, c) }()
+			select {
+			case err := <-waiter:
+				if !errors.Is(err, context.DeadlineExceeded) {
+					t.Errorf("the waiting call = %v, want context.DeadlineExceeded", err)
+				}
+			case <-time.After(5 * time.Second):
+				t.Error("the waiting call did not return while another call held the client")
+			}
+			close(hold.release)
+			if err := <-holder; err != nil {
+				t.Errorf("the call that held the client = %v, want it undisturbed", err)
+			}
+			if f.WriteCount() != written {
+				t.Errorf("the waiting call wrote to the switch")
+			}
+			// a waiter that gave up must not leave the client locked
+			if _, err := c.LED(context.Background()); err != nil {
+				t.Errorf("the client is not usable after the abandoned wait: %v", err)
+			}
+		})
+	}
+}
+
+// exchange sends nothing when the context ended before it started: the lock refuses a canceled
+// call first, so this is the second line of defense, for a context that ends between the two.
+func TestExchangeSendsNothingWhenTheContextEndedBeforeIt(t *testing.T) {
+	f := escptest.Start(t)
+	c := dialFake(t, f, "secret")
+	if _, err := c.LED(context.Background()); err != nil { // opens the socket and the session
+		t.Fatal(err)
+	}
+	before := f.Received()
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	c.mu.Lock()
+	_, err := c.exchange(ctx, wire.OpGet, nil, false, []*net.UDPAddr{c.dest})
+	c.mu.Unlock()
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("exchange = %v, want context.Canceled", err)
+	}
+	if _, err := c.LED(context.Background()); err != nil { // a later request shows what reached the switch before it
+		t.Fatal(err)
+	}
+	if n := f.Received() - before; n > 2 { // its own request, and at most the datagram of a discovery
+		t.Fatalf("the canceled exchange sent datagrams: %d reached the switch", n)
 	}
 }

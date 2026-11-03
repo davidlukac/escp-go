@@ -10,7 +10,9 @@ import (
 
 // LED reports whether the switch LEDs are on.
 func (c *Client) LED(ctx context.Context) (bool, error) {
-	c.mu.Lock()
+	if err := c.lock(ctx); err != nil {
+		return false, err
+	}
 	defer c.mu.Unlock()
 	var on bool
 	err := c.withSession(ctx, func() error {

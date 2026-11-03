@@ -155,6 +155,8 @@ func (c *Client) SetIPConfig(ctx context.Context, cfg IPConfig) error {
 	if err != nil {
 		return err
 	}
+	// Taken without the context: Info has just returned, nothing has been sent, and this is a few
+	// instructions under the lock (a caller that gave up is refused by the write that follows).
 	c.mu.Lock()
 	c.alsoFrom = net.IP(cfg.IP.AsSlice())
 	c.mu.Unlock()

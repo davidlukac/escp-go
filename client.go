@@ -9,13 +9,15 @@ import (
 	"net"
 	"net/netip"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/davidlukac/escp-go/internal/udp"
 )
 
 // Client talks ESCP to one switch. It is safe for concurrent use; requests
-// are serialized because the switch answers one request at a time. Use one Client per
+// are serialized because the switch answers one request at a time, and a call that
+// waits its turn gives up when its context ends. Use one Client per
 // switch: two Clients for the same switch were measured to fail completely, apparently
 // because the switch keeps a single session (see the package documentation).
 type Client struct {
@@ -32,11 +34,12 @@ type Client struct {
 	seq            uint16
 	session        []byte
 	// switchPorts is the switch's number of ports, read on the first write that names a port
-	// (zero until then) and kept: it is hardware. Guarded by mu.
-	switchPorts int
-	// groupLimit is the highest port-based VLAN group id the switch has, read on the first group
-	// write (unknown until then) and kept: it is hardware. Guarded by mu.
-	groupLimit PortVLANLimit
+	// (zero until then) and kept: it is hardware. Atomic, so that a call reads it without the
+	// lock another call may be holding for a whole exchange.
+	switchPorts atomic.Int64
+	// groupLimit is the highest port-based VLAN group id the switch has (a PortVLANLimit), read on
+	// the first group write (unknown until then) and kept: it is hardware. Atomic like switchPorts.
+	groupLimit atomic.Int64
 	// wrong is the device that answered the request in flight with a MAC other than Config.MAC.
 	wrong *WrongSwitchError
 	// seams are the knobs only tests turn; Dial sets them to their defaults.
