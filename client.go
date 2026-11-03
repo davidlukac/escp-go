@@ -159,6 +159,11 @@ func dial(ctx context.Context, r ipLookuper, cfg Config, opts ...dialOption) (*C
 		if err != nil {
 			return nil, fmt.Errorf("escp: resolving %q: %w", cfg.Host, err)
 		}
+		// The text check of Validate only knows the dotted form; the system resolver also reads
+		// "4294967295" or "0xffffffff", and a hosts file or DNS can map a name to anything.
+		if a := addrOf(ip); namesMoreThanOneDevice(a) {
+			return nil, invalidf("escp: Host %q resolves to %s, which does not name one switch (an unspecified, multicast or broadcast address)", cfg.Host, a)
+		}
 		c.dest = &net.UDPAddr{IP: ip, Port: cfg.SwitchPort}
 		c.hostMAC = localMAC(ip)
 	}
