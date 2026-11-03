@@ -110,3 +110,24 @@ func validatorList(t *testing.T) string {
 	}
 	return backticked(types)
 }
+
+// docs/architecture.md says where each part of the root package lives; a file it does not mention is
+// a part nobody can find from the guide.
+func TestTheArchitectureGuideNamesEveryFileOfTheRootPackage(t *testing.T) {
+	guide := readText(t, filepath.Join("docs", "architecture.md"))
+	files, err := filepath.Glob("*.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range files {
+		if strings.HasSuffix(f, "_test.go") {
+			continue
+		}
+		name := strings.TrimSuffix(f, ".go")
+		t.Run(name, func(t *testing.T) {
+			if !strings.Contains(guide, "`"+f+"`") && !strings.Contains(guide, "`"+name+"`") {
+				t.Errorf("docs/architecture.md does not mention %s (as `%s` or `%s`)", f, f, name)
+			}
+		})
+	}
+}

@@ -33,9 +33,9 @@
 // sent), asks the optional Config.WriteGate with the write's Operation and Impact, and only then
 // sends it. The safety package provides gates for firmware builds the client was not verified
 // against, for a ceiling on the impact, for ports in use and for a dry run, and Chain combines
-// them. The client does not know which ports carry traffic and, apart from SetIPConfig, does not
-// read back after a write: deciding whether a write is prudent and checking the result are the
-// caller's job. There is no reset; to restore a setting, write the value you recorded.
+// them. The client does not know which ports carry traffic and, apart from SetIPConfig and EnableDHCP
+// (which wait for the switch at its new address), does not read back after a write: deciding
+// whether a write is prudent and checking the result are the caller's job. There is no reset; to restore a setting, write the value you recorded.
 //
 // # Errors
 //

@@ -35,6 +35,8 @@ A gate is a plain function, `func(ctx, escp.Reader, escp.Operation) error`; writ
 
 `PortGate` reads through the client it guards, before every write it checks. A front end with an opt-in of its own (an "allow disruptive" flag) leaves it out and uses `safety.UseOf` and `safety.CheckPorts` to decide.
 
+**`PortGate` only sees ports.** A write that names no port passes it without a read, and some of those can cut the management path: a new address or DHCP (`SetIPConfig`, `EnableDHCP`), the VLAN mode (`SetVLANMode`) and loop prevention (`SetLoopPrevention`) are `ImpactManagement` and name no port. Port safety and the kind of change are two separate questions: `PortGate` answers the first, `MaxImpact` the second, and a front end that offers those writes needs its own confirmation for them (a flag, a prompt) whatever `PortGate` says.
+
 ## Impact
 
 `Impact` classes the kind of change a method is, by what it can do to the way the switch is reached. A method that can cut the management path or the uplink with the right arguments is `ImpactManagement`, whichever port it is aimed at; the class does not know which port is the uplink (that is what `PortGate` and your own knowledge are for).
@@ -60,7 +62,7 @@ The methods of each class (generated from `escp.Settings`, the one table the wri
 ## What the client does not do
 
 - It does not know which ports carry traffic. Deciding whether a write is prudent (is the port in use? in a link aggregation group?) and verifying the result are the caller's job; `PortGate` and `safety.UseOf` answer the common question.
-- Apart from `SetIPConfig`, which waits for the switch to answer at its new address, no write reads back to check that it took effect.
+- Apart from `SetIPConfig` and `EnableDHCP`, which wait for the switch to answer at its new address (or to report its lease), no write reads back to check that it took effect.
 - A few writes read first, so they can send the rest unchanged or refuse a combination the switch would silently break: `SetHostname`, `SetIPConfig` and `EnableDHCP` (the discovery reply), `SetPortPriorities` (the QoS page), `SetBandwidth` and `SetStormControl` (the other one's page: an ingress limit and storm control exclude each other), and every write that names a port (the port count, once). These reads are not gated; their comments say so.
 - **Restoring is explicit.** There is no "reset": to put a setting back, write the value you recorded before.
 
