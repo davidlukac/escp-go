@@ -1,3 +1,0 @@
-# Text files use LF on every system, so generated files (the README compatibility table) and
-# golden files compare byte for byte on Windows too.
-* text=auto eol=lf
