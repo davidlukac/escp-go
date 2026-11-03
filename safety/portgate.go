@@ -19,7 +19,10 @@ var ErrCannotCheckPorts = errors.New("safety: cannot check what the ports are us
 // (a LAG, a port-based VLAN, an 802.1Q VLAN), at the group's current members too, because
 // taking the uplink out of VLAN 1 is as dangerous as naming it. A LAG's own idle members are
 // tolerated when the LAG itself is edited; a link never is. Operations that touch no port
-// pass without a read.
+// pass without a read, and that includes writes that can cut the management path without
+// naming a port (a new address or DHCP, the VLAN mode, loop prevention): the gate answers
+// "is this port free?", MaxImpact answers "what kind of change is this?", and a front end
+// that offers those writes needs a confirmation of its own for them.
 //
 // It reads through the client it guards (the gate is handed the client, which has the readers),
 // before every write it checks, so it costs reads and is for a front end that wants the rule
