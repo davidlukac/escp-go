@@ -330,3 +330,53 @@ func TestAddrOf(t *testing.T) {
 		})
 	}
 }
+
+// macless dials a client at a stand-in for a switch whose replies carry no MAC address, in the
+// header or in the description, and returns what Info says.
+func maclessInfo(t *testing.T, pin MAC, replyTLVs func() []wire.TLV, headerMAC [6]byte) (Info, error) {
+	t.Helper()
+	hostPort := escptest.FreeUDPPort(t)
+	r := startResponder(t, hostPort, func(h wire.Header) [][]byte {
+		return [][]byte{wire.RC4Static(wire.Marshal(wire.Header{Op: wire.OpReply, SwitchMAC: headerMAC, Seq: h.Seq}, replyTLVs()))}
+	})
+	c, err := dial(context.Background(), net.DefaultResolver, Config{Host: "127.0.0.1", MAC: pin, SwitchPort: r.port, HostPort: hostPort,
+		BroadcastAddr: escptest.Loopback(), Timeout: 300 * time.Millisecond, Retries: NoRetries}, withLoopback())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { c.Close() })
+	return c.Info(context.Background())
+}
+
+func TestAPinnedClientRefusesAReplyWithoutAMACInTheHeader(t *testing.T) {
+	tlvs := func() []wire.TLV { return discoverTLVs(wantMAC, [4]byte{127, 0, 0, 1}, "sw") }
+	_, err := maclessInfo(t, wantMAC, tlvs, [6]byte{})
+	var wrong *WrongSwitchError
+	if !errors.Is(err, ErrWrongSwitch) || !errors.As(err, &wrong) || !wrong.Got.IsZero() || !strings.Contains(err.Error(), "without a MAC address") {
+		t.Fatalf("got %v, want ErrWrongSwitch for a reply without a MAC", err)
+	}
+}
+
+func TestAPinnedClientRefusesADiscoveryReplyWithoutAMACInTheDescription(t *testing.T) {
+	tlvs := func() []wire.TLV {
+		var out []wire.TLV
+		for _, tlv := range discoverTLVs(wantMAC, [4]byte{127, 0, 0, 1}, "sw") {
+			if tlv.Type != wire.TLVMAC {
+				out = append(out, tlv)
+			}
+		}
+		return out
+	}
+	if _, err := maclessInfo(t, wantMAC, tlvs, wantMAC); !errors.Is(err, ErrWrongSwitch) {
+		t.Fatalf("got %v, want ErrWrongSwitch", err)
+	}
+}
+
+// Without a pin there is nothing to compare with: such a client takes the first reply as it comes.
+func TestAnUnpinnedClientStillTakesAReplyWithoutAMAC(t *testing.T) {
+	tlvs := func() []wire.TLV { return discoverTLVs(wantMAC, [4]byte{127, 0, 0, 1}, "sw") }
+	info, err := maclessInfo(t, MAC{}, tlvs, [6]byte{})
+	if err != nil || info.Hostname != "sw" {
+		t.Fatalf("got %+v, %v", info, err)
+	}
+}

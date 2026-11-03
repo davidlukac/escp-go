@@ -25,7 +25,8 @@ var (
 	ErrInvalid = errors.New("escp: invalid argument")
 	// ErrWrongSwitch means the device that answered is not the switch the client talks to: the
 	// reply carries another MAC address than Config.MAC or, when that is not set, than the one
-	// the switch reported on the client's first contact. Nothing was written to it. The
+	// the switch reported on the client's first contact, or carries none (a real switch puts its
+	// MAC in every reply). Nothing was written to it. The
 	// *WrongSwitchError that wraps it names both addresses.
 	ErrWrongSwitch = errors.New("escp: the device that answered is not the configured switch")
 	// ErrNotFound means no switch with the wanted MAC address answered a discovery probe on
@@ -45,6 +46,9 @@ func (e *WrongSwitchError) Error() string {
 	where := ""
 	if e.IP.IsValid() {
 		where = " at " + e.IP.String()
+	}
+	if e.Got.IsZero() {
+		return fmt.Sprintf("%s: the device%s answered without a MAC address, the configuration names %s", ErrWrongSwitch.Error(), where, e.Want)
 	}
 	return fmt.Sprintf("%s: the device%s has MAC %s, the configuration names %s", ErrWrongSwitch.Error(), where, e.Got, e.Want)
 }

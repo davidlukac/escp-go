@@ -60,6 +60,30 @@ func TestAPinnedIdentityRefusesEveryOtherMACFromTheFirstReply(t *testing.T) {
 	}
 }
 
+// A real switch puts its MAC in every reply. When there is an identity to compare with, a reply
+// that carries none (all zero) is refused like one from another device; without one, the first
+// reply is taken as it comes.
+func TestAReplyWithoutAMACIsRefusedWhenThereIsAnIdentity(t *testing.T) {
+	pinned := identity{pin: macPin}
+	if pinned.judge(MAC{}, ipFrom) {
+		t.Fatal("a pinned identity accepted a reply without a MAC")
+	}
+	if w := pinned.wrongDevice(); w == nil || !w.Got.IsZero() || w.Want != macPin {
+		t.Fatalf("the refusal names the pin and the missing address: %+v", w)
+	}
+
+	var learned identity
+	learned.judge(macPin, ipFrom)
+	if learned.judge(MAC{}, ipFrom) {
+		t.Fatal("an identity learned from the first contact accepted a reply without a MAC")
+	}
+
+	var first identity
+	if !first.judge(MAC{}, ipFrom) {
+		t.Fatal("without an identity the first reply is accepted as it comes")
+	}
+}
+
 // Reading the identity never waits for the lock of the client: it is safe beside the exchanges.
 func TestTheIdentityIsSafeForConcurrentUse(t *testing.T) {
 	id := identity{pin: macPin}
