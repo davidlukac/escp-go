@@ -6,6 +6,7 @@ import (
 	"slices"
 
 	"github.com/davidlukac/escp-go/internal/wire"
+	"github.com/davidlukac/escp-go/model"
 )
 
 // Limits of 802.1Q VLANs (VLAN > 802.1Q VLAN, VLAN > 802.1Q PVID Setting). The
@@ -21,34 +22,14 @@ const (
 	pvidEntryLen = 3
 )
 
-// Validate checks a VLAN before it is written: the id, the name, no port both tagged and untagged,
-// and at least one member (use DeleteDot1QVLAN to remove a VLAN). The ports are valid by
-// construction; whether the switch has them is checked when the VLAN is written. The error matches
-// ErrInvalid.
-func (v Dot1QVLAN) Validate() error {
-	if err := v.ID.Validate(); err != nil {
-		return err
-	}
-	if err := v.Name.Validate(); err != nil {
-		return err
-	}
-	if both := v.Tagged.Intersect(v.Untagged); !both.IsEmpty() {
-		return invalidf("escp: port %d is both tagged and untagged in VLAN %d", both.Ports()[0], v.ID)
-	}
-	if v.Tagged.Union(v.Untagged).IsEmpty() {
-		return invalidf("escp: VLAN %d has no member ports; delete it instead", v.ID)
-	}
-	return nil
-}
-
 // encodeDot1QVLAN builds the TLV 8705 value for the VLAN, as the vendor utility does:
 // the member mask holds every port, the tagged mask only the tagged ones.
-func encodeDot1QVLAN(v Dot1QVLAN) []byte {
+func encodeDot1QVLAN(v model.Dot1QVLAN) []byte {
 	return vlanEntryBytes(v.ID, v.Tagged.Union(v.Untagged).Mask(), v.Tagged.Mask(), v.Name)
 }
 
 // vlanEntryBytes lays out a TLV 8705 value: id, member mask, tagged mask, name, NUL.
-func vlanEntryBytes(id VLANID, member, tagged []byte, name VLANName) []byte {
+func vlanEntryBytes(id model.VLANID, member, tagged []byte, name model.VLANName) []byte {
 	out := binary.BigEndian.AppendUint16(nil, uint16(id))
 	out = append(out, member...)
 	out = append(out, tagged...)
@@ -59,7 +40,7 @@ func vlanEntryBytes(id VLANID, member, tagged []byte, name VLANName) []byte {
 // SetDot1QVLAN creates or replaces an 802.1Q VLAN: TLV 8705 with the id, the
 // member and tagged port masks and the name. Changing a VLAN whose ports carry
 // traffic can cut connectivity; callers must guard. The 802.1Q mode must be on.
-func (c *Client) SetDot1QVLAN(ctx context.Context, v Dot1QVLAN) error {
+func (c *Client) SetDot1QVLAN(ctx context.Context, v model.Dot1QVLAN) error {
 	if err := v.Validate(); err != nil {
 		return err
 	}
@@ -67,25 +48,17 @@ func (c *Client) SetDot1QVLAN(ctx context.Context, v Dot1QVLAN) error {
 	if err := c.requirePorts(ctx, members); err != nil {
 		return err
 	}
-	return c.setTLVs(ctx, MethodSetDot1QVLAN.Operation().On(members).Replacing(Group{Dot1QVLAN: v.ID}), wire.TLV{Type: wire.TLVVLAN8021QVLAN, Value: encodeDot1QVLAN(v)})
+	return c.setTLVs(ctx, model.MethodSetDot1QVLAN.Operation().On(members).Replacing(model.Group{Dot1QVLAN: v.ID}), wire.TLV{Type: wire.TLVVLAN8021QVLAN, Value: encodeDot1QVLAN(v)})
 }
 
 // DeleteDot1QVLAN removes an 802.1Q VLAN: TLV 8705 with both masks empty and an
 // empty name, as the vendor utility sends it.
-func (c *Client) DeleteDot1QVLAN(ctx context.Context, id VLANID) error {
+func (c *Client) DeleteDot1QVLAN(ctx context.Context, id model.VLANID) error {
 	if err := id.Validate(); err != nil {
 		return err
 	}
 	empty := make([]byte, maskLen)
-	return c.setTLVs(ctx, MethodDeleteDot1QVLAN.Operation().Replacing(Group{Dot1QVLAN: id}), wire.TLV{Type: wire.TLVVLAN8021QVLAN, Value: vlanEntryBytes(id, empty, empty, "")})
-}
-
-// Validate checks the port and the VLAN id. The error matches ErrInvalid.
-func (p PortPVID) Validate() error {
-	if err := p.Port.Validate(); err != nil {
-		return err
-	}
-	return p.PVID.Validate()
+	return c.setTLVs(ctx, model.MethodDeleteDot1QVLAN.Operation().Replacing(model.Group{Dot1QVLAN: id}), wire.TLV{Type: wire.TLVVLAN8021QVLAN, Value: vlanEntryBytes(id, empty, empty, "")})
 }
 
 // SetPVIDs sets the default VLAN of the given ports, the same PortPVID entries Dot1Q reads: one TLV
@@ -93,11 +66,11 @@ func (p PortPVID) Validate() error {
 // once. The first entry that is not valid (PortPVID.Validate) or repeats a port is reported, in the
 // order given, and nothing is sent. The VLAN must exist and the 802.1Q mode must be on; callers must
 // guard linked ports.
-func (c *Client) SetPVIDs(ctx context.Context, pvids []PortPVID) error {
+func (c *Client) SetPVIDs(ctx context.Context, pvids []model.PortPVID) error {
 	if len(pvids) == 0 {
 		return invalidf("escp: no PVIDs to set")
 	}
-	var named PortSet
+	var named model.PortSet
 	for _, p := range pvids {
 		if err := p.Validate(); err != nil {
 			return err
@@ -110,11 +83,11 @@ func (c *Client) SetPVIDs(ctx context.Context, pvids []PortPVID) error {
 	if err := c.requirePorts(ctx, named); err != nil {
 		return err
 	}
-	sorted := slices.SortedFunc(slices.Values(pvids), func(a, b PortPVID) int { return int(a.Port) - int(b.Port) })
+	sorted := slices.SortedFunc(slices.Values(pvids), func(a, b model.PortPVID) int { return int(a.Port) - int(b.Port) })
 	tlvs := make([]wire.TLV, 0, len(sorted))
 	for _, p := range sorted {
 		value := binary.BigEndian.AppendUint16([]byte{byte(p.Port)}, uint16(p.PVID))
 		tlvs = append(tlvs, wire.TLV{Type: wire.TLVVLAN8021QPVID, Value: value})
 	}
-	return c.setTLVs(ctx, MethodSetPVIDs.Operation().On(named), tlvs...)
+	return c.setTLVs(ctx, model.MethodSetPVIDs.Operation().On(named), tlvs...)
 }

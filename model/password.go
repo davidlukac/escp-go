@@ -1,6 +1,8 @@
-package escp
+package model
 
-import "log/slog"
+import (
+	"log/slog"
+)
 
 // redacted is what a Password prints as.
 const redacted = "[redacted]"

@@ -7,17 +7,11 @@ import (
 	"sort"
 
 	"github.com/davidlukac/escp-go/internal/wire"
+	"github.com/davidlukac/escp-go/model"
 )
 
-// PortBandwidth holds a port's rate limits in kbps; 0 means unlimited.
-type PortBandwidth struct {
-	Port    PortID
-	Ingress Kbps
-	Egress  Kbps
-}
-
-func parseBandwidth(tlvs []wire.TLV) ([]PortBandwidth, error) {
-	byPort := map[PortID]*PortBandwidth{}
+func parseBandwidth(tlvs []wire.TLV) ([]model.PortBandwidth, error) {
+	byPort := map[model.PortID]*model.PortBandwidth{}
 	for _, t := range tlvs {
 		if t.Type != wire.TLVBandwidthIngress && t.Type != wire.TLVBandwidthEgress {
 			continue
@@ -25,10 +19,10 @@ func parseBandwidth(tlvs []wire.TLV) ([]PortBandwidth, error) {
 		if len(t.Value) != bwEntryLen {
 			return nil, fmt.Errorf("escp: bandwidth entry has %d bytes, want %d", len(t.Value), bwEntryLen)
 		}
-		port, rate := PortID(t.Value[bwOffPort]), Kbps(binary.BigEndian.Uint32(t.Value[bwOffRate:]))
+		port, rate := model.PortID(t.Value[bwOffPort]), model.Kbps(binary.BigEndian.Uint32(t.Value[bwOffRate:]))
 		pb := byPort[port]
 		if pb == nil {
-			pb = &PortBandwidth{Port: port}
+			pb = &model.PortBandwidth{Port: port}
 			byPort[port] = pb
 		}
 		if t.Type == wire.TLVBandwidthIngress {
@@ -37,7 +31,7 @@ func parseBandwidth(tlvs []wire.TLV) ([]PortBandwidth, error) {
 			pb.Egress = rate
 		}
 	}
-	out := make([]PortBandwidth, 0, len(byPort))
+	out := make([]model.PortBandwidth, 0, len(byPort))
 	for _, pb := range byPort {
 		out = append(out, *pb)
 	}
@@ -46,7 +40,7 @@ func parseBandwidth(tlvs []wire.TLV) ([]PortBandwidth, error) {
 }
 
 // Bandwidth reads the per-port ingress and egress rate limits.
-func (c *Client) Bandwidth(ctx context.Context) ([]PortBandwidth, error) {
+func (c *Client) Bandwidth(ctx context.Context) ([]model.PortBandwidth, error) {
 	in, err := c.getTLVs(ctx, wire.TLVBandwidthIngress)
 	if err != nil {
 		return nil, err
@@ -67,22 +61,8 @@ const (
 	bwEntryLen   = bwOffRate + 4
 )
 
-// Validate checks the limits before they are written: a valid port and, in each direction, 0
-// (unlimited) or a multiple of RateStep up to MaxBandwidth. The error matches ErrInvalid.
-func (b PortBandwidth) Validate() error {
-	if err := b.Port.Validate(); err != nil {
-		return err
-	}
-	for _, rate := range []Kbps{b.Ingress, b.Egress} {
-		if rate.Validate() != nil {
-			return invalidf("escp: invalid rate %d kbps for port %d: use 0 (unlimited) or a multiple of %d up to %d", rate, b.Port, RateStep, MaxBandwidth)
-		}
-	}
-	return nil
-}
-
 // bandwidthTLV encodes one direction of a limit that PortBandwidth.Validate accepted.
-func bandwidthTLV(typ wire.TLVType, port PortID, kbps Kbps) wire.TLV {
+func bandwidthTLV(typ wire.TLVType, port model.PortID, kbps model.Kbps) wire.TLV {
 	v := make([]byte, bwEntryLen)
 	v[bwOffPort] = byte(port)
 	if kbps != 0 {
@@ -98,7 +78,7 @@ func bandwidthTLV(typ wire.TLVType, port PortID, kbps Kbps) wire.TLV {
 // ingress first, then egress. A limit on a port that carries traffic throttles
 // it; callers must guard against that. The two requests are not atomic: if the second
 // fails (or its gate refuses, or the call is canceled) the ingress limit stays applied.
-func (c *Client) SetBandwidth(ctx context.Context, limit PortBandwidth) error {
+func (c *Client) SetBandwidth(ctx context.Context, limit model.PortBandwidth) error {
 	if err := limit.Validate(); err != nil {
 		return err
 	}
@@ -111,7 +91,7 @@ func (c *Client) SetBandwidth(ctx context.Context, limit PortBandwidth) error {
 			return err
 		}
 	}
-	op := MethodSetBandwidth.Operation().On(limit.Port.AsSet())
+	op := model.MethodSetBandwidth.Operation().On(limit.Port.AsSet())
 	if err := c.setTLVs(ctx, op, in); err != nil {
 		return err
 	}

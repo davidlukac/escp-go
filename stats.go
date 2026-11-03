@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/davidlukac/escp-go/internal/wire"
+	"github.com/davidlukac/escp-go/model"
 )
 
 // Layout of a port statistics entry: port, state, link speed (1 byte each),
@@ -21,21 +22,9 @@ const (
 	statsEntryLen  = statsOffRxBad + 4
 )
 
-// PortStats is one row of Monitoring > Port Statistics. Counters are the
-// switch's 32-bit packet counters and wrap.
-type PortStats struct {
-	ID      PortID
-	Enabled bool
-	Link    Speed // SpeedLinkDown or the negotiated speed
-	TxGood  uint32
-	TxBad   uint32
-	RxGood  uint32
-	RxBad   uint32
-}
-
 // parsePortStats decodes TLV 16384: port, state, link, tx good, tx bad, rx good, rx bad (4 bytes each).
-func parsePortStats(tlvs []wire.TLV) ([]PortStats, error) {
-	var out []PortStats
+func parsePortStats(tlvs []wire.TLV) ([]model.PortStats, error) {
+	var out []model.PortStats
 	for _, t := range tlvs {
 		if t.Type != wire.TLVPortStats {
 			continue
@@ -44,8 +33,8 @@ func parsePortStats(tlvs []wire.TLV) ([]PortStats, error) {
 		if len(v) < statsEntryLen {
 			return nil, fmt.Errorf("escp: port statistics TLV too short (%d bytes)", len(v))
 		}
-		out = append(out, PortStats{
-			ID: PortID(v[statsOffPort]), Enabled: v[statsOffState] == 1, Link: speedFromCode(v[statsOffLink]),
+		out = append(out, model.PortStats{
+			ID: model.PortID(v[statsOffPort]), Enabled: v[statsOffState] == 1, Link: speedFromCode(v[statsOffLink]),
 			TxGood: binary.BigEndian.Uint32(v[statsOffTxGood:]), TxBad: binary.BigEndian.Uint32(v[statsOffTxBad:]),
 			RxGood: binary.BigEndian.Uint32(v[statsOffRxGood:]), RxBad: binary.BigEndian.Uint32(v[statsOffRxBad:]),
 		})
@@ -55,7 +44,7 @@ func parsePortStats(tlvs []wire.TLV) ([]PortStats, error) {
 
 // PortStats reads the traffic counters of every port. The counters change on every read, so
 // they do not belong in anything compared between two reads.
-func (c *Client) PortStats(ctx context.Context) ([]PortStats, error) {
+func (c *Client) PortStats(ctx context.Context) ([]model.PortStats, error) {
 	tlvs, err := c.getTLVs(ctx, wire.TLVPortStats)
 	if err != nil {
 		return nil, err

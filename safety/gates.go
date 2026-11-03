@@ -6,14 +6,14 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 )
 
 // Chain combines write gates into one that asks each in turn and stops at the first refusal. A
 // nil gate is skipped, and Chain of nothing but nil gates is nil, which gates nothing. Put a gate
 // that has an effect of its own (DryRun) last, so it only sees what the others allowed.
-func Chain(gates ...escp.WriteGate) escp.WriteGate {
-	var live []escp.WriteGate
+func Chain(gates ...model.WriteGate) model.WriteGate {
+	var live []model.WriteGate
 	for _, g := range gates {
 		if g != nil {
 			live = append(live, g)
@@ -22,7 +22,7 @@ func Chain(gates ...escp.WriteGate) escp.WriteGate {
 	if len(live) == 0 {
 		return nil
 	}
-	return func(ctx context.Context, sw escp.Reader, op escp.Operation) error {
+	return func(ctx context.Context, sw model.Reader, op model.Operation) error {
 		for _, g := range live {
 			if err := g(ctx, sw, op); err != nil {
 				return err
@@ -35,8 +35,8 @@ func Chain(gates ...escp.WriteGate) escp.WriteGate {
 // ImpactError is the refusal of MaxImpact: the operation is above what the front end allows.
 // Callers word the message and the way to proceed (a flag, a policy) for their users.
 type ImpactError struct {
-	Op  escp.Operation
-	Max escp.Impact
+	Op  model.Operation
+	Max model.Impact
 }
 
 // Error names the operation, its impact and the ceiling it exceeded.
@@ -47,8 +47,8 @@ func (e *ImpactError) Error() string {
 // MaxImpact returns a gate that refuses every operation whose Impact is above ceiling. An operation
 // that declares no valid Impact is refused too, so a writer that forgot to classify itself fails
 // closed. A ceiling that is not an impact class refuses everything. The refusal is an *ImpactError.
-func MaxImpact(ceiling escp.Impact) escp.WriteGate {
-	return func(_ context.Context, _ escp.Reader, op escp.Operation) error {
+func MaxImpact(ceiling model.Impact) model.WriteGate {
+	return func(_ context.Context, _ model.Reader, op model.Operation) error {
 		if ceiling.Validate() != nil || op.Impact.Validate() != nil || op.Impact > ceiling {
 			return &ImpactError{Op: op, Max: ceiling}
 		}
@@ -69,7 +69,7 @@ var ErrDryRun = errors.New("safety: dry run: the write was recorded and not sent
 // A DryRun is safe for concurrent use.
 type DryRun struct {
 	mu  sync.Mutex
-	ops []escp.Operation
+	ops []model.Operation
 }
 
 // NewDryRun returns a DryRun that has recorded nothing yet.
@@ -77,8 +77,8 @@ func NewDryRun() *DryRun { return &DryRun{} }
 
 // Gate returns the gate to put in escp.Config: it records the operation and refuses it with
 // ErrDryRun.
-func (d *DryRun) Gate() escp.WriteGate {
-	return func(_ context.Context, _ escp.Reader, op escp.Operation) error {
+func (d *DryRun) Gate() model.WriteGate {
+	return func(_ context.Context, _ model.Reader, op model.Operation) error {
 		d.mu.Lock()
 		defer d.mu.Unlock()
 		d.ops = append(d.ops, op)
@@ -87,10 +87,10 @@ func (d *DryRun) Gate() escp.WriteGate {
 }
 
 // Operations returns what was recorded, in order. The result is a copy.
-func (d *DryRun) Operations() []escp.Operation {
+func (d *DryRun) Operations() []model.Operation {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	out := make([]escp.Operation, len(d.ops))
+	out := make([]model.Operation, len(d.ops))
 	copy(out, d.ops)
 	return out
 }

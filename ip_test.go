@@ -95,7 +95,7 @@ func TestSetIPConfigReportsAMoveThatCannotBeConfirmed(t *testing.T) {
 var otherDevice = MAC{0xaa, 0xbb, 0xcc, 0, 0, 1}
 
 func TestClassifyLostReply(t *testing.T) {
-	mac := MAC(escptest.DefaultMAC())
+	mac := escptest.DefaultMAC()
 	info := func(mac MAC, cfg IPConfig) Info {
 		return Info{MAC: mac, IP: cfg.IP, Netmask: cfg.Netmask, Gateway: cfg.Gateway}
 	}

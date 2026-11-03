@@ -17,7 +17,7 @@ import (
 // another one, finds the switch by its MAC when it has no usable address, and Locate looks one up.
 
 var (
-	wantMAC  = MAC(escptest.DefaultMAC())
+	wantMAC  = escptest.DefaultMAC()
 	otherMAC = MAC{0x02, 0, 0, 0, 0, 0x77}
 )
 

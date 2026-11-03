@@ -5,33 +5,33 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 	"github.com/davidlukac/escp-go/safety"
 )
 
 // firmware is an escp.Reader that reports a fixed firmware version. A gate is handed the client in
 // real use; a test hands it a double that implements the reads the gate makes and embeds the
 // interface for the rest (a read the gate was not expected to make panics).
-func firmware(version string) escp.Reader { return reportedFirmware{version: version} }
+func firmware(version string) model.Reader { return reportedFirmware{version: version} }
 
 type reportedFirmware struct {
-	escp.Reader
+	model.Reader
 	version string
 }
 
-func (f reportedFirmware) Info(context.Context) (escp.Info, error) {
-	return escp.Info{Firmware: escp.ParseFirmware(f.version)}, nil
+func (f reportedFirmware) Info(context.Context) (model.Info, error) {
+	return model.Info{Firmware: model.ParseFirmware(f.version)}, nil
 }
 
 // SwitchMAC is zero: the double does not know its switch, so the gate checks it at every write.
-func (f reportedFirmware) SwitchMAC() escp.MAC { return escp.MAC{} }
+func (f reportedFirmware) SwitchMAC() model.MAC { return model.MAC{} }
 
 // A gate remembers a verified build for each switch, by its MAC address.
 func ExampleFirmwareGate() {
-	err := safety.FirmwareGate()(context.Background(), firmware("1.0.0 Build 20230218 Rel.50633"), escp.Operation{})
+	err := safety.FirmwareGate()(context.Background(), firmware("1.0.0 Build 20230218 Rel.50633"), model.Operation{})
 	fmt.Println("verified build:", err)
 
-	err = safety.FirmwareGate()(context.Background(), firmware("1.0.0 Build 20990101 Rel.1"), escp.Operation{})
+	err = safety.FirmwareGate()(context.Background(), firmware("1.0.0 Build 20990101 Rel.1"), model.Operation{})
 	var refused *safety.FirmwareError
 	if errors.As(err, &refused) && refused.Reason == safety.FirmwareUnverified {
 		fmt.Println("refused build", refused.Firmware.Build, "- verified:", refused.Verified)
@@ -42,8 +42,8 @@ func ExampleFirmwareGate() {
 }
 
 func ExampleCheckFirmware() {
-	fmt.Println(safety.CheckFirmware(escp.ParseFirmware("1.0.0 Build 20250710 Rel.71093")))
-	err := safety.CheckFirmware(escp.ParseFirmware("custom"))
+	fmt.Println(safety.CheckFirmware(model.ParseFirmware("1.0.0 Build 20250710 Rel.71093")))
+	err := safety.CheckFirmware(model.ParseFirmware("custom"))
 	var fe *safety.FirmwareError
 	fmt.Println(errors.As(err, &fe) && fe.Reason == safety.FirmwareNoBuildDate)
 	// Output:
@@ -53,11 +53,11 @@ func ExampleCheckFirmware() {
 
 // UseOf states facts about a port; the caller decides what they mean for its write.
 func ExampleUseOf() {
-	ports := []escp.Port{
-		{ID: 1, ActualSpeed: escp.Speed1000Full, LAG: 1},
-		{ID: 7, ActualSpeed: escp.SpeedLinkDown},
+	ports := []model.Port{
+		{ID: 1, ActualSpeed: model.Speed1000Full, LAG: 1},
+		{ID: 7, ActualSpeed: model.SpeedLinkDown},
 	}
-	for _, id := range []escp.PortID{1, 7, 9} {
+	for _, id := range []model.PortID{1, 7, 9} {
 		u := safety.UseOf(ports, id)
 		fmt.Printf("port %d: exists=%v link=%v lag=%v\n", id, u.Exists, u.LinkUp(), u.InLAG())
 	}
@@ -69,20 +69,20 @@ func ExampleUseOf() {
 
 // CheckPorts names the lowest-numbered port a write should not touch; the caller words the refusal.
 func ExampleCheckPorts() {
-	ports := []escp.Port{
-		{ID: 1, ActualSpeed: escp.Speed1000Full, LAG: 1},
-		{ID: 2, ActualSpeed: escp.SpeedLinkDown, LAG: 1},
-		{ID: 7, ActualSpeed: escp.SpeedLinkDown},
+	ports := []model.Port{
+		{ID: 1, ActualSpeed: model.Speed1000Full, LAG: 1},
+		{ID: 2, ActualSpeed: model.SpeedLinkDown, LAG: 1},
+		{ID: 7, ActualSpeed: model.SpeedLinkDown},
 	}
-	fmt.Println(safety.CheckPorts(ports, safety.PortRule{}, escp.MustPortSet(7)))
-	err := safety.CheckPorts(ports, safety.PortRule{}, escp.MustPortSet(7, 2))
+	fmt.Println(safety.CheckPorts(ports, safety.PortRule{}, model.MustPortSet(7)))
+	err := safety.CheckPorts(ports, safety.PortRule{}, model.MustPortSet(7, 2))
 	var used *safety.PortUseError
 	if errors.As(err, &used) && used.Reason == safety.PortInLAG {
 		fmt.Printf("port %d is in LAG %d\n", used.Port, used.LAG)
 	}
 	// Editing LAG 1 itself tolerates its idle members, but never a link.
-	fmt.Println(safety.CheckPorts(ports, safety.PortRule{TolerateLAG: 1}, escp.MustPortSet(2)))
-	fmt.Println(safety.CheckPorts(ports, safety.PortRule{TolerateLAG: 1}, escp.MustPortSet(1)))
+	fmt.Println(safety.CheckPorts(ports, safety.PortRule{TolerateLAG: 1}, model.MustPortSet(2)))
+	fmt.Println(safety.CheckPorts(ports, safety.PortRule{TolerateLAG: 1}, model.MustPortSet(1)))
 	// Output:
 	// <nil>
 	// port 2 is in LAG 1
@@ -94,13 +94,13 @@ func ExampleCheckPorts() {
 // sees what the others allowed; the client returns ErrDryRun for every write and sends nothing.
 func ExampleDryRun() {
 	dry := safety.NewDryRun()
-	gate := safety.Chain(safety.MaxImpact(escp.ImpactTraffic), dry.Gate())
+	gate := safety.Chain(safety.MaxImpact(model.ImpactTraffic), dry.Gate())
 	ctx := context.Background()
 
-	for _, op := range []escp.Operation{
-		{Name: escp.MethodSetLED, Impact: escp.ImpactCosmetic},
-		{Name: escp.MethodSetBandwidth, Ports: escp.MustPortSet(7), Impact: escp.ImpactTraffic},
-		{Name: escp.MethodSetLAG, Ports: escp.MustPortSet(5, 6), Impact: escp.ImpactManagement},
+	for _, op := range []model.Operation{
+		{Name: model.MethodSetLED, Impact: model.ImpactCosmetic},
+		{Name: model.MethodSetBandwidth, Ports: model.MustPortSet(7), Impact: model.ImpactTraffic},
+		{Name: model.MethodSetLAG, Ports: model.MustPortSet(5, 6), Impact: model.ImpactManagement},
 	} {
 		err := gate(ctx, firmware(""), op)
 		var tooMuch *safety.ImpactError
@@ -121,33 +121,33 @@ func ExampleDryRun() {
 
 // switchPorts is a switch with these ports, no link aggregation and no VLANs: the reads PortGate
 // makes, which a Client has. Any other read panics.
-func switchPorts(ports ...escp.Port) escp.Reader { return portsOnly{ports: ports} }
+func switchPorts(ports ...model.Port) model.Reader { return portsOnly{ports: ports} }
 
 type portsOnly struct {
-	escp.Reader
-	ports []escp.Port
+	model.Reader
+	ports []model.Port
 }
 
-func (p portsOnly) Ports(context.Context) ([]escp.Port, error) { return p.ports, nil }
+func (p portsOnly) Ports(context.Context) ([]model.Port, error) { return p.ports, nil }
 
-func (portsOnly) LAGs(context.Context) ([]escp.LAG, error) { return nil, nil }
+func (portsOnly) LAGs(context.Context) ([]model.LAG, error) { return nil, nil }
 
-func (portsOnly) PortBasedVLAN(context.Context) (escp.PortBasedVLAN, error) {
-	return escp.PortBasedVLAN{}, nil
+func (portsOnly) PortBasedVLAN(context.Context) (model.PortBasedVLAN, error) {
+	return model.PortBasedVLAN{}, nil
 }
 
-func (portsOnly) Dot1Q(context.Context) (escp.Dot1Q, error) { return escp.Dot1Q{}, nil }
+func (portsOnly) Dot1Q(context.Context) (model.Dot1Q, error) { return model.Dot1Q{}, nil }
 
 // MaxImpact refuses a write whose worst case is above a ceiling, whatever its arguments. A front
 // end that must never cut the management path allows nothing above traffic.
 func ExampleMaxImpact() {
-	gate := safety.MaxImpact(escp.ImpactTraffic)
+	gate := safety.MaxImpact(model.ImpactTraffic)
 	ctx := context.Background()
-	for _, op := range []escp.Operation{
-		{Name: escp.MethodSetLED, Impact: escp.ImpactCosmetic},
-		{Name: escp.MethodSetBandwidth, Impact: escp.ImpactTraffic},
-		{Name: escp.MethodSetPort, Impact: escp.ImpactManagement},
-		{Name: escp.MethodSetIPConfig, Impact: escp.ImpactManagement},
+	for _, op := range []model.Operation{
+		{Name: model.MethodSetLED, Impact: model.ImpactCosmetic},
+		{Name: model.MethodSetBandwidth, Impact: model.ImpactTraffic},
+		{Name: model.MethodSetPort, Impact: model.ImpactManagement},
+		{Name: model.MethodSetIPConfig, Impact: model.ImpactManagement},
 	} {
 		fmt.Printf("%s: %v\n", op.Name, gate(ctx, firmware(""), op))
 	}
@@ -162,13 +162,13 @@ func ExampleMaxImpact() {
 // the switch (a Client lists its ports) at the moment of the write.
 func ExamplePortGate() {
 	sw := switchPorts(
-		escp.Port{ID: 1, ActualSpeed: escp.Speed1000Full},
-		escp.Port{ID: 2, ActualSpeed: escp.SpeedLinkDown},
+		model.Port{ID: 1, ActualSpeed: model.Speed1000Full},
+		model.Port{ID: 2, ActualSpeed: model.SpeedLinkDown},
 	)
 	gate := safety.PortGate()
 	ctx := context.Background()
-	fmt.Println("port 2:", gate(ctx, sw, escp.Operation{Name: escp.MethodSetPort, Ports: escp.MustPortSet(2)}))
-	fmt.Println("port 1:", gate(ctx, sw, escp.Operation{Name: escp.MethodSetPort, Ports: escp.MustPortSet(1)}))
+	fmt.Println("port 2:", gate(ctx, sw, model.Operation{Name: model.MethodSetPort, Ports: model.MustPortSet(2)}))
+	fmt.Println("port 1:", gate(ctx, sw, model.Operation{Name: model.MethodSetPort, Ports: model.MustPortSet(1)}))
 	// Output:
 	// port 2: <nil>
 	// port 1: port 1 has a link up (1000Mbps-full)
@@ -177,12 +177,12 @@ func ExamplePortGate() {
 // Chain runs its gates in order and stops at the first refusal, so the cheap checks go first. A
 // gate that needs the switch (PortGate) is only asked about writes that passed the others.
 func ExampleChain() {
-	sw := switchPorts(escp.Port{ID: 1, ActualSpeed: escp.Speed1000Full}, escp.Port{ID: 2, ActualSpeed: escp.SpeedLinkDown})
-	gate := safety.Chain(safety.MaxImpact(escp.ImpactTraffic), safety.PortGate())
+	sw := switchPorts(model.Port{ID: 1, ActualSpeed: model.Speed1000Full}, model.Port{ID: 2, ActualSpeed: model.SpeedLinkDown})
+	gate := safety.Chain(safety.MaxImpact(model.ImpactTraffic), safety.PortGate())
 	ctx := context.Background()
-	fmt.Println(gate(ctx, sw, escp.Operation{Name: escp.MethodSetBandwidth, Ports: escp.MustPortSet(2), Impact: escp.ImpactTraffic}))
-	fmt.Println(gate(ctx, sw, escp.Operation{Name: escp.MethodSetBandwidth, Ports: escp.MustPortSet(1), Impact: escp.ImpactTraffic}))
-	fmt.Println(gate(ctx, sw, escp.Operation{Name: escp.MethodSetLAG, Ports: escp.MustPortSet(2), Impact: escp.ImpactManagement}))
+	fmt.Println(gate(ctx, sw, model.Operation{Name: model.MethodSetBandwidth, Ports: model.MustPortSet(2), Impact: model.ImpactTraffic}))
+	fmt.Println(gate(ctx, sw, model.Operation{Name: model.MethodSetBandwidth, Ports: model.MustPortSet(1), Impact: model.ImpactTraffic}))
+	fmt.Println(gate(ctx, sw, model.Operation{Name: model.MethodSetLAG, Ports: model.MustPortSet(2), Impact: model.ImpactManagement}))
 	// Output:
 	// <nil>
 	// port 1 has a link up (1000Mbps-full)

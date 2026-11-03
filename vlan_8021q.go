@@ -4,77 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"regexp"
-	"strconv"
 
 	"github.com/davidlukac/escp-go/internal/wire"
+	"github.com/davidlukac/escp-go/model"
 )
 
-// Limits of 802.1Q VLAN ids and names. The id range is the IEEE one; the name rules are those of
-// the vendor utility (at most ten characters from letters, digits, hyphen and underscore).
-const (
-	MinVLANID      VLANID = 1
-	MaxVLANID      VLANID = 4094
-	MaxVLANNameLen        = 10
-)
-
-var vlanNamePattern = regexp.MustCompile(`^[A-Za-z0-9_-]*$`)
-
-// VLANID is the id of an 802.1Q VLAN, and the PVID of a port, which is the id of the VLAN its
-// untagged traffic enters. The IEEE range is MinVLANID to MaxVLANID; two bytes carry it on the wire.
-// (Port-based VLAN groups and LAG groups have ids of their own, PortVLANID and LAGID, one byte each.)
-type VLANID int
-
-// Validate reports whether v is within MinVLANID to MaxVLANID; the error matches ErrInvalid.
-func (v VLANID) Validate() error {
-	if v < MinVLANID || v > MaxVLANID {
-		return invalidf("escp: invalid VLAN id %d (valid: %d-%d)", v, MinVLANID, MaxVLANID)
-	}
-	return nil
-}
-
-// String is the id as a number.
-func (v VLANID) String() string { return strconv.Itoa(int(v)) }
-
-// VLANName is the name of an 802.1Q VLAN: empty, or up to MaxVLANNameLen letters, digits, hyphens and
-// underscores (the vendor utility's rules).
-type VLANName string
-
-// Validate applies the rules; the error matches ErrInvalid.
-func (n VLANName) Validate() error {
-	if len(n) > MaxVLANNameLen || !vlanNamePattern.MatchString(string(n)) {
-		return invalidf("escp: invalid VLAN name %q (at most %d letters, digits, hyphens or underscores)", string(n), MaxVLANNameLen)
-	}
-	return nil
-}
-
-// String is the name.
-func (n VLANName) String() string { return string(n) }
-
-// Dot1QVLAN is one 802.1Q VLAN with its tagged and untagged members.
-type Dot1QVLAN struct {
-	ID       VLANID
-	Name     VLANName
-	Tagged   PortSet
-	Untagged PortSet
-}
-
-// PortPVID is the default VLAN of a port.
-type PortPVID struct {
-	Port PortID
-	PVID VLANID
-}
-
-// Dot1Q is VLAN > 802.1Q VLAN plus PVID settings.
-type Dot1Q struct {
-	Enabled  bool
-	MaxVLANs int
-	VLANs    []Dot1QVLAN
-	PVIDs    []PortPVID
-}
-
-func parseDot1Q(tlvs []wire.TLV) (Dot1Q, error) {
-	out := Dot1Q{VLANs: []Dot1QVLAN{}, PVIDs: []PortPVID{}}
+func parseDot1Q(tlvs []wire.TLV) (model.Dot1Q, error) {
+	out := model.Dot1Q{VLANs: []model.Dot1QVLAN{}, PVIDs: []model.PortPVID{}}
 	seen := false
 	for _, t := range tlvs {
 		v := t.Value
@@ -95,13 +31,13 @@ func parseDot1Q(tlvs []wire.TLV) (Dot1Q, error) {
 			// Vendor semantics: member and tagged-mask -> tagged; member only -> untagged.
 			members, taggedMask := maskAt(v, vlan8021QOffMember), maskAt(v, vlan8021QOffTagged)
 			untagged := members.Minus(taggedMask)
-			out.VLANs = append(out.VLANs, Dot1QVLAN{ID: VLANID(int(v[0])<<8 | int(v[1])), Name: VLANName(wire.CString(v[vlan8021QOffName:])),
+			out.VLANs = append(out.VLANs, model.Dot1QVLAN{ID: model.VLANID(int(v[0])<<8 | int(v[1])), Name: model.VLANName(wire.CString(v[vlan8021QOffName:])),
 				Tagged: members.Minus(untagged), Untagged: untagged})
 		case wire.TLVVLAN8021QPVID:
 			if len(v) != pvidEntryLen {
 				return out, fmt.Errorf("escp: 802.1Q PVID entry has %d bytes, want %d", len(v), pvidEntryLen)
 			}
-			out.PVIDs = append(out.PVIDs, PortPVID{Port: PortID(v[0]), PVID: VLANID(int(v[1])<<8 | int(v[2]))})
+			out.PVIDs = append(out.PVIDs, model.PortPVID{Port: model.PortID(v[0]), PVID: model.VLANID(int(v[1])<<8 | int(v[2]))})
 		}
 	}
 	if !seen {
@@ -110,36 +46,16 @@ func parseDot1Q(tlvs []wire.TLV) (Dot1Q, error) {
 	return out, nil
 }
 
-// CheckRoom reports whether the table can take VLAN id: it holds it already (changing a VLAN needs no
-// room), or it has fewer entries than the most the switch supports. MaxVLANs counts VLAN 1: a
-// TL-SG108E on firmware 20250710, which reports 32, took 31 more VLANs beside VLAN 1 and refused the
-// next with code 7505.
-// A switch that did not report its maximum is not bounded here. The error matches ErrInvalid.
-func (q Dot1Q) CheckRoom(id VLANID) error {
-	if q.MaxVLANs == 0 {
-		return nil
-	}
-	for _, v := range q.VLANs {
-		if v.ID == id {
-			return nil
-		}
-	}
-	if len(q.VLANs) >= q.MaxVLANs {
-		return invalidf("escp: the 802.1Q VLAN table is full: the switch holds at most %d VLANs (VLAN 1 among them) and has %d, so VLAN %d cannot be added", q.MaxVLANs, len(q.VLANs), id)
-	}
-	return nil
-}
-
 // Dot1Q reads the 802.1Q mode, VLAN table and per-port PVIDs.
-func (c *Client) Dot1Q(ctx context.Context) (Dot1Q, error) {
+func (c *Client) Dot1Q(ctx context.Context) (model.Dot1Q, error) {
 	// Separate requests, like the vendor utility (combined ones are rejected on some pages).
 	vlans, err := c.getTLVs(ctx, wire.TLVVLAN8021QVLAN)
 	if err != nil {
-		return Dot1Q{}, err
+		return model.Dot1Q{}, err
 	}
 	pvids, err := c.getTLVs(ctx, wire.TLVVLAN8021QPVID)
 	if err != nil {
-		return Dot1Q{}, err
+		return model.Dot1Q{}, err
 	}
 	return parseDot1Q(append(vlans, pvids...))
 }

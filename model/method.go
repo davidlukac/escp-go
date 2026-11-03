@@ -1,4 +1,4 @@
-package escp
+package model
 
 // Method is the name of a Client method: the identity of a read or a write in the settings table,
 // in the Operation a WriteGate is handed, and in the log. It is the text of the method's own name,

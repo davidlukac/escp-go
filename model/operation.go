@@ -1,6 +1,8 @@
-package escp
+package model
 
-import "fmt"
+import (
+	"fmt"
+)
 
 // Impact classes what kind of change a write is, by what it can do to the way the switch is
 // reached: a method that can cut the management path or the uplink with the right arguments

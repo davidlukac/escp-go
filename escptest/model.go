@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 
 	"github.com/davidlukac/escp-go/internal/wire"
+	"github.com/davidlukac/escp-go/model"
 )
 
 // LinkSpeed is the actual speed code of a port that has a link, as the switch reports it
@@ -52,7 +53,7 @@ const (
 // measured on firmware 20250710: LAG members must agree on speed, flow control and admin
 // state and may not be mirrored, limited or in another VLAN; port-based VLAN membership is
 // exclusive, and a port left in none returns to VLAN 1.
-func (f *Switch) EnableModel(links map[int]LinkSpeed) {
+func (f *Switch) EnableModel(links map[model.PortID]LinkSpeed) {
 	f.EnableState(
 		Setting{Type: TLVType(wire.TLVIGMPEnabled), Value: []byte{1}},
 		Setting{Type: TLVType(wire.TLVIGMPGroups)},
@@ -76,7 +77,7 @@ func (f *Switch) EnableModel(links map[int]LinkSpeed) {
 	f.mu.Unlock()
 	var ports, prio, bwIn, bwOut, storm [][]byte
 	for p := 1; p <= modelPortCount; p++ {
-		ports = append(ports, []byte{byte(p), 1, 0, speedAuto, byte(links[p]), 0, 0})
+		ports = append(ports, []byte{byte(p), 1, 0, speedAuto, byte(links[model.PortID(p)]), 0, 0})
 		prio = append(prio, []byte{byte(p), 0})
 		bwIn = append(bwIn, append([]byte{byte(p)}, make([]byte, rateRowLen-1)...))
 		bwOut = append(bwOut, append([]byte{byte(p)}, make([]byte, rateRowLen-1)...))

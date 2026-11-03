@@ -6,6 +6,7 @@ import (
 	"net/netip"
 
 	"github.com/davidlukac/escp-go/internal/invalid"
+	"github.com/davidlukac/escp-go/model"
 )
 
 var (
@@ -38,7 +39,7 @@ var (
 // WrongSwitchError is the refusal to talk to a device whose MAC address is not the switch's: Want
 // is Config.MAC or, without it, the MAC of the first contact. It matches ErrWrongSwitch.
 type WrongSwitchError struct {
-	Want, Got MAC
+	Want, Got model.MAC
 	IP        netip.Addr // where the other device answered from; invalid when unknown
 }
 
@@ -94,5 +95,6 @@ func (e *RejectedError) Is(target error) bool { return target == ErrRejected }
 // id out of range, a rate that is not a multiple of the step, a combination the switch
 // cannot keep. The message names the value and what is allowed; test for the class with
 // errors.Is(err, ErrInvalid). It is never returned for a reply the client cannot parse,
-// nor for a failure of the switch.
-var ErrInvalid = invalid.Err
+// nor for a failure of the switch. It is the value of model.ErrInvalid, which the model's own
+// validators return.
+var ErrInvalid = model.ErrInvalid

@@ -1,6 +1,8 @@
 package escp
 
-import "github.com/davidlukac/escp-go/internal/wire"
+import (
+	"github.com/davidlukac/escp-go/internal/wire"
+)
 
 // Sequence numbers pair a reply with its request, and every reply goes to the one UDP port 29809
 // whoever asked (see PROTOCOL.md), so the clients and the discovery of one process hear each

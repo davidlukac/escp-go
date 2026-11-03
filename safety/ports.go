@@ -3,7 +3,7 @@ package safety
 import (
 	"fmt"
 
-	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 )
 
 // PortUse is what a write to one port could disturb. It states facts only: how a
@@ -16,14 +16,14 @@ type PortUse struct {
 	Exists bool
 	// Speed is the negotiated speed as the client reports it (escp.SpeedLinkDown
 	// without a link).
-	Speed escp.Speed
+	Speed model.Speed
 	// LAG is the link aggregation group the port belongs to, 0 for none.
-	LAG escp.LAGID
+	LAG model.LAGID
 }
 
 // LinkUp reports whether the port carries a link, and so may carry traffic or the
 // management path.
-func (u PortUse) LinkUp() bool { return u.Exists && u.Speed != escp.SpeedLinkDown }
+func (u PortUse) LinkUp() bool { return u.Exists && u.Speed != model.SpeedLinkDown }
 
 // InLAG reports whether the port is a member of a link aggregation group.
 func (u PortUse) InLAG() bool { return u.LAG != 0 }
@@ -31,7 +31,7 @@ func (u PortUse) InLAG() bool { return u.LAG != 0 }
 // UseOf looks the port up in a Ports reading. A port the switch does not list is
 // reported as not existing. A port listed more than once (a real switch never does)
 // counts as used if any of its entries says so, so the answer fails closed.
-func UseOf(ports []escp.Port, id escp.PortID) PortUse {
+func UseOf(ports []model.Port, id model.PortID) PortUse {
 	var use PortUse
 	for _, p := range ports {
 		if p.ID != id {
@@ -44,7 +44,7 @@ func UseOf(ports []escp.Port, id escp.PortID) PortUse {
 		if use.LAG == 0 {
 			use.LAG = p.LAG
 		}
-		if use.Speed == escp.SpeedLinkDown {
+		if use.Speed == model.SpeedLinkDown {
 			use.Speed = p.ActualSpeed
 		}
 	}
@@ -68,10 +68,10 @@ const (
 // without an explicit decision, and why. Callers branch on Reason and word the message in their
 // own vocabulary, as with FirmwareError; Error is a neutral description.
 type PortUseError struct {
-	Port   escp.PortID
+	Port   model.PortID
 	Reason PortReason
-	Speed  escp.Speed // the negotiated speed (PortLinkUp)
-	LAG    escp.LAGID // the group (PortInLAG)
+	Speed  model.Speed // the negotiated speed (PortLinkUp)
+	LAG    model.LAGID // the group (PortInLAG)
 }
 
 // Error names the port and why it may not be written: it does not exist, it has a link, or it is in a
@@ -91,14 +91,14 @@ func (e *PortUseError) Error() string {
 type PortRule struct {
 	// TolerateLAG is a group whose members are fine, for an edit of that very group; zero for
 	// none. A link is never tolerated.
-	TolerateLAG escp.LAGID
+	TolerateLAG model.LAGID
 }
 
 // CheckPorts returns a *PortUseError for the lowest-numbered of ports that does not exist, has a link up, or belongs to a LAG the rule does not tolerate, in
 // that order for each port. It returns nil when every port is free. all is a reading of the
 // ports (Client.Ports); a write to a port that fails the check can cut the management path or
 // the uplink, and the switch has no console to recover from that.
-func CheckPorts(all []escp.Port, rule PortRule, ports escp.PortSet) error {
+func CheckPorts(all []model.Port, rule PortRule, ports model.PortSet) error {
 	for _, p := range ports.Ports() {
 		use := UseOf(all, p)
 		switch {

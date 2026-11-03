@@ -7,6 +7,7 @@ import (
 
 	"github.com/davidlukac/escp-go"
 	"github.com/davidlukac/escp-go/escptest"
+	"github.com/davidlukac/escp-go/model"
 )
 
 // dial aims a client at the fake. A real switch always uses UDP ports 29808 and 29809, so the
@@ -55,13 +56,13 @@ func ExampleSwitch_EnableModel() {
 		panic(err)
 	}
 	defer func() { _ = sw.Close() }()
-	sw.EnableModel(map[int]escptest.LinkSpeed{1: escptest.Link1000Full})
+	sw.EnableModel(map[model.PortID]escptest.LinkSpeed{1: escptest.Link1000Full})
 	c := dial(sw)
 	defer func() { _ = c.Close() }()
 
 	ctx := context.Background()
-	fmt.Println("mirror:", c.SetPortMirror(ctx, escp.Mirror{Enabled: true, Destination: 4, IngressPorts: escp.MustPortSet(2)}))
-	err = c.SetLAG(ctx, escp.LAG{ID: 1, Ports: escp.MustPortSet(2, 3)})
+	fmt.Println("mirror:", c.SetPortMirror(ctx, model.Mirror{Enabled: true, Destination: 4, IngressPorts: model.MustPortSet(2)}))
+	err = c.SetLAG(ctx, model.LAG{ID: 1, Ports: model.MustPortSet(2, 3)})
 	var refused *escp.RejectedError
 	if errors.As(err, &refused) {
 		fmt.Println("LAG refused with code", refused.Code)

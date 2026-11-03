@@ -28,7 +28,7 @@ Go 1.26.2 or later (1.26.0 and 1.26.1 can corrupt the stack in a UDP read on Win
 ## Quick start
 
 ```go
-c, err := escp.Dial(escp.Config{Host: "192.0.2.11", Username: "admin", Password: escp.Password(pw)})
+c, err := escp.Dial(escp.Config{Host: "192.0.2.11", Username: "admin", Password: model.Password(pw)})
 if err != nil { /* ... */ }
 defer c.Close()
 
@@ -47,10 +47,10 @@ A write goes through the same client; give it a gate so that it cannot touch wha
 
 ```go
 c, err := escp.Dial(escp.Config{
-	Host: host, Username: user, Password: escp.Password(pw),
-	WriteGate: safety.Chain(safety.FirmwareGate(), safety.MaxImpact(escp.ImpactTraffic), safety.PortGate()),
+	Host: host, Username: user, Password: model.Password(pw),
+	WriteGate: safety.Chain(safety.FirmwareGate(), safety.MaxImpact(model.ImpactTraffic), safety.PortGate()),
 })
-err = c.SetBandwidth(ctx, escp.PortBandwidth{Port: 3, Ingress: 10240}) // traffic: allowed, if port 3 is free
+err = c.SetBandwidth(ctx, model.PortBandwidth{Port: 3, Ingress: 10240}) // traffic: allowed, if port 3 is free
 ```
 
 The ceiling `ImpactTraffic` keeps out everything that can cut the management path (the address, VLANs, port settings, link aggregation, mirroring, loop prevention); a front end that does write those allows `ImpactManagement` and relies on `PortGate` and its own confirmation ([Writing safely](docs/writing-safely.md#impact)).
@@ -78,7 +78,7 @@ The examples in the [package documentation](https://pkg.go.dev/github.com/davidl
 
 ## What it can read and write
 
-<!-- settings-table:begin (generated from escp.Settings: make settings-docs) -->
+<!-- settings-table:begin (generated from model.Settings: make settings-docs) -->
 
 | Setting (web UI page) | Read | Write | Types | Impact of the write |
 |---|---|---|---|---|
@@ -105,11 +105,11 @@ Deliberately **not** offered: user account, config restore, reboot, factory rese
 
 ## Data you get back
 
-- **Ports are numbers from 1**: a `PortID` for one, a `PortSet` for a set (a comparable value held as the wire bitmap: no duplicates, ascending, `Union`/`Minus`/`Intersect`; `escp.NewPortSet(2, 3)` refuses a port outside 1 to `MaxPort`).
+- **Ports are numbers from 1**: a `PortID` for one, a `PortSet` for a set (a comparable value held as the wire bitmap: no duplicates, ascending, `Union`/`Minus`/`Intersect`; `model.NewPortSet(2, 3)` refuses a port outside 1 to `MaxPort`).
 - **Closed sets are types** with a list function and, where the names are text, a `Parse...` function: `Speed` (`ConfigurableSpeeds`, `ParseSpeed`), `QoSMode` (`QoSModes`, `ParseQoSMode`), `VLANMode` (`VLANModes`, `ParseVLANMode`), and `Priority` (1 to 4, as the web UI shows it). Each has `Validate() error`, like every input type. The spellings are the web UI's and the Terraform provider's; consumers keep them in saved state, so they do not change.
 - **Values encode as text and read back.** `MAC`, `PortSet`, `Firmware`, `Speed`, `QoSMode`, `VLANMode` and `Impact` have `MarshalText`/`UnmarshalText` (the names and forms above), so `encoding/json` (and the YAML and TOML libraries) write `"00:00:5e:00:53:01"`, `"2,3,5"` and `"port-based"` and decode them, refusing what is no value; every reading survives a round trip (`TestReadingsSurviveJSON`). `Password` encodes as `[redacted]` on purpose and does not read back; `ConfigFile` encodes as base64.
 - **Readers return values, not pointers.** Counters in `PortStats` are the switch's 32-bit counters and wrap.
-- **Limits and validators are public** so a front end can refuse a bad value before it reaches the client: every input type has a `Validate` method (<!-- validators:begin (generated from escp.Settings: make settings-docs) -->`Config`, `Dot1QVLAN`, `Hostname`, `IPConfig`, `Impact`, `Kbps`, `LAG`, `LAGID`, `Method`, `Mirror`, `PortBandwidth`, `PortConfig`, `PortID`, `PortPVID`, `PortPriority`, `PortVLAN`, `PortVLANID`, `Priority`, `QoSMode`, `Speed`, `StormConfig`, `VLANID`, `VLANMode`, `VLANModeSetting`, `VLANName`<!-- validators:end -->), a writer refuses exactly what the method refuses, and the constants they use are exported (`MaxPort`, `RateStep`, `MaxBandwidth`, `LAGGroupCount`, ...).
+- **Limits and validators are public** so a front end can refuse a bad value before it reaches the client: every input type has a `Validate` method (<!-- validators:begin (generated from model.Settings: make settings-docs) -->`Config`, `Dot1QVLAN`, `Hostname`, `IPConfig`, `Impact`, `Kbps`, `LAG`, `LAGID`, `Method`, `Mirror`, `PortBandwidth`, `PortConfig`, `PortID`, `PortPVID`, `PortPriority`, `PortVLAN`, `PortVLANID`, `Priority`, `QoSMode`, `Speed`, `StormConfig`, `VLANID`, `VLANMode`, `VLANModeSetting`, `VLANName`<!-- validators:end -->), a writer refuses exactly what the method refuses, and the constants they use are exported (`MaxPort`, `RateStep`, `MaxBandwidth`, `LAGGroupCount`, ...).
 
 ## Compatibility
 

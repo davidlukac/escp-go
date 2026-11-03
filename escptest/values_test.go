@@ -6,8 +6,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/davidlukac/escp-go"
 	"github.com/davidlukac/escp-go/escptest"
+	"github.com/davidlukac/escp-go/model"
 )
 
 // The fake cannot name the client's types (see the package documentation), so what it takes and
@@ -15,13 +15,13 @@ import (
 // writes sw.SetMAC(mac) with an escp.MAC and mac := escptest.DefaultMAC() into one. These
 // declarations stop compiling if the fake's type ever stops being an unnamed [6]byte.
 var (
-	_ escp.MAC = escptest.DefaultMAC()
-	_ [6]byte  = escp.MAC{}
+	_ model.MAC = escptest.DefaultMAC()
+	_ [6]byte   = model.MAC{}
 )
 
 func TestAnEscpMACGoesIntoTheFakeAndTheClientReadsItBack(t *testing.T) {
 	sw := escptest.Start(t)
-	want := escp.MAC{0x02, 0, 0, 0, 0, 0x42}
+	want := model.MAC{0x02, 0, 0, 0, 0, 0x42}
 	if want == escptest.DefaultMAC() {
 		t.Fatal("the test needs an address other than the default")
 	}

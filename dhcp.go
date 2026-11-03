@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net"
 	"time"
+
+	"github.com/davidlukac/escp-go/model"
 )
 
 // leaseWait is how long EnableDHCP waits for the switch to report a lease. A TL-SG108E on firmware 20250710 took about four
@@ -43,7 +45,7 @@ func (c *Client) EnableDHCP(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	sent, err := c.writeSystem(ctx, MethodEnableDHCP.Operation(), info.Hostname, true, before)
+	sent, err := c.writeSystem(ctx, model.MethodEnableDHCP.Operation(), info.Hostname, true, before)
 	var refused *RejectedError
 	if err != nil && (!sent || errors.As(err, &refused)) {
 		return err // nothing was applied: the gate or the switch refused, or the request was not sent
@@ -61,12 +63,12 @@ func (c *Client) EnableDHCP(ctx context.Context) error {
 
 // awaitLease polls for the switch by MAC until it reports DHCP on with a usable address, then points
 // the client at that address. lost is the error of the write when it got no reply. Callers hold c.mu.
-func (c *Client) awaitLease(ctx context.Context, before IPConfig, lost error) error {
+func (c *Client) awaitLease(ctx context.Context, before model.IPConfig, lost error) error {
 	wait := c.moveWait
 	if wait == 0 {
 		wait = leaseWait
 	}
-	var last Info
+	var last model.Info
 	var followed error
 	seen := false
 	leased := pollUntil(ctx, wait, c.pollInterval(),
@@ -93,7 +95,7 @@ func (c *Client) awaitLease(ctx context.Context, before IPConfig, lost error) er
 }
 
 // leaseNotConfirmed says what is known when no lease was reported in time.
-func leaseNotConfirmed(before IPConfig, last Info, seen bool, lost error) error {
+func leaseNotConfirmed(before model.IPConfig, last model.Info, seen bool, lost error) error {
 	switch {
 	case seen && !last.DHCP && lost != nil && errors.Is(lost, ErrNoReply):
 		return fmt.Errorf("%w; a lookup shows the switch still static at %s, so DHCP was not switched on", lost, last.IP)
@@ -113,7 +115,7 @@ func onOff(on bool) string {
 
 // follow points the client at the address a lookup found the switch at, with a fresh session.
 // Callers hold c.mu. The destination is changed in place, because requests in flight hold it.
-func (c *Client) follow(found Info) error {
+func (c *Client) follow(found model.Info) error {
 	ip := net.IP(found.IP.AsSlice())
 	if !found.IP.Is4() {
 		return fmt.Errorf("%w: %s answered without a usable address", ErrNotFound, c.cfg.MAC)

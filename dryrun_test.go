@@ -10,6 +10,7 @@ import (
 	"github.com/davidlukac/escp-go"
 	"github.com/davidlukac/escp-go/escptest"
 	"github.com/davidlukac/escp-go/internal/wire"
+	"github.com/davidlukac/escp-go/model"
 	"github.com/davidlukac/escp-go/safety"
 )
 
@@ -23,7 +24,7 @@ func TestDryRunThroughTheRealClient(t *testing.T) {
 	c, err := escp.Dial(escp.Config{
 		Host: "127.0.0.1", Username: escptest.Username, Password: escptest.Password,
 		Timeout: 300 * time.Millisecond, SwitchPort: f.UDPPort(), HostPort: escptest.FreeUDPPort(t), BroadcastAddr: escptest.Loopback(),
-		WriteGate: safety.Chain(safety.FirmwareGate(), safety.MaxImpact(escp.ImpactTraffic), dry.Gate()),
+		WriteGate: safety.Chain(safety.FirmwareGate(), safety.MaxImpact(model.ImpactTraffic), dry.Gate()),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -32,10 +33,10 @@ func TestDryRunThroughTheRealClient(t *testing.T) {
 	ctx := context.Background()
 
 	// writes within the ceiling are recorded and refused with ErrDryRun, which means success here
-	if err := c.SetStormControl(ctx, escp.StormConfig{Port: 3, Broadcast: true, Rate: 64}); !errors.Is(err, safety.ErrDryRun) {
+	if err := c.SetStormControl(ctx, model.StormConfig{Port: 3, Broadcast: true, Rate: 64}); !errors.Is(err, safety.ErrDryRun) {
 		t.Fatalf("SetStormControl: got %v, want ErrDryRun", err)
 	}
-	if err := c.SetBandwidth(ctx, escp.PortBandwidth{Port: 4, Ingress: 64}); !errors.Is(err, safety.ErrDryRun) {
+	if err := c.SetBandwidth(ctx, model.PortBandwidth{Port: 4, Ingress: 64}); !errors.Is(err, safety.ErrDryRun) {
 		t.Fatalf("SetBandwidth: got %v, want ErrDryRun", err)
 	}
 	if err := c.SetLED(ctx, false); !errors.Is(err, safety.ErrDryRun) {
@@ -44,17 +45,17 @@ func TestDryRunThroughTheRealClient(t *testing.T) {
 	// a write above the ceiling is refused before the dry run sees it: a link aggregation group, and
 	// a port setting, which can turn a port off whichever it is aimed at
 	var tooMuch *safety.ImpactError
-	if err := c.SetLAG(ctx, escp.LAG{ID: 1, Ports: escp.MustPortSet(2, 3)}); !errors.As(err, &tooMuch) || tooMuch.Op.Name != escp.MethodSetLAG {
+	if err := c.SetLAG(ctx, model.LAG{ID: 1, Ports: model.MustPortSet(2, 3)}); !errors.As(err, &tooMuch) || tooMuch.Op.Name != model.MethodSetLAG {
 		t.Fatalf("SetLAG: got %v, want an *ImpactError for SetLAG", err)
 	}
-	if err := c.SetPort(ctx, escp.PortConfig{ID: 3, Enabled: false, Speed: escp.SpeedAuto}); !errors.As(err, &tooMuch) || tooMuch.Op.Name != escp.MethodSetPort {
+	if err := c.SetPort(ctx, model.PortConfig{ID: 3, Enabled: false, Speed: model.SpeedAuto}); !errors.As(err, &tooMuch) || tooMuch.Op.Name != model.MethodSetPort {
 		t.Fatalf("SetPort: got %v, want an *ImpactError for SetPort", err)
 	}
 
-	want := []escp.Operation{
-		{Name: escp.MethodSetStormControl, Ports: escp.MustPortSet(3), Impact: escp.ImpactTraffic},
-		{Name: escp.MethodSetBandwidth, Ports: escp.MustPortSet(4), Impact: escp.ImpactTraffic}, // two SETs, one operation: the first refusal ends it
-		{Name: escp.MethodSetLED, Impact: escp.ImpactCosmetic},
+	want := []model.Operation{
+		{Name: model.MethodSetStormControl, Ports: model.MustPortSet(3), Impact: model.ImpactTraffic},
+		{Name: model.MethodSetBandwidth, Ports: model.MustPortSet(4), Impact: model.ImpactTraffic}, // two SETs, one operation: the first refusal ends it
+		{Name: model.MethodSetLED, Impact: model.ImpactCosmetic},
 	}
 	if got := dry.Operations(); !reflect.DeepEqual(got, want) {
 		t.Fatalf("recorded %+v, want %+v", got, want)
@@ -77,10 +78,10 @@ func TestDryRunOfAWriteThatReadsFirst(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = c.Close() })
-	if err := c.SetPortPriorities(context.Background(), []escp.PortPriority{{Port: 5, Priority: escp.PriorityHighest}, {Port: 2, Priority: escp.PriorityLowest}}); !errors.Is(err, safety.ErrDryRun) {
+	if err := c.SetPortPriorities(context.Background(), []model.PortPriority{{Port: 5, Priority: model.PriorityHighest}, {Port: 2, Priority: model.PriorityLowest}}); !errors.Is(err, safety.ErrDryRun) {
 		t.Fatalf("got %v, want ErrDryRun", err)
 	}
-	want := []escp.Operation{{Name: escp.MethodSetPortPriorities, Ports: escp.MustPortSet(2, 5), Impact: escp.ImpactTraffic}}
+	want := []model.Operation{{Name: model.MethodSetPortPriorities, Ports: model.MustPortSet(2, 5), Impact: model.ImpactTraffic}}
 	if got := dry.Operations(); !reflect.DeepEqual(got, want) {
 		t.Fatalf("recorded %+v, want %+v", got, want)
 	}
@@ -122,17 +123,17 @@ func TestPortGateThroughTheRealClient(t *testing.T) {
 	ctx := context.Background()
 
 	var used *safety.PortUseError
-	if err := c.SetPort(ctx, escp.PortConfig{ID: 1, Enabled: false, Speed: escp.SpeedAuto}); !errors.As(err, &used) || used.Port != 1 || used.Reason != safety.PortLinkUp {
+	if err := c.SetPort(ctx, model.PortConfig{ID: 1, Enabled: false, Speed: model.SpeedAuto}); !errors.As(err, &used) || used.Port != 1 || used.Reason != safety.PortLinkUp {
 		t.Fatalf("disabling the uplink: got %v, want a link-up refusal for port 1", err)
 	}
 	// removing LAG 1 names no port, yet its member carries the link
-	if err := c.SetLAG(ctx, escp.LAG{ID: 1, Ports: 0}); !errors.As(err, &used) || used.Port != 1 {
+	if err := c.SetLAG(ctx, model.LAG{ID: 1, Ports: 0}); !errors.As(err, &used) || used.Port != 1 {
 		t.Fatalf("removing LAG 1: got %v, want a refusal for port 1", err)
 	}
 	if n := f.WriteCount(); n != 0 {
 		t.Fatalf("the refusals must send nothing, the switch received %d writes", n)
 	}
-	if err := c.SetPort(ctx, escp.PortConfig{ID: 3, Enabled: true, Speed: escp.SpeedAuto}); err != nil {
+	if err := c.SetPort(ctx, model.PortConfig{ID: 3, Enabled: true, Speed: model.SpeedAuto}); err != nil {
 		t.Fatalf("a free port: %v", err)
 	}
 	if n := f.WriteCount(); n != 1 {

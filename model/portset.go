@@ -1,4 +1,4 @@
-package escp
+package model
 
 import (
 	"encoding/binary"

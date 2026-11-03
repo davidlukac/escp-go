@@ -7,6 +7,8 @@ import (
 	"net"
 	"net/netip"
 	"time"
+
+	"github.com/davidlukac/escp-go/model"
 )
 
 const (
@@ -24,83 +26,15 @@ const (
 // found nothing, or something else answered. Its address is then unknown: look at both.
 var ErrMoveUnconfirmed = errors.New("escp: the switch did not answer at its new address")
 
-// IPConfig is the static management address of the switch (System > IP Setting): three IPv4
-// addresses. It is a comparable value; two configurations are the same when they are ==.
-type IPConfig struct {
-	IP, Netmask, Gateway netip.Addr
-}
-
-// ParseIPv4 reads a dotted-quad IPv4 address: no IPv6, no zone, no port. The error matches
-// ErrInvalid. It is the one parser of an address a person types; replies are read from the wire.
-func ParseIPv4(s string) (netip.Addr, error) {
-	a, err := netip.ParseAddr(s)
-	if err != nil || !a.Is4() {
-		return netip.Addr{}, invalidf("escp: %q is not a dotted IPv4 address", s)
-	}
-	return a, nil
-}
-
-// String formats the triple for messages.
-func (cfg IPConfig) String() string {
-	return fmt.Sprintf("ip %s mask %s gateway %s", cfg.IP, cfg.Netmask, cfg.Gateway)
-}
-
 // ipConfigFromInfo parses the address triple of a discovery reply. It refuses
 // a reply that does not carry three IPv4 addresses, because anything written
 // back from it could cut the management path.
-func ipConfigFromInfo(info Info) (IPConfig, error) {
-	cfg := IPConfig{IP: info.IP, Netmask: info.Netmask, Gateway: info.Gateway}
+func ipConfigFromInfo(info model.Info) (model.IPConfig, error) {
+	cfg := model.IPConfig{IP: info.IP, Netmask: info.Netmask, Gateway: info.Gateway}
 	if !cfg.IP.Is4() || !cfg.Netmask.Is4() || !cfg.Gateway.Is4() {
-		return IPConfig{}, fmt.Errorf("escp: switch reported an unusable IP configuration (%q %q %q); refusing to write", info.IP, info.Netmask, info.Gateway)
+		return model.IPConfig{}, fmt.Errorf("escp: switch reported an unusable IP configuration (%q %q %q); refusing to write", info.IP, info.Netmask, info.Gateway)
 	}
 	return cfg, nil
-}
-
-// Validate checks a static management address before anything is sent:
-// all three are IPv4, the mask is a contiguous prefix between /8 and /30, the
-// address is a usable host address of its subnet and the gateway is another
-// host of the same subnet (0.0.0.0 means no gateway).
-func (cfg IPConfig) Validate() error { return validateIPConfig(cfg, false) }
-
-// ValidateAllowingLoopback is Validate for a switch that lives on this host, which a fake switch
-// does: it also accepts an address in 127.0.0.0/8. A client uses it only when a test turned that on.
-func (cfg IPConfig) ValidateAllowingLoopback() error { return validateIPConfig(cfg, true) }
-
-// validateIPConfig is IPConfig.Validate; allowLoopback lets tests move a fake switch that lives on 127.0.0.0/8.
-func validateIPConfig(cfg IPConfig, allowLoopback bool) error {
-	if !cfg.IP.Is4() || !cfg.Netmask.Is4() || !cfg.Gateway.Is4() {
-		return invalidf("escp: IP address, subnet mask and gateway must all be IPv4 addresses (%s)", cfg)
-	}
-	ip, mask, gw := net.IP(cfg.IP.AsSlice()), net.IP(cfg.Netmask.AsSlice()), net.IP(cfg.Gateway.AsSlice())
-	m := net.IPMask(mask)
-	if ones, bits := m.Size(); bits == 0 || ones < 8 || ones > 30 {
-		return invalidf("escp: subnet mask %s is not a contiguous prefix between /8 and /30", mask)
-	}
-	subnet := net.IPNet{IP: ip.Mask(m), Mask: m}
-	if !isUsableHost(ip, subnet, allowLoopback) {
-		return invalidf("escp: %s is not a usable host address in %s", ip, subnet.String())
-	}
-	if gw.IsUnspecified() {
-		return nil // no gateway
-	}
-	if !subnet.Contains(gw) || !isHostAddress(gw, subnet) || gw.Equal(ip) {
-		return invalidf("escp: gateway %s must be another host address in %s", gw, subnet.String())
-	}
-	return nil
-}
-
-// isUsableHost reports whether ip can be a switch's own address in subnet: a host address (neither the
-// network nor the broadcast address), not unspecified, not multicast, and not loopback unless allowed.
-func isUsableHost(ip net.IP, subnet net.IPNet, allowLoopback bool) bool {
-	if ip.IsUnspecified() || ip.IsMulticast() || (ip.IsLoopback() && !allowLoopback) {
-		return false
-	}
-	return isHostAddress(ip, subnet)
-}
-
-// isHostAddress reports whether ip is neither the network address nor the broadcast address of subnet.
-func isHostAddress(ip net.IP, subnet net.IPNet) bool {
-	return !ip.Equal(subnet.IP) && !ip.Equal(broadcastOf(subnet))
 }
 
 // addrOf converts an address of the net package; nil and anything that is no address give the
@@ -111,14 +45,6 @@ func addrOf(ip net.IP) netip.Addr {
 		return netip.Addr{}
 	}
 	return a.Unmap()
-}
-
-func broadcastOf(n net.IPNet) net.IP {
-	out := make(net.IP, len(n.IP))
-	for i := range n.IP {
-		out[i] = n.IP[i] | ^n.Mask[i]
-	}
-	return out
 }
 
 // SetIPConfig gives the switch a static management address, keeping the device description as
@@ -147,7 +73,7 @@ func broadcastOf(n net.IPNet) net.IP {
 //
 // Callers must guard: a wrong address, mask or gateway can cut the management path for good.
 // EnableDHCP is the way back to a lease.
-func (c *Client) SetIPConfig(ctx context.Context, cfg IPConfig) error {
+func (c *Client) SetIPConfig(ctx context.Context, cfg model.IPConfig) error {
 	if err := c.validateIPConfig(cfg); err != nil {
 		return err
 	}
@@ -164,7 +90,7 @@ func (c *Client) SetIPConfig(ctx context.Context, cfg IPConfig) error {
 	c.mu.Lock()
 	c.alsoFrom = net.IP(cfg.IP.AsSlice())
 	c.mu.Unlock()
-	sent, err := c.writeSystem(ctx, MethodSetIPConfig.Operation(), info.Hostname, false, cfg)
+	sent, err := c.writeSystem(ctx, model.MethodSetIPConfig.Operation(), info.Hostname, false, cfg)
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	var refused *RejectedError
@@ -208,7 +134,7 @@ const (
 // classifyLostReply compares what answered a probe after an unanswered write with the
 // switch it was sent to (its MAC address) and with the settings before and wanted. When
 // the wanted settings equal the old ones the switch is where it was asked to be either way.
-func classifyLostReply(mac MAC, before, want IPConfig, after Info) lostReplyOutcome {
+func classifyLostReply(mac model.MAC, before, want model.IPConfig, after model.Info) lostReplyOutcome {
 	if after.MAC != mac {
 		return lostReplyOtherDevice
 	}
@@ -228,7 +154,7 @@ func classifyLostReply(mac MAC, before, want IPConfig, after Info) lostReplyOutc
 // settleLostReply is called when the write got no reply. It returns nil when a probe shows
 // that the switch has the new settings, and otherwise an error that says what is known.
 // Callers hold c.mu.
-func (c *Client) settleLostReply(ctx context.Context, mac MAC, before, want IPConfig, lost error) error {
+func (c *Client) settleLostReply(ctx context.Context, mac model.MAC, before, want model.IPConfig, lost error) error {
 	c.log.WarnContext(ctx, "the write got no reply; asking the switch what it has", "error", lost.Error())
 	after, err := c.discover(ctx)
 	if err != nil {
@@ -263,7 +189,7 @@ func (c *Client) pollInterval() time.Duration {
 // awaitAddress probes the new address until the switch reports it, because
 // the first packets can fail while the neighbor caches of the network catch up
 // (for example "host is down" from an earlier unanswered ARP). Callers hold c.mu.
-func (c *Client) awaitAddress(ctx context.Context, want IPConfig) error {
+func (c *Client) awaitAddress(ctx context.Context, want model.IPConfig) error {
 	wait := c.moveWait
 	if wait == 0 {
 		wait = ipMoveWait
@@ -283,7 +209,7 @@ func (c *Client) awaitAddress(ctx context.Context, want IPConfig) error {
 }
 
 // validateIPConfig is IPConfig.Validate, or ValidateAllowingLoopback when a test allows the loopback.
-func (c *Client) validateIPConfig(cfg IPConfig) error {
+func (c *Client) validateIPConfig(cfg model.IPConfig) error {
 	if c.allowLoopback {
 		return cfg.ValidateAllowingLoopback()
 	}

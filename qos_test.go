@@ -70,7 +70,7 @@ func TestParseQoS(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := QoS{Mode: QoSDSCP8021p, Priorities: []PortPriority{{1, 1}, {2, 1}, {3, 1}, {4, 4}}}
+	want := QoS{Mode: QoSDSCP8021p, Priorities: []PortPriority{{Port: 1, Priority: 1}, {Port: 2, Priority: 1}, {Port: 3, Priority: 1}, {Port: 4, Priority: 4}}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %+v", got)
 	}

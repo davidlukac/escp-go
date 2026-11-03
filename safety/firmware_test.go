@@ -8,13 +8,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 )
 
 func TestCheckFirmware(t *testing.T) {
 	for _, v := range []string{"1.0.0 Build 20230218 Rel.50633", "1.0.0 Build 20250710 Rel.71093"} {
 		t.Run(v, func(t *testing.T) {
-			if err := CheckFirmware(escp.ParseFirmware(v)); err != nil {
+			if err := CheckFirmware(model.ParseFirmware(v)); err != nil {
 				t.Errorf("%q must be verified: %v", v, err)
 			}
 		})
@@ -22,7 +22,7 @@ func TestCheckFirmware(t *testing.T) {
 	tests := []struct {
 		version, frag string
 		reason        FirmwareReason
-		build         escp.BuildDate
+		build         model.BuildDate
 	}{
 		{"1.0.0 Build 20260101 Rel.1", "build 20260101 has not been verified", FirmwareUnverified, "20260101"},
 		{"1.0.0 Build 20220930 Rel.1", "build 20220930 has not been verified", FirmwareUnverified, "20220930"},
@@ -31,9 +31,9 @@ func TestCheckFirmware(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.version, func(t *testing.T) {
-			err := CheckFirmware(escp.ParseFirmware(tt.version))
+			err := CheckFirmware(model.ParseFirmware(tt.version))
 			var fe *FirmwareError
-			if !errors.As(err, &fe) || fe.Reason != tt.reason || fe.Firmware.Build != tt.build || fe.Firmware != escp.ParseFirmware(tt.version) || !strings.Contains(err.Error(), tt.frag) {
+			if !errors.As(err, &fe) || fe.Reason != tt.reason || fe.Firmware.Build != tt.build || fe.Firmware != model.ParseFirmware(tt.version) || !strings.Contains(err.Error(), tt.frag) {
 				t.Errorf("CheckFirmware(%q) = %#v, want reason %d build %q containing %q", tt.version, err, tt.reason, tt.build, tt.frag)
 			}
 			if !slices.Equal(fe.Verified, VerifiedFirmwareBuilds()) {
@@ -46,7 +46,7 @@ func TestCheckFirmware(t *testing.T) {
 // The verified list in an error is a copy: a caller cannot change the allow-list through it.
 func TestFirmwareErrorDoesNotExposeTheAllowList(t *testing.T) {
 	var fe *FirmwareError
-	if !errors.As(CheckFirmware(escp.ParseFirmware("1.0.0 Build 20990101 Rel.1")), &fe) {
+	if !errors.As(CheckFirmware(model.ParseFirmware("1.0.0 Build 20990101 Rel.1")), &fe) {
 		t.Fatal("want a FirmwareError")
 	}
 	fe.Verified[0] = "tampered"
@@ -62,37 +62,37 @@ func TestVerifiedFirmwareBuildsIsACopy(t *testing.T) {
 		t.Fatalf("the two builds tested on real switches must be listed, got %v", got)
 	}
 	got[0] = "20990101" // overwrite an entry of the copy with a build nobody verified
-	if err := CheckFirmware(escp.ParseFirmware("1.0.0 Build 20990101 Rel.1")); err == nil {
+	if err := CheckFirmware(model.ParseFirmware("1.0.0 Build 20990101 Rel.1")); err == nil {
 		t.Error("a build written into the copy passed the gate")
 	}
-	if err := CheckFirmware(escp.ParseFirmware("1.0.0 Build 20230218 Rel.50633")); err != nil {
+	if err := CheckFirmware(model.ParseFirmware("1.0.0 Build 20230218 Rel.50633")); err != nil {
 		t.Errorf("a verified build was refused after the copy was changed: %v", err)
 	}
 }
 
 // infoSource is a switch that reports a firmware version, or fails to.
 type infoSource struct {
-	escp.Reader
+	model.Reader
 	firmware string
 	err      error
 	reads    int
-	mac      escp.MAC // zero: a reader that does not know its switch
+	mac      model.MAC // zero: a reader that does not know its switch
 }
 
-func (s *infoSource) Info(context.Context) (escp.Info, error) {
+func (s *infoSource) Info(context.Context) (model.Info, error) {
 	s.reads++
-	return escp.Info{Firmware: escp.ParseFirmware(s.firmware), MAC: s.mac}, s.err
+	return model.Info{Firmware: model.ParseFirmware(s.firmware), MAC: s.mac}, s.err
 }
 
-func (s *infoSource) SwitchMAC() escp.MAC { return s.mac }
+func (s *infoSource) SwitchMAC() model.MAC { return s.mac }
 
 func TestFirmwareGateAllowsVerifiedBuildsAndReadsTheFirmwareOnce(t *testing.T) {
 	for _, version := range []string{"1.0.0 Build 20230218 Rel.50633", "1.0.0 Build 20250710 Rel.71093"} {
 		t.Run(version, func(t *testing.T) {
-			sw := &infoSource{firmware: version, mac: escp.MAC{0, 0, 0x5e, 0, 0x53, 1}}
+			sw := &infoSource{firmware: version, mac: model.MAC{0, 0, 0x5e, 0, 0x53, 1}}
 			gate := FirmwareGate()
 			for range 3 {
-				if err := gate(context.Background(), sw, escp.Operation{}); err != nil {
+				if err := gate(context.Background(), sw, model.Operation{}); err != nil {
 					t.Fatalf("%s: %v", version, err)
 				}
 			}
@@ -107,11 +107,11 @@ func TestFirmwareGateRefusesAnUnverifiedBuildAndDoesNotRememberTheRefusal(t *tes
 	sw := &infoSource{firmware: "1.0.0 Build 20990101 Rel.1"}
 	gate := FirmwareGate()
 	var fe *FirmwareError
-	if err := gate(context.Background(), sw, escp.Operation{}); !errors.As(err, &fe) || fe.Reason != FirmwareUnverified || fe.Firmware.Build != "20990101" {
+	if err := gate(context.Background(), sw, model.Operation{}); !errors.As(err, &fe) || fe.Reason != FirmwareUnverified || fe.Firmware.Build != "20990101" {
 		t.Fatalf("got %v", err)
 	}
 	sw.firmware = "1.0.0 Build 20230218 Rel.50633" // the switch now reports a verified build
-	if err := gate(context.Background(), sw, escp.Operation{}); err != nil {
+	if err := gate(context.Background(), sw, model.Operation{}); err != nil {
 		t.Fatalf("a refusal must not stick: %v", err)
 	}
 }
@@ -121,19 +121,19 @@ func TestFirmwareGateRefusesWhenTheFirmwareCannotBeRead(t *testing.T) {
 	sw := &infoSource{firmware: "1.0.0 Build 20230218 Rel.50633", err: cause}
 	gate := FirmwareGate()
 	var fe *FirmwareError
-	err := gate(context.Background(), sw, escp.Operation{})
+	err := gate(context.Background(), sw, model.Operation{})
 	if !errors.As(err, &fe) || fe.Reason != FirmwareUnreadable || !errors.Is(err, cause) || !strings.Contains(err.Error(), "cannot read the firmware version") {
 		t.Fatalf("got %v", err)
 	}
 	sw.err = nil
-	if err := gate(context.Background(), sw, escp.Operation{}); err != nil {
+	if err := gate(context.Background(), sw, model.Operation{}); err != nil {
 		t.Fatalf("the check is retried once the switch answers: %v", err)
 	}
 }
 
 func TestFirmwareGateRefusesAFirmwareWithoutABuildDate(t *testing.T) {
 	var fe *FirmwareError
-	if err := FirmwareGate()(context.Background(), &infoSource{firmware: "custom"}, escp.Operation{}); !errors.As(err, &fe) || fe.Reason != FirmwareNoBuildDate {
+	if err := FirmwareGate()(context.Background(), &infoSource{firmware: "custom"}, model.Operation{}); !errors.As(err, &fe) || fe.Reason != FirmwareNoBuildDate {
 		t.Fatalf("got %v", err)
 	}
 }
@@ -141,17 +141,17 @@ func TestFirmwareGateRefusesAFirmwareWithoutABuildDate(t *testing.T) {
 // One gate may serve several switches: it remembers the verdict per switch, so a verified one does
 // not vouch for another that runs a build nobody verified.
 func TestAGateSharedBetweenSwitchesChecksEachOnce(t *testing.T) {
-	good := &infoSource{firmware: "1.0.0 Build 20230218 Rel.50633", mac: escp.MAC{0, 0, 0x5e, 0, 0x53, 1}}
-	bad := &infoSource{firmware: "1.0.0 Build 20990101 Rel.1", mac: escp.MAC{0, 0, 0x5e, 0, 0x53, 2}}
+	good := &infoSource{firmware: "1.0.0 Build 20230218 Rel.50633", mac: model.MAC{0, 0, 0x5e, 0, 0x53, 1}}
+	bad := &infoSource{firmware: "1.0.0 Build 20990101 Rel.1", mac: model.MAC{0, 0, 0x5e, 0, 0x53, 2}}
 	gate := FirmwareGate()
 	ctx := context.Background()
 	for range 2 {
-		if err := gate(ctx, good, escp.Operation{}); err != nil {
+		if err := gate(ctx, good, model.Operation{}); err != nil {
 			t.Fatal(err)
 		}
 	}
 	var fe *FirmwareError
-	if err := gate(ctx, bad, escp.Operation{}); !errors.As(err, &fe) || fe.Reason != FirmwareUnverified {
+	if err := gate(ctx, bad, model.Operation{}); !errors.As(err, &fe) || fe.Reason != FirmwareUnverified {
 		t.Fatalf("the second switch must be checked on its own: %v", err)
 	}
 	if good.reads != 1 || bad.reads != 1 {
@@ -161,13 +161,13 @@ func TestAGateSharedBetweenSwitchesChecksEachOnce(t *testing.T) {
 
 // The same switch behind a new address or a new client is still the same switch.
 func TestAVerifiedSwitchIsRememberedAcrossReaders(t *testing.T) {
-	mac := escp.MAC{0, 0, 0x5e, 0, 0x53, 1}
+	mac := model.MAC{0, 0, 0x5e, 0, 0x53, 1}
 	first := &infoSource{firmware: "1.0.0 Build 20230218 Rel.50633", mac: mac}
 	second := &infoSource{firmware: "1.0.0 Build 20230218 Rel.50633", mac: mac}
 	gate := FirmwareGate()
 	// subtests: two readers in sequence, the second depends on what the first left in the gate
 	for _, sw := range []*infoSource{first, second} {
-		if err := gate(context.Background(), sw, escp.Operation{}); err != nil {
+		if err := gate(context.Background(), sw, model.Operation{}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -181,7 +181,7 @@ func TestAReaderWithoutAMACIsCheckedAtEveryWrite(t *testing.T) {
 	sw := &infoSource{firmware: "1.0.0 Build 20230218 Rel.50633"}
 	gate := FirmwareGate()
 	for range 3 {
-		if err := gate(context.Background(), sw, escp.Operation{}); err != nil {
+		if err := gate(context.Background(), sw, model.Operation{}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -195,10 +195,10 @@ func TestFirmwareGatesDoNotShareState(t *testing.T) {
 	good := &infoSource{firmware: "1.0.0 Build 20230218 Rel.50633"}
 	bad := &infoSource{firmware: "1.0.0 Build 20990101 Rel.1"}
 	a, b := FirmwareGate(), FirmwareGate()
-	if err := a(context.Background(), good, escp.Operation{}); err != nil {
+	if err := a(context.Background(), good, model.Operation{}); err != nil {
 		t.Fatal(err)
 	}
-	if err := b(context.Background(), bad, escp.Operation{}); err == nil {
+	if err := b(context.Background(), bad, model.Operation{}); err == nil {
 		t.Fatal("the second gate must check its own switch")
 	}
 }

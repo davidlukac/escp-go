@@ -59,7 +59,7 @@ var writeCalls = map[Method]func(context.Context, *Client) error{
 	},
 	MethodEnableDHCP: func(ctx context.Context, c *Client) error {
 		// the client needs the switch's MAC, and a lookup that asks the fake itself
-		c.cfg.MAC = MAC(escptest.DefaultMAC())
+		c.cfg.MAC = escptest.DefaultMAC()
 		c.locator = func(ctx context.Context, _ MAC) (Info, error) { return c.discoverOnce(ctx) }
 		return c.EnableDHCP(ctx)
 	},

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 )
 
 var updateReadme = flag.Bool("update-readme", false, "rewrite the compatibility table in README.md from compatibility.json")
@@ -20,17 +20,17 @@ const (
 )
 
 func TestCompatibilityFeedsTheAllowList(t *testing.T) {
-	if got, want := VerifiedFirmwareBuilds(), []escp.BuildDate{"20230218", "20250710"}; !slices.Equal(got, want) {
+	if got, want := VerifiedFirmwareBuilds(), []model.BuildDate{"20230218", "20250710"}; !slices.Equal(got, want) {
 		t.Fatalf("allow-list = %v, want %v", got, want)
 	}
 	// An untried or unsupported row never adds a build to the allow-list.
 	rows := []CompatibilityRow{
-		{Model: "m", Hardware: "h", Firmware: "f", Builds: []escp.BuildDate{"20250101"}, Support: SupportVerified},
-		{Model: "m", Hardware: "h", Firmware: "f", Builds: []escp.BuildDate{"20260101"}, Support: SupportUntried},
-		{Model: "m", Hardware: "h", Firmware: "f", Builds: []escp.BuildDate{"20240101"}, Support: SupportUnsupported},
-		{Model: "m", Hardware: "h", Firmware: "f", Builds: []escp.BuildDate{"20230101"}, Support: SupportVerified},
+		{Model: "m", Hardware: "h", Firmware: "f", Builds: []model.BuildDate{"20250101"}, Support: SupportVerified},
+		{Model: "m", Hardware: "h", Firmware: "f", Builds: []model.BuildDate{"20260101"}, Support: SupportUntried},
+		{Model: "m", Hardware: "h", Firmware: "f", Builds: []model.BuildDate{"20240101"}, Support: SupportUnsupported},
+		{Model: "m", Hardware: "h", Firmware: "f", Builds: []model.BuildDate{"20230101"}, Support: SupportVerified},
 	}
-	if got, want := verifiedBuilds(rows), []escp.BuildDate{"20230101", "20250101"}; !slices.Equal(got, want) {
+	if got, want := verifiedBuilds(rows), []model.BuildDate{"20230101", "20250101"}; !slices.Equal(got, want) {
 		t.Fatalf("verifiedBuilds = %v, want %v (sorted, verified rows only)", got, want)
 	}
 }

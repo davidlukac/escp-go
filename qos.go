@@ -6,103 +6,11 @@ import (
 	"fmt"
 
 	"github.com/davidlukac/escp-go/internal/wire"
+	"github.com/davidlukac/escp-go/model"
 )
 
-// QoSMode is the switch's QoS mode. The number is the wire byte; the name is the web UI's
-// and the Terraform provider's spelling, which consumers keep in saved state: do not change it.
-type QoSMode int
-
-// The QoS modes the switch knows. Per-port priorities only take effect in QoSPortBased.
-const (
-	QoSPortBased QoSMode = 0
-	QoS8021p     QoSMode = 1
-	QoSDSCP8021p QoSMode = 2
-)
-
-var qosModeNames = [...]string{QoSPortBased: "port-based", QoS8021p: "802.1p", QoSDSCP8021p: "dscp-802.1p"}
-
-// QoSModes lists the modes SetQoSMode accepts, in the order of their codes.
-func QoSModes() []QoSMode { return []QoSMode{QoSPortBased, QoS8021p, QoSDSCP8021p} }
-
-// Validate reports whether the switch knows the mode; the error matches ErrInvalid.
-func (m QoSMode) Validate() error {
-	if m < 0 || int(m) >= len(qosModeNames) {
-		return invalidf("escp: invalid QoS mode %d (valid: 0, 1, 2)", int(m))
-	}
-	return nil
-}
-
-// String returns the web UI's name of the mode, or unknown(n) for a code this client does not know.
-func (m QoSMode) String() string {
-	if m.Validate() != nil {
-		return fmt.Sprintf("unknown(%d)", int(m))
-	}
-	return qosModeNames[m]
-}
-
-// ParseQoSMode converts a mode name as String spells it.
-func ParseQoSMode(name string) (QoSMode, error) {
-	for _, m := range QoSModes() {
-		if m.String() == name {
-			return m, nil
-		}
-	}
-	return 0, invalidf("escp: unknown QoS mode %q (valid: %v)", name, QoSModes())
-}
-
-// MarshalText is the web UI's name of the mode, as String spells it; a code this client does not know
-// is an error, since a name that no decoder reads back would lose it.
-func (m QoSMode) MarshalText() ([]byte, error) {
-	if err := m.Validate(); err != nil {
-		return nil, err
-	}
-	return []byte(m.String()), nil
-}
-
-// UnmarshalText reads a mode name with the rule of ParseQoSMode.
-func (m *QoSMode) UnmarshalText(text []byte) error {
-	v, err := ParseQoSMode(string(text))
-	if err != nil {
-		return err
-	}
-	*m = v
-	return nil
-}
-
-// Priority is a port's priority queue as the web UI shows it: PriorityLowest (1) to PriorityHighest (4).
-// On the wire it is one less.
-type Priority int
-
-// The bounds of Priority.
-const (
-	PriorityLowest  Priority = 1
-	PriorityHighest Priority = 4
-)
-
-// Validate reports whether the priority is within PriorityLowest..PriorityHighest; the error matches
-// ErrInvalid.
-func (p Priority) Validate() error {
-	if p < PriorityLowest || p > PriorityHighest {
-		return invalidf("escp: invalid priority %d (valid: %d-%d)", int(p), PriorityLowest, PriorityHighest)
-	}
-	return nil
-}
-
-// PortPriority is a port's priority queue (PriorityLowest to PriorityHighest).
-type PortPriority struct {
-	Port     PortID
-	Priority Priority
-}
-
-// QoS is the QoS Basic page: the mode and, for every port, a priority. The priorities are only
-// effective in QoSPortBased mode, but the switch reports them in every mode.
-type QoS struct {
-	Mode       QoSMode
-	Priorities []PortPriority // one entry per port
-}
-
-func parseQoS(tlvs []wire.TLV) (QoS, error) {
-	out := QoS{Priorities: []PortPriority{}}
+func parseQoS(tlvs []wire.TLV) (model.QoS, error) {
+	out := model.QoS{Priorities: []model.PortPriority{}}
 	seen := false
 	for _, t := range tlvs {
 		switch t.Type {
@@ -110,12 +18,12 @@ func parseQoS(tlvs []wire.TLV) (QoS, error) {
 			if len(t.Value) != 1 {
 				return out, fmt.Errorf("escp: QoS mode TLV has %d bytes", len(t.Value))
 			}
-			out.Mode, seen = QoSMode(t.Value[0]), true
+			out.Mode, seen = model.QoSMode(t.Value[0]), true
 		case wire.TLVQoSPriority:
 			if len(t.Value) != 2 {
 				return out, fmt.Errorf("escp: QoS priority entry has %d bytes, want 2", len(t.Value))
 			}
-			out.Priorities = append(out.Priorities, PortPriority{Port: PortID(t.Value[0]), Priority: Priority(t.Value[1]) + PriorityLowest})
+			out.Priorities = append(out.Priorities, model.PortPriority{Port: model.PortID(t.Value[0]), Priority: model.Priority(t.Value[1]) + model.PriorityLowest})
 		}
 	}
 	if !seen {
@@ -126,14 +34,14 @@ func parseQoS(tlvs []wire.TLV) (QoS, error) {
 
 // QoS reads the QoS mode and per-port priorities. Priorities are only
 // effective in port-based mode but are always reported.
-func (c *Client) QoS(ctx context.Context) (QoS, error) {
+func (c *Client) QoS(ctx context.Context) (model.QoS, error) {
 	mode, err := c.getTLVs(ctx, wire.TLVQoSMode)
 	if err != nil {
-		return QoS{}, err
+		return model.QoS{}, err
 	}
 	pri, err := c.getTLVs(ctx, wire.TLVQoSPriority)
 	if err != nil {
-		return QoS{}, err
+		return model.QoS{}, err
 	}
 	return parseQoS(append(mode, pri...))
 }
@@ -141,22 +49,11 @@ func (c *Client) QoS(ctx context.Context) (QoS, error) {
 // SetQoSMode selects the QoS mode, which changes how traffic is queued on every port. The
 // mode must be one of QoSModes. Per-port priorities (SetPortPriorities) only take effect in
 // QoSPortBased; the switch accepts them in the other modes and ignores them.
-func (c *Client) SetQoSMode(ctx context.Context, mode QoSMode) error {
+func (c *Client) SetQoSMode(ctx context.Context, mode model.QoSMode) error {
 	if err := mode.Validate(); err != nil {
 		return err
 	}
-	return c.setTLVs(ctx, MethodSetQoSMode.Operation(), wire.TLV{Type: wire.TLVQoSMode, Value: []byte{byte(mode)}})
-}
-
-// Validate checks the port and the priority. The error matches ErrInvalid.
-func (p PortPriority) Validate() error {
-	if err := p.Port.Validate(); err != nil {
-		return err
-	}
-	if p.Priority.Validate() != nil {
-		return invalidf("escp: invalid priority %d for port %d (valid: %d-%d)", p.Priority, p.Port, PriorityLowest, PriorityHighest)
-	}
-	return nil
+	return c.setTLVs(ctx, model.MethodSetQoSMode.Operation(), wire.TLV{Type: wire.TLVQoSMode, Value: []byte{byte(mode)}})
 }
 
 // SetPortPriorities changes the priority of the given ports, the same PortPriority entries QoS
@@ -165,8 +62,8 @@ func (p PortPriority) Validate() error {
 // request carries the priority of every port, so the current values are read first (a QoS read, which
 // the write gate does not see) and the ports not mentioned are re-sent unchanged. The priorities only
 // take effect in QoSPortBased mode.
-func (c *Client) SetPortPriorities(ctx context.Context, changes []PortPriority) error {
-	var named PortSet
+func (c *Client) SetPortPriorities(ctx context.Context, changes []model.PortPriority) error {
+	var named model.PortSet
 	for _, ch := range changes {
 		if err := ch.Validate(); err != nil {
 			return err
@@ -180,7 +77,7 @@ func (c *Client) SetPortPriorities(ctx context.Context, changes []PortPriority) 
 	if err != nil {
 		return err
 	}
-	prio := map[PortID]Priority{}
+	prio := map[model.PortID]model.Priority{}
 	for _, p := range cur.Priorities {
 		prio[p.Port] = p.Priority
 	}
@@ -192,7 +89,7 @@ func (c *Client) SetPortPriorities(ctx context.Context, changes []PortPriority) 
 	}
 	tlvs := make([]wire.TLV, 0, len(prio))
 	for _, p := range cur.Priorities { // keep the switch's port order
-		tlvs = append(tlvs, wire.TLV{Type: wire.TLVQoSPriority, Value: []byte{byte(p.Port), byte(prio[p.Port] - PriorityLowest)}})
+		tlvs = append(tlvs, wire.TLV{Type: wire.TLVQoSPriority, Value: []byte{byte(p.Port), byte(prio[p.Port] - model.PriorityLowest)}})
 	}
-	return c.setTLVs(ctx, MethodSetPortPriorities.Operation().On(named), tlvs...)
+	return c.setTLVs(ctx, model.MethodSetPortPriorities.Operation().On(named), tlvs...)
 }
