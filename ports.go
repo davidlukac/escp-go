@@ -3,6 +3,7 @@ package escp
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/davidlukac/escp-go/internal/wire"
 )
@@ -162,8 +163,8 @@ func (cfg PortConfig) Validate() error {
 	if err := cfg.ID.Validate(); err != nil {
 		return err
 	}
-	if _, err := speedCode(cfg.Speed); err != nil {
-		return err
+	if !slices.Contains(configurableSpeeds[:], cfg.Speed) {
+		return invalidf("escp: unknown speed %q (valid: %v)", string(cfg.Speed), configurableSpeeds)
 	}
 	if cfg.FlowControl && !cfg.Speed.AllowsFlowControl() {
 		return invalidf("escp: port %d: flow control needs speed %s or %s, not %s (the switch keeps it off at a fixed 10 or 100 Mbps speed)", cfg.ID, SpeedAuto, Speed1000Full, cfg.Speed)

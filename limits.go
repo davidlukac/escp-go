@@ -11,9 +11,10 @@ const (
 	MaxPort = 32
 	// MaxHostnameLen is the longest device description the switch accepts.
 	MaxHostnameLen = 32
-	// maskLen is the size of a port mask on the wire.
-	maskLen = wire.MaskLen
 )
+
+// maskLen is the size of a port mask on the wire.
+const maskLen = wire.MaskLen
 
 // The limits of a rate limit.
 const (
