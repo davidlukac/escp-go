@@ -13,9 +13,11 @@ on:
   push:
     branches: [main]
 
-# A newer push to the same PR supersedes the running one; runs on main always finish.
+# A newer push to the same PR supersedes the running one. A push to main is never superseded: its
+# group is its own run, because with one group per branch GitHub cancels the run that is pending
+# when a newer one queues, and a burst of merges left canceled runs (and a failing badge) on main.
 concurrency:
-  group: tests-${{ github.workflow }}-${{ github.ref }}
+  group: tests-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
