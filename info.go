@@ -48,7 +48,7 @@ func (c *Client) discover(ctx context.Context) (Info, error) {
 			return Info{}, err
 		}
 	}
-	if c.cfg.MAC.IsZero() || c.haveSwMAC {
+	if c.cfg.MAC.IsZero() || c.ident.known() {
 		return c.discoverOnce(ctx)
 	}
 	// First contact with a switch that is pinned by MAC: the address gets a short budget (a switch
@@ -87,7 +87,7 @@ func (c *Client) discoverOnce(ctx context.Context) (Info, error) {
 		return Info{}, err
 	}
 	info := infoFromReply(r)
-	if want := c.identity(); !want.IsZero() && !info.MAC.IsZero() && info.MAC != want {
+	if want := c.ident.mac(); !want.IsZero() && !info.MAC.IsZero() && info.MAC != want {
 		return Info{}, &WrongSwitchError{Want: want, Got: info.MAC, IP: addrOf(c.dest.IP)}
 	}
 	return info, nil

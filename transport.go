@@ -96,20 +96,6 @@ func (c *Client) decrypt(b []byte) []byte {
 	return wire.RC4Static(b)
 }
 
-// identity is the MAC address of the switch this client talks to: the one Config.MAC names or, when
-// it names none, the one the switch reported on first contact. A device that answers with another
-// one is not that switch, whoever took the address over. Zero before the first contact of a client
-// that has no Config.MAC. Callers hold c.mu.
-func (c *Client) identity() MAC {
-	if !c.cfg.MAC.IsZero() {
-		return c.cfg.MAC
-	}
-	if c.haveSwMAC {
-		return c.swMAC
-	}
-	return MAC{}
-}
-
 // accept decides whether a datagram is the reply to the request in flight: it
 // must come from the switch, decode to a valid packet, echo the current
 // sequence number and not be our own broadcast discovery coming back.
@@ -121,13 +107,9 @@ func (c *Client) accept(from *net.UDPAddr, data []byte) (reply, bool) {
 	if err != nil || h.Seq != c.seq || h.Op == wire.OpDiscovery {
 		return reply{}, false
 	}
-	if want, got := c.identity(), MAC(h.SwitchMAC); !want.IsZero() && !got.IsZero() && got != want {
-		// the address answers, but it is another device: remember it and let exchange say so
-		c.wrong = &WrongSwitchError{Want: want, Got: got, IP: addrOf(from.IP)}
+	if !c.ident.judge(MAC(h.SwitchMAC), from.IP) {
+		// the address answers, but it is another device: judge remembered it, exchange says so
 		return reply{}, false
-	}
-	if !c.haveSwMAC {
-		c.swMAC, c.haveSwMAC = h.SwitchMAC, true
 	}
 	return reply{op: h.Op, err: ReplyCode(h.ErrCode), tlvs: t, fragment: h.Fragment}, true
 }
@@ -152,8 +134,8 @@ func (c *Client) recv(ctx context.Context, deadline time.Time) (reply, error) {
 		if rep, ok := c.accept(from, buf[:n]); ok {
 			return rep, nil
 		}
-		if c.wrong != nil {
-			return reply{}, c.wrong
+		if wrong := c.ident.wrongDevice(); wrong != nil {
+			return reply{}, wrong
 		}
 	}
 	return reply{}, errSilent
@@ -234,7 +216,7 @@ func (c *Client) discard() {
 func (c *Client) send(op byte, tlvs []wire.TLV, static bool, to []*net.UDPAddr) error {
 	c.discard()
 	c.seq = requestSeq(c.seq, op)
-	pkt := c.encrypt(wire.Marshal(wire.Header{Op: op, SwitchMAC: c.swMAC, HostMAC: c.hostMAC, Seq: c.seq}, tlvs), static)
+	pkt := c.encrypt(wire.Marshal(wire.Header{Op: op, SwitchMAC: c.ident.header(), HostMAC: c.hostMAC, Seq: c.seq}, tlvs), static)
 	for _, d := range to {
 		if _, err := c.conn.WriteToUDP(pkt, d); err != nil {
 			return fmt.Errorf("escp: send: %w", err)
@@ -250,7 +232,7 @@ func (c *Client) exchange(ctx context.Context, op byte, tlvs []wire.TLV, static 
 		return reply{}, err
 	}
 	defer c.interruptOnDone(ctx)()
-	c.wrong = nil
+	c.ident.forget()
 	for attempt := 0; attempt <= c.cfg.Retries; attempt++ {
 		if err := expired(ctx); err != nil { // a canceled call sends nothing, not even a retry
 			return reply{}, err
@@ -283,7 +265,7 @@ func (c *Client) exchange(ctx context.Context, op byte, tlvs []wire.TLV, static 
 func (c *Client) exchangeFragments(ctx context.Context, op byte, tlvs []wire.TLV, typ wire.TLVType) ([][]byte, error) {
 	// Callers hold c.mu and run inside withSession, so the socket is open.
 	defer c.interruptOnDone(ctx)()
-	c.wrong = nil
+	c.ident.forget()
 	for attempt := 0; attempt <= c.cfg.Retries; attempt++ {
 		if err := expired(ctx); err != nil {
 			return nil, err

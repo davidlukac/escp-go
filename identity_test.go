@@ -152,7 +152,7 @@ func TestAWrongDeviceEndsTheCallAtOnce(t *testing.T) {
 	f.SetMAC(otherMAC)
 	c, _ := dialMAC(t, f, "127.0.0.1", wantMAC, nil)
 	c.cfg.Timeout = time.Minute
-	c.haveSwMAC = true // not a first contact, which has a short budget of its own
+	c.ident.have = true // not a first contact, which has a short budget of its own
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	start := time.Now()

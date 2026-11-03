@@ -29,10 +29,11 @@ type Client struct {
 	// being moved to it (SetIPConfig); nil otherwise.
 	alsoFrom net.IP
 
-	hostMAC, swMAC MAC
-	haveSwMAC      bool
-	seq            uint16
-	session        []byte
+	hostMAC MAC
+	// ident is who the client believes the switch is (the pin, the MAC of the first contact).
+	ident   identity
+	seq     uint16
+	session []byte
 	// switchPorts is the switch's number of ports, read on the first write that names a port
 	// (zero until then) and kept: it is hardware. Atomic, so that a call reads it without the
 	// lock another call may be holding for a whole exchange.
@@ -40,8 +41,6 @@ type Client struct {
 	// groupLimit is the highest port-based VLAN group id the switch has (a PortVLANLimit), read on
 	// the first group write (unknown until then) and kept: it is hardware. Atomic like switchPorts.
 	groupLimit atomic.Int64
-	// wrong is the device that answered the request in flight with a MAC other than Config.MAC.
-	wrong *WrongSwitchError
 	// seams are the knobs only tests turn; Dial sets them to their defaults.
 	seams
 	// log is Config.Logger, or a logger that discards, with the switch's host and MAC attached.
@@ -152,7 +151,7 @@ func dial(ctx context.Context, r ipLookuper, cfg Config, opts ...dialOption) (*C
 		cfg.BroadcastAddr = netip.AddrFrom4([net.IPv4len]byte{255, 255, 255, 255})
 	}
 	base := clientLogger(cfg)
-	c := &Client{cfg: cfg, log: identified(base)}
+	c := &Client{cfg: cfg, log: identified(base), ident: identity{pin: cfg.MAC}}
 	c.locator = hostLocator(base) // Locate identifies itself
 	if cfg.Host == "" && !cfg.MAC.IsZero() {
 		// no address yet: the first request finds the switch by its MAC address

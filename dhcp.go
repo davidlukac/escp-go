@@ -66,25 +66,30 @@ func (c *Client) awaitLease(ctx context.Context, before IPConfig, lost error) er
 	if wait == 0 {
 		wait = leaseWait
 	}
-	ctx, cancel := context.WithTimeout(ctx, wait)
-	defer cancel()
 	var last Info
+	var followed error
 	seen := false
-	for {
-		if found, err := c.locator(ctx, c.cfg.MAC); err == nil {
-			last, seen = found, true
-			if _, perr := ipConfigFromInfo(found); found.DHCP && perr == nil {
-				c.log.InfoContext(ctx, "lease obtained", "ip", found.IP.String())
-				return c.follow(found)
+	leased := pollUntil(ctx, wait, c.pollInterval(),
+		func(ctx context.Context) bool {
+			found, err := c.locator(ctx, c.cfg.MAC)
+			if err != nil {
+				return false
 			}
-		}
-		c.log.DebugContext(ctx, "no lease reported yet; asking again", "poll", c.pollInterval().String())
-		select {
-		case <-ctx.Done():
-			return leaseNotConfirmed(before, last, seen, lost)
-		case <-time.After(c.pollInterval()):
-		}
+			last, seen = found, true
+			if _, perr := ipConfigFromInfo(found); !found.DHCP || perr != nil {
+				return false
+			}
+			c.log.InfoContext(ctx, "lease obtained", "ip", found.IP.String())
+			followed = c.follow(found)
+			return true
+		},
+		func(ctx context.Context) {
+			c.log.DebugContext(ctx, "no lease reported yet; asking again", "poll", c.pollInterval().String())
+		})
+	if !leased {
+		return leaseNotConfirmed(before, last, seen, lost)
 	}
+	return followed
 }
 
 // leaseNotConfirmed says what is known when no lease was reported in time.
