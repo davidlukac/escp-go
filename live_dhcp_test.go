@@ -63,7 +63,7 @@ func TestLiveDHCPProbe(t *testing.T) {
 	started := time.Now()
 	since := func() string { return time.Since(started).Round(100 * time.Millisecond).String() }
 	setSystem := func(cl *Client, dhcp bool, cfg IPConfig) {
-		sent, err := cl.writeSystem(ctx, Operation{Name: "SetIPConfig", Impact: ImpactManagement}, info0.Hostname, dhcp, cfg)
+		sent, err := cl.writeSystem(ctx, Operation{Name: MethodSetIPConfig, Impact: ImpactManagement}, info0.Hostname, dhcp, cfg)
 		obs("%s write dhcp=%t %s -> sent=%t err=%v", since(), dhcp, cfg, sent, err)
 	}
 	// look is one discovery by MAC.
