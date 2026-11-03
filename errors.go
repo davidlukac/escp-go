@@ -23,17 +23,18 @@ var (
 	// errors.Is(err, ErrInvalid). It is never returned for a reply the client cannot parse,
 	// nor for a failure of the switch.
 	ErrInvalid = errors.New("escp: invalid argument")
-	// ErrWrongSwitch means the device that answered is not the one the configuration names:
-	// Config.MAC is set and the reply carries another MAC address. Nothing was written to it.
-	// The *WrongSwitchError that wraps it names both addresses.
+	// ErrWrongSwitch means the device that answered is not the switch the client talks to: the
+	// reply carries another MAC address than Config.MAC or, when that is not set, than the one
+	// the switch reported on the client's first contact. Nothing was written to it. The
+	// *WrongSwitchError that wraps it names both addresses.
 	ErrWrongSwitch = errors.New("escp: the device that answered is not the configured switch")
 	// ErrNotFound means no switch with the wanted MAC address answered a discovery probe on
 	// this network (Locate, or a client configured with a MAC and no working address).
 	ErrNotFound = errors.New("escp: no switch with that MAC address answered")
 )
 
-// WrongSwitchError is the refusal to talk to a device whose MAC address is not Config.MAC. It
-// matches ErrWrongSwitch.
+// WrongSwitchError is the refusal to talk to a device whose MAC address is not the switch's: Want
+// is Config.MAC or, without it, the MAC of the first contact. It matches ErrWrongSwitch.
 type WrongSwitchError struct {
 	Want, Got MAC
 	IP        netip.Addr // where the other device answered from; invalid when unknown
