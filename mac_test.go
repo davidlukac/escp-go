@@ -18,7 +18,8 @@ func TestParseMAC(t *testing.T) {
 	}
 	// Refused: not hex, too short, too long, mixed separators, and the forms net.ParseMAC also reads.
 	for _, s := range []string{"", "zz:00:5e:00:53:01", "00:00:5e:00:53", "00:00:5e:00:53:01:00:01", "00:00-5e:00:53:01", "00005e005301",
-		"0000.5e00.5301", "02:00:5e:10:00:00:00:01", " 00:00:5e:00:53:01", "00:00:5e:00:53:01\n"} {
+		"0000.5e00.5301", "02:00:5e:10:00:00:00:01", " 00:00:5e:00:53:01", "00:00:5e:00:53:01\n",
+		"00:00:00:00:00:00", "00-00-00-00-00-00"} { // the all-zero address is "no MAC", not a device's
 		t.Run(s, func(t *testing.T) {
 			if got, err := ParseMAC(s); !errors.Is(err, ErrInvalid) || !got.IsZero() {
 				t.Errorf("ParseMAC(%q) = %v, %v; want the zero MAC and ErrInvalid", s, got, err)
@@ -50,5 +51,17 @@ func TestMACFromBytes(t *testing.T) {
 				t.Errorf("%d bytes accepted: %v", len(b), m)
 			}
 		})
+	}
+}
+
+// The empty text is "no MAC"; the all-zero address is not an alternative spelling of it.
+func TestUnmarshalTextRefusesTheZeroAddressButReadsTheEmptyText(t *testing.T) {
+	var m MAC
+	if err := m.UnmarshalText(nil); err != nil || !m.IsZero() {
+		t.Fatalf("the empty text is no MAC: %v, %v", m, err)
+	}
+	m = MAC{1}
+	if err := m.UnmarshalText([]byte("00:00:00:00:00:00")); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("UnmarshalText of the all-zero address = %v, want ErrInvalid", err)
 	}
 }

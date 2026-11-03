@@ -20,13 +20,18 @@ type MAC [macLen]byte
 // ParseMAC reads the text form "aa:bb:cc:dd:ee:ff": six hex bytes, any case, separated by colons
 // or by hyphens (one kind of separator). Anything else, including the dotted and unseparated forms
 // net.ParseMAC accepts, is an error that matches ErrInvalid and shows the form that is accepted.
+// The all-zero address is refused too: it is the zero MAC, "no MAC", and no device has it, so
+// reading it would give a Config.MAC that pins nothing.
 func ParseMAC(s string) (MAC, error) {
 	hw, err := net.ParseMAC(s)
 	// net.ParseMAC also reads dotted and unseparated forms and longer addresses; only this form is documented.
 	if err != nil || len(hw) != macLen || len(s) != macTextLen || strings.Count(s, ":")+strings.Count(s, "-") != macLen-1 {
 		return MAC{}, invalidf("escp: %q is not a MAC address; write it as aa:bb:cc:dd:ee:ff (colons or hyphens)", s)
 	}
-	return MAC(hw), nil
+	if m := MAC(hw); !m.IsZero() {
+		return m, nil
+	}
+	return MAC{}, invalidf("escp: %q is the all-zero address, which no device has and which means \"no MAC\"", s)
 }
 
 // MACFromBytes converts a six-byte hardware address; ok is false for any other length.
