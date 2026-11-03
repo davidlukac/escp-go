@@ -4,9 +4,52 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
+	"strconv"
 
 	"github.com/davidlukac/escp-go/internal/wire"
 )
+
+// Limits of 802.1Q VLAN ids and names. The id range is the IEEE one; the name rules are those of
+// the vendor utility (at most ten characters from letters, digits, hyphen and underscore).
+const (
+	MinVLANID      VLANID = 1
+	MaxVLANID      VLANID = 4094
+	MaxVLANNameLen        = 10
+)
+
+var vlanNamePattern = regexp.MustCompile(`^[A-Za-z0-9_-]*$`)
+
+// VLANID is the id of an 802.1Q VLAN, and the PVID of a port, which is the id of the VLAN its
+// untagged traffic enters. The IEEE range is MinVLANID to MaxVLANID; two bytes carry it on the wire.
+// (Port-based VLAN groups and LAG groups have ids of their own, PortVLANID and LAGID, one byte each.)
+type VLANID int
+
+// Validate reports whether v is within MinVLANID to MaxVLANID; the error matches ErrInvalid.
+func (v VLANID) Validate() error {
+	if v < MinVLANID || v > MaxVLANID {
+		return invalidf("escp: invalid VLAN id %d (valid: %d-%d)", v, MinVLANID, MaxVLANID)
+	}
+	return nil
+}
+
+// String is the id as a number.
+func (v VLANID) String() string { return strconv.Itoa(int(v)) }
+
+// VLANName is the name of an 802.1Q VLAN: empty, or up to MaxVLANNameLen letters, digits, hyphens and
+// underscores (the vendor utility's rules).
+type VLANName string
+
+// Validate applies the rules; the error matches ErrInvalid.
+func (n VLANName) Validate() error {
+	if len(n) > MaxVLANNameLen || !vlanNamePattern.MatchString(string(n)) {
+		return invalidf("escp: invalid VLAN name %q (at most %d letters, digits, hyphens or underscores)", string(n), MaxVLANNameLen)
+	}
+	return nil
+}
+
+// String is the name.
+func (n VLANName) String() string { return string(n) }
 
 // Dot1QVLAN is one 802.1Q VLAN with its tagged and untagged members.
 type Dot1QVLAN struct {
