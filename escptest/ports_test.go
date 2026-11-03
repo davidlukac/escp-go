@@ -201,10 +201,14 @@ func TestAPortThatAnotherProcessHoldsIsSkipped(t *testing.T) {
 
 // When nothing can be reserved, the error says why.
 func TestTheReasonForNotFindingAPortIsKept(t *testing.T) {
-	held := FreeUDPPort(t)
-	_, _, err := listenUnreserved(listenAt(t, held))
-	if err == nil || !strings.Contains(err.Error(), "listen tcp4 127.0.0.1:") {
-		t.Fatalf("got %v, want the failed TCP listen of the marker in the message", err)
+	// the marker fails the way it does when another process holds the TCP number; a real held
+	// listener would depend on the ports the machine lets the test hold (a Windows runner forbids some)
+	markerWith(t, func(port int) (net.Listener, error) {
+		return nil, &net.OpError{Op: "listen", Net: "tcp4", Addr: &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: port}, Err: os.NewSyscallError("bind", syscall.EADDRINUSE)}
+	})
+	_, _, err := listenUnreserved(listenLoopback)
+	if err == nil || !strings.Contains(err.Error(), "listen tcp4 127.0.0.1:") || !errors.Is(err, syscall.EADDRINUSE) {
+		t.Fatalf("got %v, want the failed TCP listen of the marker in the message and in the chain", err)
 	}
 }
 
