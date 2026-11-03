@@ -5,6 +5,20 @@ version; a breaking change is called out as such. The history before 0.1.0 is th
 `internal/escp` of [terraform-provider-tplinkeasysmart](https://github.com/davidlukac/terraform-provider-tplinkeasysmart),
 whose commits this repository keeps.
 
+## 0.6.0
+
+- **Behavior change** (no signature change; `make apidiff` reports one addition, `DialContext`):
+
+  | 0.5.0 | 0.6.0 |
+  |---|---|
+  | `ParsePortID` documented plain decimal input but read it with `strconv.Atoi`, so `"+3"`, `"01"` and `"003"` were accepted as ports 3, 1 and 3 (#53) | only the canonical spelling is accepted: the text must be the number written in decimal without sign or leading zeros, so one port has one spelling. `"+3"`, `"01"`, `"003"`, `"-0"`, `"0x3"`, `"1_0"`, a non-ASCII digit and an overflowing number are refused with the existing "not a port number" error, which matches `ErrInvalid`. A caller that passed a signed or zero-padded port normalizes it first |
+
+- **Added:** `DialContext(ctx, cfg)`. `Dial` looked a host name up without a context, so a slow resolver blocked the caller and canceling did nothing; `DialContext` resolves under `ctx` and returns its error (`errors.Is` matches `context.Canceled` and `context.DeadlineExceeded`). `Dial(cfg)` is `DialContext(context.Background(), cfg)`; a literal address and a MAC need no lookup (#54).
+- **`escptest`:** `TLVType` is the fake's own type (`type TLVType int16`, documented) and no longer an alias of the internal wire codec's, so it has a page of its own on pkg.go.dev. `make apidiff` lists `TLVType`, `Setting.Type`, `Faults.OnGet` and `EnableRows` as incompatible because their type is no longer the internal one; no code outside the module can have held that type, and `escptest.TLVType(4352)`, `[]escptest.TLVType` and `Setting{Type: 4352}` compile as before, so no migration is needed (#55). `FreeUDPPort` no longer fails on Windows runners where the system forbids binding the TCP port that marks a reservation (the error "an attempt was made to access a socket in a way forbidden by its access permissions", seen in CI): such a port is handed out without the cross-process marker, and never twice in one process (#71).
+- **Documentation:** `PROTOCOL.md` has one layout table per setting (`Type | Dir | Bytes | Layout | Status`) with the measurements and the evidence in notes below it; no layout or status changed (#56).
+- **Internal and contributors** (no API change): the client keeps MAC addresses as `MAC` instead of `[6]byte` (#58) and its test seams in one unexported `seams` struct set through dial options (#57); the tests that waited for real timeouts wait less, about a third off the root package's run on the maintainer's machine (#59); tests were added for the mutants that survived a full mutation run, and the run now leaves one survivor, an equivalent one (efficacy 98.97% before, 99.83% after) (#60); `scripts/pkgdoc.sh` and `scripts/fuzz.sh` are Go programs and no inline Python is left in the repository (#61); every case of a table-style test runs as a subtest, and `make lint` fails on a loop over cases without `t.Run` (`internal/subtests`) (#73).
+- **Verified on hardware:** the live tests (`go test -tags live`) passed on a TL-SG108E with firmware 20250710 on the candidate commit: 17 passed, none failed, the three that move the management address skipped; the switch was left as found.
+
 ## 0.5.0
 
 - **Behavior changes** (no signature changes; `make apidiff` reports one addition, `MaxRetries`):
