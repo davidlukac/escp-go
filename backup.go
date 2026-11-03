@@ -64,7 +64,9 @@ func (f ConfigFile) LogValue() slog.Value { return slog.StringValue(f.String()) 
 // configuration that changes while it is read fails the same way. A rejection, a missing reply
 // and a canceled context end the call at once.
 func (c *Client) ConfigBackup(ctx context.Context) (ConfigFile, error) {
-	c.mu.Lock()
+	if err := c.lock(ctx); err != nil {
+		return nil, err
+	}
 	defer c.mu.Unlock()
 	var out []byte
 	err := c.withSession(ctx, func() error {

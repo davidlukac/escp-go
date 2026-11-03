@@ -35,7 +35,9 @@ type Info struct {
 // switch's address and to Config.BroadcastAddr, and repeated up to Config.Retries times; if
 // nothing answers the error is ErrNoReply.
 func (c *Client) Info(ctx context.Context) (Info, error) {
-	c.mu.Lock()
+	if err := c.lock(ctx); err != nil {
+		return Info{}, err
+	}
 	defer c.mu.Unlock()
 	return c.discover(ctx)
 }

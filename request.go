@@ -9,6 +9,32 @@ import (
 	"github.com/davidlukac/escp-go/internal/wire"
 )
 
+// lock takes the client's lock, which is held across a whole exchange (the switch answers one
+// request at a time), and gives up when ctx ends first: a call that queues behind another one must
+// not outlive its own context. It returns ctx's error, with nothing held, or nil with the lock held.
+// The calls that must run to the end whatever their context says (settling the outcome of a write
+// that may have been applied) take c.mu directly.
+func (c *Client) lock(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	got := make(chan struct{})
+	go func() {
+		c.mu.Lock()
+		close(got)
+	}()
+	select {
+	case <-got:
+		return nil
+	case <-ctx.Done():
+		go func() { // the lock arrives later and is handed straight back
+			<-got
+			c.mu.Unlock()
+		}()
+		return ctx.Err()
+	}
+}
+
 func boolByte(b bool) byte {
 	if b {
 		return 1
@@ -37,7 +63,9 @@ func (c *Client) setTLVsSent(ctx context.Context, op Operation, tlvs ...wire.TLV
 			return false, err
 		}
 	}
-	c.mu.Lock()
+	if err := c.lock(ctx); err != nil {
+		return true, err // the gate let it go: sent reports that, as it always has, and a caller that settles an unknown outcome stays on the safe side
+	}
 	defer c.mu.Unlock()
 	c.log.InfoContext(ctx, "write", "operation", op.Name, "impact", op.Impact.String(), "ports", op.Ports.String())
 	return true, c.withSession(ctx, func() error {
@@ -59,7 +87,9 @@ func (c *Client) setTLVsSent(ctx context.Context, op Operation, tlvs ...wire.TLV
 // getTLVs reads one or more setting types with an authenticated session and
 // returns every TLV of the reply. It never writes.
 func (c *Client) getTLVs(ctx context.Context, types ...wire.TLVType) ([]wire.TLV, error) {
-	c.mu.Lock()
+	if err := c.lock(ctx); err != nil {
+		return nil, err
+	}
 	defer c.mu.Unlock()
 	var out []wire.TLV
 	err := c.withSession(ctx, func() error {
@@ -104,10 +134,7 @@ func (c *Client) requirePorts(ctx context.Context, ports PortSet) error {
 
 // portCount returns the switch's number of ports, reading it on first use.
 func (c *Client) portCount(ctx context.Context) (int, error) {
-	c.mu.Lock()
-	known := c.switchPorts
-	c.mu.Unlock()
-	if known > 0 {
+	if known := int(c.switchPorts.Load()); known > 0 {
 		return known, nil
 	}
 	tlvs, err := c.getTLVs(ctx, wire.TLVPortCount)
@@ -116,9 +143,7 @@ func (c *Client) portCount(ctx context.Context) (int, error) {
 	}
 	for _, t := range tlvs {
 		if t.Type == wire.TLVPortCount && len(t.Value) == 1 && t.Value[0] > 0 {
-			c.mu.Lock()
-			c.switchPorts = int(t.Value[0])
-			c.mu.Unlock()
+			c.switchPorts.Store(int64(t.Value[0]))
 			return int(t.Value[0]), nil
 		}
 	}
