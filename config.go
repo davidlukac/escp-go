@@ -28,6 +28,12 @@ const defaultRetries = 2
 // not answer the first three will ever answer.
 const MaxRetries = 10
 
+// MaxTimeout is the highest Config.Timeout that Config.Validate and Dial accept: the wait for a reply
+// per attempt. A switch answers in well under three seconds (it stalled for about ten under heavy
+// load); with MaxRetries the longest a request can hold a call is (MaxRetries+1) x MaxTimeout, 330
+// seconds, and a Timeout of an hour would hold it for hours.
+const MaxTimeout = 30 * time.Second
+
 // Config configures a Client. Zero values select sensible defaults, except Host, which is
 // required. A Config holds the switch's password as a Password, which prints as [redacted], so a
 // Config can be logged or put in an error message; keep the text itself (Reveal) out of both.
@@ -48,7 +54,7 @@ type Config struct {
 	// Username and Password are sent with every write and every authenticated read.
 	Username string
 	Password Password
-	Timeout  time.Duration // how long to wait for a reply per attempt, default 3s
+	Timeout  time.Duration // how long to wait for a reply per attempt, default 3s, at most MaxTimeout
 	// Retries is the number of additional attempts after the first when the switch stays
 	// silent: zero selects the default (2), NoRetries (any negative value) selects none, and
 	// more than MaxRetries is refused.
@@ -82,7 +88,7 @@ const maxUDPPort = 1<<16 - 1
 
 // Validate checks the configuration the way Dial does, before anything is resolved or sent: a switch
 // to talk to (Host or MAC; a Host that is no IPv6 address, no host:port and no address that reaches
-// more than one device), no negative Timeout, no more than MaxRetries Retries, ports that are UDP ports and an IPv4 BroadcastAddr.
+// more than one device), no negative Timeout and none above MaxTimeout, no more than MaxRetries Retries, ports that are UDP ports and an IPv4 BroadcastAddr.
 // The zero value of every optional field is valid (it selects the default). The error matches
 // ErrInvalid.
 func (cfg Config) Validate() error {
@@ -96,6 +102,8 @@ func (cfg Config) Validate() error {
 		return invalidf("escp: Config needs a Host or a MAC to find the switch by")
 	case cfg.Timeout < 0:
 		return invalidf("escp: negative Timeout %v", cfg.Timeout)
+	case cfg.Timeout > MaxTimeout:
+		return invalidf("escp: Timeout %v is above the limit of %v", cfg.Timeout, MaxTimeout)
 	case cfg.Retries > MaxRetries:
 		return invalidf("escp: Retries %d is above the limit of %d", cfg.Retries, MaxRetries)
 	case cfg.SwitchPort < 0 || cfg.SwitchPort > maxUDPPort:
