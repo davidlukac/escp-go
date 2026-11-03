@@ -86,8 +86,8 @@ func FuzzPortMaskRoundTrip(f *testing.F) {
 		if err != nil {
 			t.Fatalf("ports 1-%d must always be accepted: %v", MaxPort, err)
 		}
-		got := PortSetFromMask(set.Mask())
-		if got != set || got.Len() != len(want) || !sort.SliceIsSorted(got.Ports(), func(i, j int) bool { return got.Ports()[i] < got.Ports()[j] }) {
+		got, err := ParsePortMask(set.Mask())
+		if err != nil || got != set || got.Len() != len(want) || !sort.SliceIsSorted(got.Ports(), func(i, j int) bool { return got.Ports()[i] < got.Ports()[j] }) {
 			t.Fatalf("round trip of %v gave %v", ports, got)
 		}
 		for _, p := range got.Ports() {

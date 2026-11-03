@@ -39,8 +39,8 @@ func parseMirror(tlvs []wire.TLV) (Mirror, error) {
 		m := Mirror{}
 		if t.Value[mirrorOffEnabled] == 1 {
 			m.Enabled, m.Destination = true, PortID(t.Value[mirrorOffPort])
-			m.IngressPorts = PortSetFromMask(t.Value[mirrorOffIngress:])
-			m.EgressPorts = PortSetFromMask(t.Value[mirrorOffEgress:])
+			m.IngressPorts = maskAt(t.Value, mirrorOffIngress)
+			m.EgressPorts = maskAt(t.Value, mirrorOffEgress)
 		}
 		return m, nil
 	}
