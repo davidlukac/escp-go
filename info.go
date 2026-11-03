@@ -42,6 +42,11 @@ func (c *Client) Info(ctx context.Context) (Info, error) {
 	return c.discover(ctx)
 }
 
+// SwitchMAC is the MAC address of the switch this client talks to: Config.MAC or, without one, the
+// MAC the switch reported on the client's first contact. It is zero before that first contact of a
+// client that has no Config.MAC. It reads state of its own and never waits for a call in flight.
+func (c *Client) SwitchMAC() MAC { return c.ident.mac() }
+
 func (c *Client) discover(ctx context.Context) (Info, error) {
 	if c.dest.IP == nil {
 		if err := c.relocate(ctx); err != nil {

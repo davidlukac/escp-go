@@ -146,6 +146,9 @@ func namesMoreThanOneDevice(a netip.Addr) bool {
 // runs). It only reads. A *Client is a Reader; a test double implements the few methods its gate calls
 // and embeds the interface for the rest.
 type Reader interface {
+	// SwitchMAC is the MAC address of the switch the reader talks to; zero while it is not known
+	// yet. It never waits for a call in flight.
+	SwitchMAC() MAC
 	Info(ctx context.Context) (Info, error)
 	System(ctx context.Context) (System, error)
 	LED(ctx context.Context) (bool, error)
