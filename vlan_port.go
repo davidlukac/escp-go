@@ -113,7 +113,7 @@ func parsePortBasedVLAN(tlvs []wire.TLV) (PortBasedVLAN, error) {
 			if len(t.Value) != pvlanEntryLen {
 				return out, fmt.Errorf("escp: port-based VLAN entry has %d bytes, want %d", len(t.Value), pvlanEntryLen)
 			}
-			out.VLANs = append(out.VLANs, PortVLAN{ID: PortVLANID(t.Value[0]), Ports: PortSetFromMask(t.Value[pvlanOffMask:])})
+			out.VLANs = append(out.VLANs, PortVLAN{ID: PortVLANID(t.Value[0]), Ports: maskAt(t.Value, pvlanOffMask)})
 		}
 	}
 	if !seen {

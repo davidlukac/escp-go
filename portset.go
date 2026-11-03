@@ -69,13 +69,20 @@ func MustPortSet(ports ...PortID) PortSet {
 	return s
 }
 
-// PortSetFromMask reads a big-endian port bitmap (bit n-1 = port n) from the first four bytes of
-// v; shorter input is the empty set.
-func PortSetFromMask(v []byte) PortSet {
-	if len(v) < maskLen {
-		return 0
+// ParsePortMask reads a big-endian port bitmap (bit n-1 = port n), the inverse of Mask. The input
+// must be exactly four bytes long: a shorter or longer one is an error that matches ErrInvalid, so
+// a truncated mask is never taken for the empty set (which means "no ports").
+func ParsePortMask(v []byte) (PortSet, error) {
+	if len(v) != maskLen {
+		return 0, invalidf("escp: a port mask is %d bytes, got %d", maskLen, len(v))
 	}
-	return PortSet(binary.BigEndian.Uint32(v))
+	return maskAt(v, 0), nil
+}
+
+// maskAt reads the port mask at offset off of an entry whose length the caller has already checked
+// against its layout; it panics, like any slice index, on input that was not checked.
+func maskAt(v []byte, off int) PortSet {
+	return PortSet(binary.BigEndian.Uint32(v[off : off+maskLen]))
 }
 
 // Mask is the big-endian port bitmap that goes on the wire.

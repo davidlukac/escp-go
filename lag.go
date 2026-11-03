@@ -124,7 +124,7 @@ func parseLAGs(tlvs []wire.TLV) ([]LAG, error) {
 		if len(t.Value) < lagEntryLen {
 			return nil, fmt.Errorf("escp: LAG TLV too short (%d bytes)", len(t.Value))
 		}
-		out = append(out, LAG{ID: LAGID(t.Value[0]), Ports: PortSetFromMask(t.Value[lagOffMask:])})
+		out = append(out, LAG{ID: LAGID(t.Value[0]), Ports: maskAt(t.Value, lagOffMask)})
 	}
 	return out, nil
 }

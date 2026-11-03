@@ -74,14 +74,36 @@ func TestPortSetIsTheWireMask(t *testing.T) {
 	if got, want := s.Mask(), []byte{0x80, 0, 0, 0x05}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("mask % x, want % x", got, want)
 	}
-	if back := PortSetFromMask(s.Mask()); back != s {
-		t.Fatalf("round trip gave %v", back)
+	back, err := ParsePortMask(s.Mask())
+	if err != nil || back != s {
+		t.Fatalf("round trip gave %v, %v", back, err)
 	}
-	if PortSetFromMask([]byte{1, 2, 3}) != 0 || PortSetFromMask(nil) != 0 {
-		t.Fatal("a mask shorter than four bytes is the empty set")
+}
+
+// A mask of the wrong length is refused; it is never the empty set.
+func TestParsePortMaskRefusesTheWrongLength(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		in   []byte
+	}{
+		{"nil", nil},
+		{"three bytes", []byte{1, 2, 3}},
+		{"five bytes", []byte{0, 0, 0, 0x0c, 0xff}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := ParsePortMask(tc.in)
+			if !errors.Is(err, ErrInvalid) || got != 0 {
+				t.Fatalf("got %v, %v; want an ErrInvalid and no ports", got, err)
+			}
+		})
 	}
-	if PortSetFromMask([]byte{0, 0, 0, 0x0c, 0xff}) != MustPortSet(3, 4) {
-		t.Fatal("bytes after the first four are ignored")
+}
+
+// Four zero bytes are a real mask: the empty set.
+func TestParsePortMaskAcceptsTheEmptySet(t *testing.T) {
+	got, err := ParsePortMask([]byte{0, 0, 0, 0})
+	if err != nil || !got.IsEmpty() {
+		t.Fatalf("got %v, %v", got, err)
 	}
 }
 

@@ -50,7 +50,7 @@ func parseDot1Q(tlvs []wire.TLV) (Dot1Q, error) {
 				return out, fmt.Errorf("escp: 802.1Q VLAN entry has %d bytes, want at least %d", len(v), vlan8021QOffName)
 			}
 			// Vendor semantics: member and tagged-mask -> tagged; member only -> untagged.
-			members, taggedMask := PortSetFromMask(v[vlan8021QOffMember:]), PortSetFromMask(v[vlan8021QOffTagged:])
+			members, taggedMask := maskAt(v, vlan8021QOffMember), maskAt(v, vlan8021QOffTagged)
 			untagged := members.Minus(taggedMask)
 			out.VLANs = append(out.VLANs, Dot1QVLAN{ID: VLANID(int(v[0])<<8 | int(v[1])), Name: VLANName(wire.CString(v[vlan8021QOffName:])),
 				Tagged: members.Minus(untagged), Untagged: untagged})

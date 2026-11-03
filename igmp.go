@@ -50,7 +50,7 @@ func parseIGMP(tlvs []wire.TLV) (IGMP, error) {
 			for i := 0; i < len(t.Value); i += igmpGroupLen {
 				e := t.Value[i : i+igmpGroupLen]
 				out.Groups = append(out.Groups, IGMPGroup{
-					IP: netip.AddrFrom4([net.IPv4len]byte(e[igmpOffIP:igmpOffVLAN])), VLAN: VLANID(binary.BigEndian.Uint16(e[igmpOffVLAN:])), Ports: PortSetFromMask(e[igmpOffPorts:]),
+					IP: netip.AddrFrom4([net.IPv4len]byte(e[igmpOffIP:igmpOffVLAN])), VLAN: VLANID(binary.BigEndian.Uint16(e[igmpOffVLAN:])), Ports: maskAt(e, igmpOffPorts),
 				})
 			}
 		}
