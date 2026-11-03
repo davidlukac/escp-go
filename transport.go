@@ -96,6 +96,20 @@ func (c *Client) decrypt(b []byte) []byte {
 	return wire.RC4Static(b)
 }
 
+// identity is the MAC address of the switch this client talks to: the one Config.MAC names or, when
+// it names none, the one the switch reported on first contact. A device that answers with another
+// one is not that switch, whoever took the address over. Zero before the first contact of a client
+// that has no Config.MAC. Callers hold c.mu.
+func (c *Client) identity() MAC {
+	if !c.cfg.MAC.IsZero() {
+		return c.cfg.MAC
+	}
+	if c.haveSwMAC {
+		return c.swMAC
+	}
+	return MAC{}
+}
+
 // accept decides whether a datagram is the reply to the request in flight: it
 // must come from the switch, decode to a valid packet, echo the current
 // sequence number and not be our own broadcast discovery coming back.
@@ -107,9 +121,9 @@ func (c *Client) accept(from *net.UDPAddr, data []byte) (reply, bool) {
 	if err != nil || h.Seq != c.seq || h.Op == wire.OpDiscovery {
 		return reply{}, false
 	}
-	if got := MAC(h.SwitchMAC); !c.cfg.MAC.IsZero() && !got.IsZero() && got != c.cfg.MAC {
+	if want, got := c.identity(), MAC(h.SwitchMAC); !want.IsZero() && !got.IsZero() && got != want {
 		// the address answers, but it is another device: remember it and let exchange say so
-		c.wrong = &WrongSwitchError{Want: c.cfg.MAC, Got: got, IP: addrOf(from.IP)}
+		c.wrong = &WrongSwitchError{Want: want, Got: got, IP: addrOf(from.IP)}
 		return reply{}, false
 	}
 	if !c.haveSwMAC {

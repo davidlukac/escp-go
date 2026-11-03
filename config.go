@@ -41,7 +41,9 @@ type Config struct {
 	// address is never written to (the request fails with ErrWrongSwitch). With no Host, or when
 	// Host does not answer, the switch is looked up by MAC with a discovery probe on the first
 	// request and again when it stops answering (its address may have changed); nothing is sent
-	// by Dial.
+	// by Dial. Without it the client pins itself to the MAC the switch reports on its first
+	// contact, so a device that takes the address over later is refused the same way; only the
+	// first contact is then taken on trust.
 	MAC MAC
 	// Username and Password are sent with every write and every authenticated read.
 	Username string
