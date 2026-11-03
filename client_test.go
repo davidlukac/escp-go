@@ -412,6 +412,37 @@ func TestDialContextTakesTheFirstIPv4AddressOfAName(t *testing.T) {
 	}
 }
 
+// The text check of Config.Validate knows the dotted form only; a spelling the system resolver reads
+// as an address that reaches every device (or a name that a hosts file or DNS maps to one) is caught
+// when the lookup has answered, before a client exists to send the password there.
+func TestDialRefusesAHostThatResolvesToAnAddressThatReachesManyDevices(t *testing.T) {
+	for name, tc := range map[string]struct{ host, resolved string }{
+		"broadcast as a number":   {"4294967295", "255.255.255.255"},
+		"broadcast as a name":     {"broadcasthost", "255.255.255.255"},
+		"multicast, short form":   {"224.1", "224.0.0.1"},
+		"multicast, local subnet": {"sw.example", "224.0.0.251"},
+		"unspecified":             {"0", "0.0.0.0"},
+		"first of several":        {"sw.example", "0.0.0.0"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			look := &stubLookup{addrs: []net.IPAddr{{IP: net.ParseIP(tc.resolved)}, {IP: net.ParseIP("192.0.2.7")}}}
+			c, err := dial(context.Background(), look, Config{Host: tc.host})
+			if c != nil || !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), tc.resolved) || !strings.Contains(err.Error(), tc.host) {
+				t.Fatalf("client built: %t, err %v; want ErrInvalid naming %q and %s and no client", c != nil, err, tc.host, tc.resolved)
+			}
+		})
+	}
+	// an ordinary address, and loopback (the fake switch lives there), are fine
+	for _, ok := range []string{"192.0.2.7", "127.0.0.1", "10.0.0.255", "255.255.255.254"} {
+		t.Run(ok, func(t *testing.T) {
+			look := &stubLookup{addrs: []net.IPAddr{{IP: net.ParseIP(ok)}}}
+			if _, err := dial(context.Background(), look, Config{Host: "sw.example"}); err != nil {
+				t.Error(err)
+			}
+		})
+	}
+}
+
 func TestDialContextRefusesANameWithoutAnIPv4Address(t *testing.T) {
 	for name, look := range map[string]*stubLookup{
 		"only IPv6":  {addrs: []net.IPAddr{{IP: net.ParseIP("2001:db8::1")}}},

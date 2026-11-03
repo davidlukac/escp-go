@@ -35,7 +35,7 @@ type Config struct {
 	// Host is the switch's IPv4 address or hostname (no port: that is SwitchPort; no IPv6). It
 	// is required unless MAC is set, in which case the address is found by discovery on the
 	// first request. An address that reaches no single device (0.0.0.0, a multicast group,
-	// 255.255.255.255) is refused.
+	// 255.255.255.255) is refused, whether it is written out or a name resolves to it.
 	Host string
 	// MAC, when set, pins the identity of the switch: a device that answers with another MAC
 	// address is never written to (the request fails with ErrWrongSwitch). With no Host, or when
@@ -120,10 +120,17 @@ func validateHost(host string) error {
 	if strings.ContainsAny(host, ": \t") {
 		return invalidf("escp: Host %q is not an IPv4 address or a host name (no IPv6, no port, no spaces)", host)
 	}
-	if a, err := netip.ParseAddr(host); err == nil && (a.IsUnspecified() || a.IsMulticast() || a == limitedBroadcast) {
+	if a, err := netip.ParseAddr(host); err == nil && namesMoreThanOneDevice(a) {
 		return invalidf("escp: Host %s does not name one switch (an unspecified, multicast or broadcast address)", host)
 	}
 	return nil
+}
+
+// namesMoreThanOneDevice reports whether a is an address that reaches no single device: the
+// unspecified address, a multicast group or the limited broadcast. A request sent there carries the
+// password to every device that listens.
+func namesMoreThanOneDevice(a netip.Addr) bool {
+	return a.IsUnspecified() || a.IsMulticast() || a == limitedBroadcast
 }
 
 // Reader is the part of a Client that a WriteGate may use: the reads of the settings, so that a gate
