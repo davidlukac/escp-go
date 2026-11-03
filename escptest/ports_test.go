@@ -283,3 +283,29 @@ func TestOnlyTheForbiddenErrorOfTheSystemIsTakenForAMarkerThatCannotBePlaced(t *
 		})
 	}
 }
+
+// The ports come from a range the kernel never draws from for a socket that binds port 0, so no
+// socket of the process can be given a port that was just handed out.
+func TestPortsAreHandedOutFromBelowTheKernelsOwnRange(t *testing.T) {
+	for range 200 {
+		port := FreeUDPPort(t)
+		if port < firstTestPort || port >= endTestPort {
+			t.Fatalf("port %d is outside %d-%d", port, firstTestPort, endTestPort-1)
+		}
+		if port == 29808 || port == 29809 {
+			t.Fatalf("port %d is one of the protocol's own", port)
+		}
+	}
+}
+
+func TestTheSearchForALoopbackPortGivesUpAndSaysSo(t *testing.T) {
+	cause := errors.New("address already in use")
+	tries := 0
+	old := listenUDP
+	listenUDP = func(string, *net.UDPAddr) (*net.UDPConn, error) { tries++; return nil, cause }
+	t.Cleanup(func() { listenUDP = old })
+	_, err := listenLoopback()
+	if !errors.Is(err, cause) || tries != maxLoopbackTries {
+		t.Fatalf("got %v after %d tries, want %q after %d", err, tries, cause, maxLoopbackTries)
+	}
+}

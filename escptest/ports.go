@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand/v2"
 	"net"
 	"net/netip"
 	"strconv"
@@ -18,7 +19,8 @@ import (
 // BroadcastAddr, so discovery stays on this machine.
 func Loopback() netip.Addr { return netip.MustParseAddr("127.0.0.1") }
 
-// FreeUDPPort returns a currently unused UDP port so tests never bind the
+// FreeUDPPort returns a currently unused UDP port (drawn from 20000-28999, below the ports the
+// system gives to sockets that bind port 0) so tests never bind the
 // protocol's real client port 29809. The port is reserved for the life of the process, and no
 // other process that uses this package is given it either: the kernel hands a port it has just
 // released to the very next bind, in this process (measured: about 1 in 10,000 when several
@@ -81,9 +83,33 @@ func markerForbidden(err error) bool { return errors.Is(err, wsaeacces) }
 // maxReservedTries bounds the search for a port nobody was given before.
 const maxReservedTries = 100
 
-// listenLoopback binds a UDP socket on a kernel-chosen loopback port.
+// The range the ports are drawn from: below the ranges the systems give to the sockets that bind
+// port 0 (49152 and up on macOS, Windows and BSD, 32768 and up on Linux), and clear of the protocol's
+// own ports 29808 and 29809. A port from the kernel's own range can be handed to any socket of the
+// process that binds port 0 right after this package released it (a client's source port, a
+// discovery socket): the macOS CI run that failed with "binding UDP port ... is a client that does
+// not share the port running" was that collision. A port from this range is never given by the
+// kernel, so only another program that picks the same number can take it.
+const (
+	firstTestPort = 20000
+	endTestPort   = 29000
+)
+
+// maxLoopbackTries bounds the search for a port in that range that can be bound.
+const maxLoopbackTries = 50
+
+// listenLoopback binds a UDP socket on a random loopback port of the test range.
 func listenLoopback() (*net.UDPConn, error) {
-	return net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
+	var lastErr error
+	for range maxLoopbackTries {
+		port := firstTestPort + rand.IntN(endTestPort-firstTestPort) //nolint:gosec // a test port, not a secret: any number in the range will do
+		c, err := listenUDP("udp4", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: port})
+		if err == nil {
+			return c, nil
+		}
+		lastErr = err
+	}
+	return nil, fmt.Errorf("escptest: no UDP port to bind in %d-%d after %d tries: %w", firstTestPort, endTestPort-1, maxLoopbackTries, lastErr)
 }
 
 // listenUnreserved binds with listen until the kernel gives a port that nobody holds a reservation
@@ -136,3 +162,6 @@ func reserve(port int) error {
 	}
 	return nil
 }
+
+// listenUDP binds a UDP socket; tests replace it.
+var listenUDP = net.ListenUDP
