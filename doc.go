@@ -24,7 +24,8 @@
 // Discover finds the switches on the network without credentials or addresses; Locate finds one
 // by its MAC address. Config.MAC pins a client to a switch, so that a request to an address that
 // now belongs to another device fails with ErrWrongSwitch before anything is written to it, and
-// finds the switch again when its address changed.
+// finds the switch again when its address changed. A client without Config.MAC keeps to the
+// switch it met on its first contact in the same way; Config.MAC is what pins it from the start.
 //
 // # Writing safely
 //

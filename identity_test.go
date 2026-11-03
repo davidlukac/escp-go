@@ -97,6 +97,35 @@ func TestALookupThatFindsNobodyIsTriedOnceMore(t *testing.T) {
 	}
 }
 
+// A client without Config.MAC learns the switch's MAC on its first contact and keeps to it: when
+// another device takes the address over (a lease changed hands, say), it is not written to either.
+func TestAnUnpinnedClientNeverWritesToAnotherDeviceThanTheOneItMet(t *testing.T) {
+	f := escptest.Start(t)
+	c, _ := dialMAC(t, f, "127.0.0.1", MAC{}, nil)
+	ctx := context.Background()
+	if err := c.SetLED(ctx, false); err != nil {
+		t.Fatal(err) // the first contact is trusted
+	}
+	f.SetMAC(otherMAC)
+	f.ClearSession() // the new device knows no session key
+	written := f.WriteCount()
+	var wrong *WrongSwitchError
+	if err := c.SetLED(ctx, true); !errors.Is(err, ErrWrongSwitch) || !errors.As(err, &wrong) || wrong.Want != wantMAC || wrong.Got != otherMAC {
+		t.Fatalf("SetLED = %v, want ErrWrongSwitch naming %v and %v", err, wantMAC, otherMAC)
+	}
+	if _, err := c.Info(ctx); !errors.Is(err, ErrWrongSwitch) {
+		t.Fatalf("Info = %v, want ErrWrongSwitch", err)
+	}
+	if f.WriteCount() != written {
+		t.Fatalf("the stranger was written to: %d writes, want %d", f.WriteCount(), written)
+	}
+	f.SetMAC(wantMAC) // the switch is back
+	f.ClearSession()
+	if err := c.SetLED(ctx, true); err != nil {
+		t.Fatalf("the switch it met is back and must be written to again: %v", err)
+	}
+}
+
 func TestADeviceWithAnotherMACIsNeverWrittenTo(t *testing.T) {
 	f := escptest.Start(t)
 	f.SetMAC(otherMAC)
