@@ -23,6 +23,13 @@ if printf '%s\n' "$staged" | grep -q '^\.github/'; then
   make actionlint
 fi
 
+# Prose and configuration are American English too, and a commit that touches only those (a guide, a
+# workflow) would otherwise skip every check below: spell them first, it takes a second.
+if printf '%s\n' "$staged" | grep -Eq '(\.(md|ya?ml|json|sh)$|^Makefile$)'; then
+  echo "pre-commit: make spell"
+  make spell
+fi
+
 # Only these paths can change build, lint or test results.
 if ! printf '%s\n' "$staged" | grep -Eq '(\.go$|^go\.(mod|sum)$|^\.golangci\.yml$|^Makefile$|^\.githooks/|^devtools/|^safety/compatibility\.json$|^README\.md$)'; then
   echo "pre-commit: no Go-relevant changes staged, skipping checks"

@@ -5,7 +5,7 @@
 # Dependabot bumps them there. `go tool` builds the pinned version on first use (cached afterwards).
 DEVTOOL := go tool -modfile=devtools/go.mod
 
-.PHONY: test lint actionlint vuln cover cover-html apidiff fuzz mutation mutation-diff pkgdoc pkgdoc-serve compat-table settings-docs soak hooks pre-commit
+.PHONY: test lint spell actionlint vuln cover cover-html apidiff fuzz mutation mutation-diff pkgdoc pkgdoc-serve compat-table settings-docs soak hooks pre-commit
 
 # Unit tests against the fake switch. No hardware is touched.
 test:
@@ -18,7 +18,14 @@ test:
 # binary is built for this machine first: `go tool -n` prints its path).
 LINT_GOOS := linux windows
 
-lint:
+# American English in every tracked text file, not only the Go comments the misspell linter reads: the
+# Markdown, YAML, shell and the Makefile too. The same word list as the linter (misspell, locale US, pinned in
+# devtools). History that quotes the past (the changelog, the code of conduct) is left as it was.
+spell:
+	@git ls-files -z -- '*.go' '*.md' '*.yml' '*.yaml' '*.json' '*.sh' Makefile ':!:CHANGELOG.md' ':!:CODE_OF_CONDUCT.md' ':!:text_test.go' ':!:testdata' \
+		| xargs -0 $(DEVTOOL) misspell -locale US -error
+
+lint: spell
 	go -C devtools build -o $(CURDIR)/build/subtests ./subtests
 	go -C devtools test -count=1 ./...
 	build/subtests ./...
