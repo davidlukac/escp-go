@@ -336,6 +336,39 @@ func TestUsage(t *testing.T) {
 	}
 }
 
+// forgetGitEnvironment removes every GIT_ variable from the environment of the process: a git hook
+// exports GIT_DIR, GIT_INDEX_FILE and the like (absolute in a linked worktree), and a test that runs
+// git while the hook is committing would otherwise act on the repository being committed to (and a
+// test that expects git to fail outside a repository would find that one).
+func forgetGitEnvironment() {
+	for _, kv := range os.Environ() {
+		if name, _, _ := strings.Cut(kv, "="); strings.HasPrefix(name, "GIT_") {
+			_ = os.Unsetenv(name) // the name came from the environment, so it is valid
+		}
+	}
+}
+
+func TestMain(m *testing.M) {
+	forgetGitEnvironment()
+	os.Exit(m.Run())
+}
+
+func TestForgetGitEnvironmentRemovesWhatAHookExports(t *testing.T) {
+	names := []string{"GIT_DIR", "GIT_INDEX_FILE", "GIT_WORK_TREE", "GIT_AUTHOR_NAME"}
+	// subtests: this sets the environment up, it is not a list of cases
+	for _, name := range names {
+		t.Setenv(name, "/somewhere/else") // restored when the test ends
+	}
+	forgetGitEnvironment()
+	for _, name := range names {
+		t.Run(name, func(t *testing.T) {
+			if v, set := os.LookupEnv(name); set {
+				t.Errorf("%s is still set (%q)", name, v)
+			}
+		})
+	}
+}
+
 // With the real git and make, in a repository of its own: the whole preparation and the tag.
 func TestAgainstARealRepository(t *testing.T) {
 	dir := t.TempDir()
