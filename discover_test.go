@@ -110,8 +110,11 @@ func TestDiscoverReturnsEveryDistinctSwitchSortedByAddress(t *testing.T) {
 			packet(wire.OpReply, h.Seq, noMAC), // no MAC: keyed by the sender's address
 		}
 	})
-	got, err := discoverWith(context.Background(), DiscoverOptions{Window: 300 * time.Millisecond},
-		loopbackEnv(t, r, hostPort, netInterface{Name: "en0", MAC: macOne, Broadcasts: lo}))
+	// The reply without a MAC is the last datagram of the burst and loopback keeps the order, so
+	// when it is in, everything before it was read; the window is only a limit.
+	got, err := discoverUntil(context.Background(), DiscoverOptions{Window: time.Minute},
+		loopbackEnv(t, r, hostPort, netInterface{Name: "en0", MAC: macOne, Broadcasts: lo}),
+		func(found map[string]Info) bool { _, ok := found["127.0.0.1"]; return ok })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -184,7 +187,8 @@ func TestDiscoverCanBeLimitedToOneInterface(t *testing.T) {
 }
 
 // The window is how long Discover listens, no more: the second probe goes out halfway, and the
-// call ends at the end of the window, not twice that. The bounds leave room for a slow machine.
+// call ends at the end of the window, not twice that. The bounds leave room for a slow machine:
+// the upper one only has to tell one window from two.
 func TestDiscoverListensForTheWindowAndNoLonger(t *testing.T) {
 	hostPort := escptest.FreeUDPPort(t)
 	r := startResponder(t, hostPort, nil)
@@ -194,7 +198,7 @@ func TestDiscoverListensForTheWindowAndNoLonger(t *testing.T) {
 		loopbackEnv(t, r, hostPort, netInterface{Name: "en0", MAC: macOne, Broadcasts: lo})); err != nil {
 		t.Fatal(err)
 	}
-	if took := time.Since(start); took < window-50*time.Millisecond || took > window+300*time.Millisecond {
+	if took := time.Since(start); took < window-50*time.Millisecond || took >= 2*window-100*time.Millisecond {
 		t.Fatalf("a window of %v took %v", window, took)
 	}
 }
@@ -267,7 +271,10 @@ func TestDiscoverSurvivesOneInterfaceThatCannotSend(t *testing.T) {
 		_, err := conn.WriteToUDP(pkt, to)
 		return err
 	}
-	got, err := discoverWith(context.Background(), DiscoverOptions{Window: 200 * time.Millisecond}, env)
+	// The window is only a limit: the search ends when the reply is in, so a slow machine cannot
+	// make the test miss it.
+	got, err := discoverUntil(context.Background(), DiscoverOptions{Window: time.Minute}, env,
+		func(found map[string]Info) bool { return len(found) == 1 })
 	if err != nil || len(got) != 1 || got[0].Hostname != "sw" {
 		t.Fatalf("got %+v, %v; one failing interface must not hide the others", got, err)
 	}

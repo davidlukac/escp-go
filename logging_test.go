@@ -393,8 +393,9 @@ func TestDiscoveryLogsItsProbesAndWhatItFound(t *testing.T) {
 	hostPort := escptest.FreeUDPPort(t)
 	r := startResponder(t, hostPort, answerAsOneSwitch)
 	log, rec := newLogRecorder()
-	_, err := discoverWith(context.Background(), DiscoverOptions{Window: 200 * time.Millisecond, Logger: log}, loopbackEnv(t, r, hostPort,
-		netInterface{Name: "en0", MAC: macOne, Broadcasts: lo}))
+	// The window is only a limit: the search ends when the one switch has answered.
+	_, err := discoverUntil(context.Background(), DiscoverOptions{Window: time.Minute, Logger: log}, loopbackEnv(t, r, hostPort,
+		netInterface{Name: "en0", MAC: macOne, Broadcasts: lo}), func(found map[string]Info) bool { return len(found) == 1 })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -412,7 +413,7 @@ func TestLocateLogsWhereItFoundTheSwitch(t *testing.T) {
 	hostPort := escptest.FreeUDPPort(t)
 	r := startResponder(t, hostPort, answerAsOneSwitch)
 	log, rec := newLogRecorder()
-	if _, err := locateWith(context.Background(), MAC(oneSwitchMAC), DiscoverOptions{Window: 200 * time.Millisecond, Logger: log}, loopbackEnv(t, r, hostPort,
+	if _, err := locateWith(context.Background(), MAC(oneSwitchMAC), DiscoverOptions{Window: time.Minute, Logger: log}, loopbackEnv(t, r, hostPort,
 		netInterface{Name: "en0", MAC: macOne, Broadcasts: lo})); err != nil {
 		t.Fatal(err)
 	}
