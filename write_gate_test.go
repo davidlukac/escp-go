@@ -22,59 +22,59 @@ var errGateRefused = errors.New("test gate: refused")
 // valid arguments, so the call can only fail because the gate says no. The test
 // below finds the write methods by reflection and fails when one is missing from
 // this table, so a new Set* or Delete* method cannot skip the gate unnoticed.
-var writeCalls = map[string]func(context.Context, *Client) error{
-	"SetLED": func(ctx context.Context, c *Client) error { return c.SetLED(ctx, false) },
-	"SetBandwidth": func(ctx context.Context, c *Client) error {
+var writeCalls = map[Method]func(context.Context, *Client) error{
+	MethodSetLED: func(ctx context.Context, c *Client) error { return c.SetLED(ctx, false) },
+	MethodSetBandwidth: func(ctx context.Context, c *Client) error {
 		return c.SetBandwidth(ctx, PortBandwidth{Port: 2, Ingress: 64, Egress: 64})
 	},
-	"SetIGMP": func(ctx context.Context, c *Client) error {
+	MethodSetIGMP: func(ctx context.Context, c *Client) error {
 		return c.SetIGMP(ctx, IGMPConfig{Enabled: true, ReportSuppression: false})
 	},
-	"SetLAG":            func(ctx context.Context, c *Client) error { return c.SetLAG(ctx, LAG{ID: 1, Ports: MustPortSet(2, 3)}) },
-	"SetLoopPrevention": func(ctx context.Context, c *Client) error { return c.SetLoopPrevention(ctx, true) },
-	"SetPort": func(ctx context.Context, c *Client) error {
+	MethodSetLAG:            func(ctx context.Context, c *Client) error { return c.SetLAG(ctx, LAG{ID: 1, Ports: MustPortSet(2, 3)}) },
+	MethodSetLoopPrevention: func(ctx context.Context, c *Client) error { return c.SetLoopPrevention(ctx, true) },
+	MethodSetPort: func(ctx context.Context, c *Client) error {
 		return c.SetPort(ctx, PortConfig{ID: 2, Enabled: true, Speed: "auto", FlowControl: false})
 	},
-	"SetPortMirror": func(ctx context.Context, c *Client) error {
+	MethodSetPortMirror: func(ctx context.Context, c *Client) error {
 		return c.SetPortMirror(ctx, Mirror{Enabled: true, Destination: 2, IngressPorts: MustPortSet(3)})
 	},
-	"SetQoSMode": func(ctx context.Context, c *Client) error { return c.SetQoSMode(ctx, 1) },
-	"SetPortPriorities": func(ctx context.Context, c *Client) error {
+	MethodSetQoSMode: func(ctx context.Context, c *Client) error { return c.SetQoSMode(ctx, 1) },
+	MethodSetPortPriorities: func(ctx context.Context, c *Client) error {
 		return c.SetPortPriorities(ctx, []PortPriority{{Port: 2, Priority: 1}})
 	},
-	"SetStormControl": func(ctx context.Context, c *Client) error {
+	MethodSetStormControl: func(ctx context.Context, c *Client) error {
 		return c.SetStormControl(ctx, StormConfig{Port: 2, UnknownUnicast: true, Multicast: false, Broadcast: false, Rate: 64})
 	},
-	"SetHostname": func(ctx context.Context, c *Client) error { return c.SetHostname(ctx, "sw-test") },
-	"SetDot1QVLAN": func(ctx context.Context, c *Client) error {
+	MethodSetHostname: func(ctx context.Context, c *Client) error { return c.SetHostname(ctx, "sw-test") },
+	MethodSetDot1QVLAN: func(ctx context.Context, c *Client) error {
 		return c.SetDot1QVLAN(ctx, Dot1QVLAN{ID: 10, Name: "test", Untagged: MustPortSet(2)})
 	},
-	"DeleteDot1QVLAN": func(ctx context.Context, c *Client) error { return c.DeleteDot1QVLAN(ctx, 10) },
-	"SetPVIDs":        func(ctx context.Context, c *Client) error { return c.SetPVIDs(ctx, []PortPVID{{Port: 2, PVID: 1}}) },
-	"SetVLANMode": func(ctx context.Context, c *Client) error {
+	MethodDeleteDot1QVLAN: func(ctx context.Context, c *Client) error { return c.DeleteDot1QVLAN(ctx, 10) },
+	MethodSetPVIDs:        func(ctx context.Context, c *Client) error { return c.SetPVIDs(ctx, []PortPVID{{Port: 2, PVID: 1}}) },
+	MethodSetVLANMode: func(ctx context.Context, c *Client) error {
 		return c.SetVLANMode(ctx, VLANModeSetting{Mode: VLANModeMTU, UplinkPort: 8})
 	},
-	"SetPortBasedVLAN": func(ctx context.Context, c *Client) error {
+	MethodSetPortBasedVLAN: func(ctx context.Context, c *Client) error {
 		return c.SetPortBasedVLAN(ctx, PortVLAN{ID: 2, Ports: MustPortSet(3, 4)})
 	},
-	"EnableDHCP": func(ctx context.Context, c *Client) error {
+	MethodEnableDHCP: func(ctx context.Context, c *Client) error {
 		// the client needs the switch's MAC, and a lookup that asks the fake itself
 		c.cfg.MAC = MAC(escptest.DefaultMAC())
 		c.locator = func(ctx context.Context, _ MAC) (Info, error) { return c.discoverOnce(ctx) }
 		return c.EnableDHCP(ctx)
 	},
-	"SetIPConfig": func(ctx context.Context, c *Client) error {
+	MethodSetIPConfig: func(ctx context.Context, c *Client) error {
 		// the address the fake switch already has, so an allowed write is confirmed at once
 		return c.SetIPConfig(ctx, cfgOf("127.0.0.1", "255.0.0.0", "127.0.0.2"))
 	},
 }
 
-func writeMethodNames() []string {
-	var names []string
+func writeMethodNames() []Method {
+	var names []Method
 	typ := reflect.TypeOf(&Client{})
 	for i := range typ.NumMethod() {
 		if n := typ.Method(i).Name; strings.HasPrefix(n, "Set") || strings.HasPrefix(n, "Delete") || strings.HasPrefix(n, "Enable") {
-			names = append(names, n)
+			names = append(names, Method(n))
 		}
 	}
 	return names
@@ -103,7 +103,7 @@ func TestWriteGateRefusalSendsNothingForAnyWriteMethod(t *testing.T) {
 		if call == nil {
 			continue // reported by TestEveryWriteMethodIsInTheGateTable
 		}
-		t.Run(name, func(t *testing.T) {
+		t.Run(string(name), func(t *testing.T) {
 			f := escptest.Start(t)
 			f.EnableModel(nil) // the pre-write read of the other limiter needs a switch that answers
 			var consulted int
@@ -132,7 +132,7 @@ func TestWriteGateThatAllowsLetsEveryWriteMethodThrough(t *testing.T) {
 		if call == nil {
 			continue
 		}
-		t.Run(name, func(t *testing.T) {
+		t.Run(string(name), func(t *testing.T) {
 			f := escptest.Start(t)
 			f.EnableModel(nil) // the pre-write read of the other limiter needs a switch that answers
 			c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 300 * time.Millisecond,
@@ -223,25 +223,25 @@ func TestEscptestWriteRecordsAreCopies(t *testing.T) {
 // What every write method tells its gate: its own name, the ports of its arguments and the group it
 // replaces, written out by hand. The class is not here: it is a decision kept in one place, the
 // settings table (settings.go), and the test below checks the gate is told what that table says.
-var writeOperations = map[string]Operation{
-	"SetLED":            {Name: "SetLED"},
-	"SetHostname":       {Name: "SetHostname"},
-	"SetBandwidth":      {Name: "SetBandwidth", Ports: MustPortSet(2)},
-	"SetIGMP":           {Name: "SetIGMP"},
-	"SetPort":           {Name: "SetPort", Ports: MustPortSet(2)},
-	"SetPortMirror":     {Name: "SetPortMirror", Ports: MustPortSet(2, 3)},
-	"SetQoSMode":        {Name: "SetQoSMode"},
-	"SetPortPriorities": {Name: "SetPortPriorities", Ports: MustPortSet(2)},
-	"SetStormControl":   {Name: "SetStormControl", Ports: MustPortSet(2)},
-	"SetDot1QVLAN":      {Name: "SetDot1QVLAN", Ports: MustPortSet(2), Replaces: Group{Dot1QVLAN: 10}},
-	"DeleteDot1QVLAN":   {Name: "DeleteDot1QVLAN", Replaces: Group{Dot1QVLAN: 10}},
-	"SetPortBasedVLAN":  {Name: "SetPortBasedVLAN", Ports: MustPortSet(3, 4), Replaces: Group{PortVLAN: 2}},
-	"SetLAG":            {Name: "SetLAG", Ports: MustPortSet(2, 3), Replaces: Group{LAG: 1}},
-	"SetLoopPrevention": {Name: "SetLoopPrevention"},
-	"SetPVIDs":          {Name: "SetPVIDs", Ports: MustPortSet(2)},
-	"SetVLANMode":       {Name: "SetVLANMode", Ports: MustPortSet(8)},
-	"SetIPConfig":       {Name: "SetIPConfig"},
-	"EnableDHCP":        {Name: "EnableDHCP"},
+var writeOperations = map[Method]Operation{
+	MethodSetLED:            {Name: MethodSetLED},
+	MethodSetHostname:       {Name: MethodSetHostname},
+	MethodSetBandwidth:      {Name: MethodSetBandwidth, Ports: MustPortSet(2)},
+	MethodSetIGMP:           {Name: MethodSetIGMP},
+	MethodSetPort:           {Name: MethodSetPort, Ports: MustPortSet(2)},
+	MethodSetPortMirror:     {Name: MethodSetPortMirror, Ports: MustPortSet(2, 3)},
+	MethodSetQoSMode:        {Name: MethodSetQoSMode},
+	MethodSetPortPriorities: {Name: MethodSetPortPriorities, Ports: MustPortSet(2)},
+	MethodSetStormControl:   {Name: MethodSetStormControl, Ports: MustPortSet(2)},
+	MethodSetDot1QVLAN:      {Name: MethodSetDot1QVLAN, Ports: MustPortSet(2), Replaces: Group{Dot1QVLAN: 10}},
+	MethodDeleteDot1QVLAN:   {Name: MethodDeleteDot1QVLAN, Replaces: Group{Dot1QVLAN: 10}},
+	MethodSetPortBasedVLAN:  {Name: MethodSetPortBasedVLAN, Ports: MustPortSet(3, 4), Replaces: Group{PortVLAN: 2}},
+	MethodSetLAG:            {Name: MethodSetLAG, Ports: MustPortSet(2, 3), Replaces: Group{LAG: 1}},
+	MethodSetLoopPrevention: {Name: MethodSetLoopPrevention},
+	MethodSetPVIDs:          {Name: MethodSetPVIDs, Ports: MustPortSet(2)},
+	MethodSetVLANMode:       {Name: MethodSetVLANMode, Ports: MustPortSet(8)},
+	MethodSetIPConfig:       {Name: MethodSetIPConfig},
+	MethodEnableDHCP:        {Name: MethodEnableDHCP},
 }
 
 // operationsOf runs call against a client whose gate allows and records what the gate was told.
@@ -272,7 +272,7 @@ func TestEveryWriteMethodDeclaresItsOperation(t *testing.T) {
 			continue
 		}
 		want.Impact = registeredImpact(name) // the class is the settings table's, and nowhere else
-		t.Run(name, func(t *testing.T) {
+		t.Run(string(name), func(t *testing.T) {
 			seen := operationsOf(t, writeCalls[name])
 			if len(seen) == 0 {
 				t.Fatal("the gate was not consulted")
@@ -378,9 +378,9 @@ func TestARemovedGroupIsStillReportedAsReplaced(t *testing.T) {
 		call func(c *Client) error
 		want Operation
 	}{
-		{"LAG", func(c *Client) error { return c.SetLAG(ctx, LAG{ID: 2, Ports: 0}) }, Operation{Name: "SetLAG", Impact: registeredImpact("SetLAG"), Replaces: Group{LAG: 2}}},
-		{"port-based VLAN", func(c *Client) error { return c.SetPortBasedVLAN(ctx, PortVLAN{ID: 3, Ports: 0}) }, Operation{Name: "SetPortBasedVLAN", Impact: registeredImpact("SetPortBasedVLAN"), Replaces: Group{PortVLAN: 3}}},
-		{"802.1Q VLAN", func(c *Client) error { return c.DeleteDot1QVLAN(ctx, 20) }, Operation{Name: "DeleteDot1QVLAN", Impact: registeredImpact("DeleteDot1QVLAN"), Replaces: Group{Dot1QVLAN: 20}}},
+		{"LAG", func(c *Client) error { return c.SetLAG(ctx, LAG{ID: 2, Ports: 0}) }, Operation{Name: MethodSetLAG, Impact: registeredImpact("SetLAG"), Replaces: Group{LAG: 2}}},
+		{"port-based VLAN", func(c *Client) error { return c.SetPortBasedVLAN(ctx, PortVLAN{ID: 3, Ports: 0}) }, Operation{Name: MethodSetPortBasedVLAN, Impact: registeredImpact("SetPortBasedVLAN"), Replaces: Group{PortVLAN: 3}}},
+		{"802.1Q VLAN", func(c *Client) error { return c.DeleteDot1QVLAN(ctx, 20) }, Operation{Name: MethodDeleteDot1QVLAN, Impact: registeredImpact("DeleteDot1QVLAN"), Replaces: Group{Dot1QVLAN: 20}}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

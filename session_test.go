@@ -160,32 +160,32 @@ func TestAuthenticatedRequestFailures(t *testing.T) {
 }
 
 func TestWrongPasswordIsRejectedForEverySetter(t *testing.T) {
-	setters := map[string]func(*Client, context.Context) error{
-		"SetLED": func(c *Client, ctx context.Context) error { return c.SetLED(ctx, true) },
-		"SetIGMP": func(c *Client, ctx context.Context) error {
+	setters := map[Method]func(*Client, context.Context) error{
+		MethodSetLED: func(c *Client, ctx context.Context) error { return c.SetLED(ctx, true) },
+		MethodSetIGMP: func(c *Client, ctx context.Context) error {
 			return c.SetIGMP(ctx, IGMPConfig{Enabled: true, ReportSuppression: false})
 		},
-		"SetLoopPrevention": func(c *Client, ctx context.Context) error { return c.SetLoopPrevention(ctx, true) },
-		"SetPort": func(c *Client, ctx context.Context) error {
+		MethodSetLoopPrevention: func(c *Client, ctx context.Context) error { return c.SetLoopPrevention(ctx, true) },
+		MethodSetPort: func(c *Client, ctx context.Context) error {
 			return c.SetPort(ctx, PortConfig{ID: 7, Enabled: true, Speed: "auto", FlowControl: false})
 		},
-		"SetQoSMode": func(c *Client, ctx context.Context) error { return c.SetQoSMode(ctx, 0) },
-		"SetBandwidth": func(c *Client, ctx context.Context) error {
+		MethodSetQoSMode: func(c *Client, ctx context.Context) error { return c.SetQoSMode(ctx, 0) },
+		MethodSetBandwidth: func(c *Client, ctx context.Context) error {
 			return c.SetBandwidth(ctx, PortBandwidth{Port: 7, Ingress: 64, Egress: 64})
 		},
-		"SetStormControl": func(c *Client, ctx context.Context) error {
+		MethodSetStormControl: func(c *Client, ctx context.Context) error {
 			return c.SetStormControl(ctx, StormConfig{Port: 7, UnknownUnicast: true, Multicast: false, Broadcast: false, Rate: 64})
 		},
-		"SetPortMirror": func(c *Client, ctx context.Context) error {
+		MethodSetPortMirror: func(c *Client, ctx context.Context) error {
 			return c.SetPortMirror(ctx, Mirror{Enabled: true, Destination: 7, IngressPorts: MustPortSet(4)})
 		},
-		"SetLAG": func(c *Client, ctx context.Context) error { return c.SetLAG(ctx, LAG{ID: 2, Ports: MustPortSet(6, 7)}) },
-		"SetPortBasedVLAN": func(c *Client, ctx context.Context) error {
+		MethodSetLAG: func(c *Client, ctx context.Context) error { return c.SetLAG(ctx, LAG{ID: 2, Ports: MustPortSet(6, 7)}) },
+		MethodSetPortBasedVLAN: func(c *Client, ctx context.Context) error {
 			return c.SetPortBasedVLAN(ctx, PortVLAN{ID: 2, Ports: MustPortSet(6, 7)})
 		},
 	}
 	for name, call := range setters {
-		t.Run(name, func(t *testing.T) {
+		t.Run(string(name), func(t *testing.T) {
 			f := escptest.Start(t)
 			f.EnableModel(nil) // the pre-write read of the other limiter needs a switch that answers
 			c := dialFast(t, f, "wrong-password")

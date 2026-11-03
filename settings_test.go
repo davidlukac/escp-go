@@ -16,7 +16,7 @@ var updateDocs = flag.Bool("update-docs", false, "rewrite the tables generated f
 
 // registeredImpact is the class the settings table gives a write method, read through the public
 // Settings so that it does not share code with the writers.
-func registeredImpact(method string) Impact {
+func registeredImpact(method Method) Impact {
 	for _, s := range Settings() {
 		for _, w := range s.Writes {
 			if w.Name == method {
@@ -34,14 +34,14 @@ func TestTheSettingsTableListsEveryReaderAndWriter(t *testing.T) {
 	var rows, written []string
 	for _, s := range Settings() {
 		for _, r := range s.Reads {
-			rows = append(rows, r)
-			if _, ok := typ.MethodByName(r); !ok {
+			rows = append(rows, string(r))
+			if _, ok := typ.MethodByName(string(r)); !ok {
 				t.Errorf("%s: the table lists the reader %s, which Client does not have", s.Page, r)
 			}
 		}
 		for _, w := range s.Writes {
-			written = append(written, w.Name)
-			if _, ok := typ.MethodByName(w.Name); !ok {
+			written = append(written, string(w.Name))
+			if _, ok := typ.MethodByName(string(w.Name)); !ok {
 				t.Errorf("%s: the table lists the writer %s, which Client does not have", s.Page, w.Name)
 			}
 			if w.Impact.Validate() != nil {
@@ -53,7 +53,7 @@ func TestTheSettingsTableListsEveryReaderAndWriter(t *testing.T) {
 		}
 	}
 	for _, name := range writeMethodNames() {
-		if !slices.Contains(written, name) {
+		if !slices.Contains(written, string(name)) {
 			t.Errorf("%s changes the switch but is not in the settings table (settings.go): add it with its class", name)
 		}
 	}
@@ -101,7 +101,7 @@ func TestAMethodThatIsNotInTheSettingsTableHasNoClass(t *testing.T) {
 	if got := impactOf("SetNothing"); got != 0 {
 		t.Fatalf("an unknown method has class %v, want none (the gates refuse the zero class)", got)
 	}
-	if got := impactOf("SetPort"); got != ImpactManagement {
+	if got := impactOf(MethodSetPort); got != ImpactManagement {
 		t.Fatalf("SetPort has class %v", got)
 	}
 }
@@ -124,7 +124,7 @@ func settingsTable() string {
 	for _, s := range Settings() {
 		var writes []string
 		for _, w := range s.Writes {
-			writes = append(writes, "`"+w.Name+"`")
+			writes = append(writes, "`"+string(w.Name)+"`")
 		}
 		write := strings.Join(writes, ", ")
 		if len(writes) == 0 {
@@ -139,10 +139,10 @@ func settingsTable() string {
 	return b.String()
 }
 
-func backticked(names []string) string {
+func backticked[S ~string](names []S) string {
 	quoted := make([]string, len(names))
 	for i, n := range names {
-		quoted[i] = "`" + n + "`"
+		quoted[i] = "`" + string(n) + "`"
 	}
 	return strings.Join(quoted, ", ")
 }
@@ -154,7 +154,7 @@ func impactCell(s Setting) string {
 	}
 	byClass := map[Impact][]string{}
 	for _, w := range s.Writes {
-		byClass[w.Impact] = append(byClass[w.Impact], w.Name)
+		byClass[w.Impact] = append(byClass[w.Impact], string(w.Name))
 	}
 	if len(byClass) == 1 {
 		return s.Writes[0].Impact.String()
@@ -177,7 +177,7 @@ func impactClasses() string {
 		for _, s := range Settings() {
 			for _, w := range s.Writes {
 				if w.Impact == class {
-					names = append(names, w.Name)
+					names = append(names, string(w.Name))
 				}
 			}
 		}

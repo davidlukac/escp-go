@@ -42,7 +42,7 @@ func TestReadingsSurviveJSON(t *testing.T) {
 			PVIDs: []PortPVID{{Port: 2, PVID: 10}}}, new(Dot1Q)},
 		{"Port statistics", []PortStats{{ID: 1, Enabled: true, Link: Speed100Full, TxGood: 4294967295, RxGood: 7}}, new([]PortStats)},
 		{"System", System{PortCount: 8, AutoSave: true}, new(System)},
-		{"Operation", Operation{Name: "SetLAG", Ports: MustPortSet(2, 3), Impact: ImpactManagement, Replaces: Group{LAG: 1}}, new(Operation)},
+		{"Operation", Operation{Name: MethodSetLAG, Ports: MustPortSet(2, 3), Impact: ImpactManagement, Replaces: Group{LAG: 1}}, new(Operation)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			text, err := json.Marshal(tc.value)

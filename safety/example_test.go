@@ -95,9 +95,9 @@ func ExampleDryRun() {
 	ctx := context.Background()
 
 	for _, op := range []escp.Operation{
-		{Name: "SetLED", Impact: escp.ImpactCosmetic},
-		{Name: "SetBandwidth", Ports: escp.MustPortSet(7), Impact: escp.ImpactTraffic},
-		{Name: "SetLAG", Ports: escp.MustPortSet(5, 6), Impact: escp.ImpactManagement},
+		{Name: escp.MethodSetLED, Impact: escp.ImpactCosmetic},
+		{Name: escp.MethodSetBandwidth, Ports: escp.MustPortSet(7), Impact: escp.ImpactTraffic},
+		{Name: escp.MethodSetLAG, Ports: escp.MustPortSet(5, 6), Impact: escp.ImpactManagement},
 	} {
 		err := gate(ctx, firmware(""), op)
 		var tooMuch *safety.ImpactError
@@ -141,10 +141,10 @@ func ExampleMaxImpact() {
 	gate := safety.MaxImpact(escp.ImpactTraffic)
 	ctx := context.Background()
 	for _, op := range []escp.Operation{
-		{Name: "SetLED", Impact: escp.ImpactCosmetic},
-		{Name: "SetBandwidth", Impact: escp.ImpactTraffic},
-		{Name: "SetPort", Impact: escp.ImpactManagement},
-		{Name: "SetIPConfig", Impact: escp.ImpactManagement},
+		{Name: escp.MethodSetLED, Impact: escp.ImpactCosmetic},
+		{Name: escp.MethodSetBandwidth, Impact: escp.ImpactTraffic},
+		{Name: escp.MethodSetPort, Impact: escp.ImpactManagement},
+		{Name: escp.MethodSetIPConfig, Impact: escp.ImpactManagement},
 	} {
 		fmt.Printf("%s: %v\n", op.Name, gate(ctx, firmware(""), op))
 	}
@@ -164,8 +164,8 @@ func ExamplePortGate() {
 	)
 	gate := safety.PortGate()
 	ctx := context.Background()
-	fmt.Println("port 2:", gate(ctx, sw, escp.Operation{Name: "SetPort", Ports: escp.MustPortSet(2)}))
-	fmt.Println("port 1:", gate(ctx, sw, escp.Operation{Name: "SetPort", Ports: escp.MustPortSet(1)}))
+	fmt.Println("port 2:", gate(ctx, sw, escp.Operation{Name: escp.MethodSetPort, Ports: escp.MustPortSet(2)}))
+	fmt.Println("port 1:", gate(ctx, sw, escp.Operation{Name: escp.MethodSetPort, Ports: escp.MustPortSet(1)}))
 	// Output:
 	// port 2: <nil>
 	// port 1: port 1 has a link up (1000Mbps-full)
@@ -177,9 +177,9 @@ func ExampleChain() {
 	sw := switchPorts(escp.Port{ID: 1, ActualSpeed: escp.Speed1000Full}, escp.Port{ID: 2, ActualSpeed: escp.SpeedLinkDown})
 	gate := safety.Chain(safety.MaxImpact(escp.ImpactTraffic), safety.PortGate())
 	ctx := context.Background()
-	fmt.Println(gate(ctx, sw, escp.Operation{Name: "SetBandwidth", Ports: escp.MustPortSet(2), Impact: escp.ImpactTraffic}))
-	fmt.Println(gate(ctx, sw, escp.Operation{Name: "SetBandwidth", Ports: escp.MustPortSet(1), Impact: escp.ImpactTraffic}))
-	fmt.Println(gate(ctx, sw, escp.Operation{Name: "SetLAG", Ports: escp.MustPortSet(2), Impact: escp.ImpactManagement}))
+	fmt.Println(gate(ctx, sw, escp.Operation{Name: escp.MethodSetBandwidth, Ports: escp.MustPortSet(2), Impact: escp.ImpactTraffic}))
+	fmt.Println(gate(ctx, sw, escp.Operation{Name: escp.MethodSetBandwidth, Ports: escp.MustPortSet(1), Impact: escp.ImpactTraffic}))
+	fmt.Println(gate(ctx, sw, escp.Operation{Name: escp.MethodSetLAG, Ports: escp.MustPortSet(2), Impact: escp.ImpactManagement}))
 	// Output:
 	// <nil>
 	// port 1 has a link up (1000Mbps-full)

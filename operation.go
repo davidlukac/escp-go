@@ -93,8 +93,8 @@ func (g Group) IsZero() bool { return g == Group{} }
 
 // Operation describes a write to a WriteGate before it is sent.
 type Operation struct {
-	// Name is the name of the client method that is writing ("SetPort", "SetLAG").
-	Name string
+	// Name is the client method that is writing (MethodSetPort, MethodSetLAG).
+	Name Method
 	// Ports are the ports the write names: the mirror's destination and sources, the members
 	// of a LAG or a VLAN, the port of a port setting. Empty for a write that names none.
 	//
