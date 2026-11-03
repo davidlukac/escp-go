@@ -1,6 +1,10 @@
 package escp
 
-import "strconv"
+import (
+	"strconv"
+
+	"github.com/davidlukac/escp-go/internal/wire"
+)
 
 const (
 	// MaxPort is the highest port number a 32-bit port mask can express.
@@ -8,7 +12,7 @@ const (
 	// MaxHostnameLen is the longest device description the switch accepts.
 	MaxHostnameLen = 32
 	// maskLen is the size of a port mask on the wire.
-	maskLen = 4
+	maskLen = wire.MaskLen
 )
 
 // The limits of a rate limit.

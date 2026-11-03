@@ -62,6 +62,10 @@ func ipConfigFromInfo(info Info) (IPConfig, error) {
 // host of the same subnet (0.0.0.0 means no gateway).
 func (cfg IPConfig) Validate() error { return validateIPConfig(cfg, false) }
 
+// ValidateAllowingLoopback is Validate for a switch that lives on this host, which a fake switch
+// does: it also accepts an address in 127.0.0.0/8. A client uses it only when a test turned that on.
+func (cfg IPConfig) ValidateAllowingLoopback() error { return validateIPConfig(cfg, true) }
+
 // validateIPConfig is IPConfig.Validate; allowLoopback lets tests move a fake switch that lives on 127.0.0.0/8.
 func validateIPConfig(cfg IPConfig, allowLoopback bool) error {
 	if !cfg.IP.Is4() || !cfg.Netmask.Is4() || !cfg.Gateway.Is4() {
@@ -144,7 +148,7 @@ func broadcastOf(n net.IPNet) net.IP {
 // Callers must guard: a wrong address, mask or gateway can cut the management path for good.
 // EnableDHCP is the way back to a lease.
 func (c *Client) SetIPConfig(ctx context.Context, cfg IPConfig) error {
-	if err := validateIPConfig(cfg, c.allowLoopback); err != nil {
+	if err := c.validateIPConfig(cfg); err != nil {
 		return err
 	}
 	info, err := c.Info(ctx)
@@ -160,7 +164,7 @@ func (c *Client) SetIPConfig(ctx context.Context, cfg IPConfig) error {
 	c.mu.Lock()
 	c.alsoFrom = net.IP(cfg.IP.AsSlice())
 	c.mu.Unlock()
-	sent, err := c.writeSystem(ctx, MethodSetIPConfig.operation(), info.Hostname, false, cfg)
+	sent, err := c.writeSystem(ctx, MethodSetIPConfig.Operation(), info.Hostname, false, cfg)
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	var refused *RejectedError
@@ -276,4 +280,12 @@ func (c *Client) awaitAddress(ctx context.Context, want IPConfig) error {
 		return fmt.Errorf("%w (%s)", ErrMoveUnconfirmed, want.IP)
 	}
 	return nil
+}
+
+// validateIPConfig is IPConfig.Validate, or ValidateAllowingLoopback when a test allows the loopback.
+func (c *Client) validateIPConfig(cfg IPConfig) error {
+	if c.allowLoopback {
+		return cfg.ValidateAllowingLoopback()
+	}
+	return cfg.Validate()
 }

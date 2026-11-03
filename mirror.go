@@ -64,10 +64,10 @@ func (c *Client) SetPortMirror(ctx context.Context, m Mirror) error {
 	if err := m.Validate(); err != nil {
 		return err
 	}
-	op := MethodSetPortMirror.operation()
+	op := MethodSetPortMirror.Operation()
 	v := make([]byte, mirrorEntryLen)
 	if m.Enabled {
-		op.Ports = m.named()
+		op.Ports = mirrorPorts(m)
 		if err := c.requirePorts(ctx, op.Ports); err != nil {
 			return err
 		}
@@ -78,9 +78,9 @@ func (c *Client) SetPortMirror(ctx context.Context, m Mirror) error {
 	return c.setTLVs(ctx, op, wire.TLV{Type: wire.TLVMirror, Value: v})
 }
 
-// named is every port the configuration mentions: the sources and the destination.
-func (m Mirror) named() PortSet {
-	return m.IngressPorts.Union(m.EgressPorts).Union(m.Destination.set())
+// mirrorPorts is every port the configuration mentions: the sources and the destination.
+func mirrorPorts(m Mirror) PortSet {
+	return m.IngressPorts.Union(m.EgressPorts).Union(m.Destination.AsSet())
 }
 
 // Validate checks the configuration before it is written. An enabled mirror has a valid

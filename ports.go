@@ -99,20 +99,20 @@ func speedFromCode(b byte) Speed {
 	if b == 0 {
 		return SpeedLinkDown
 	}
-	if int(b) <= len(configurableSpeeds) {
-		return configurableSpeeds[b-1]
+	if speeds := ConfigurableSpeeds(); int(b) <= len(speeds) {
+		return speeds[b-1]
 	}
 	return Speed(fmt.Sprintf("unknown(%d)", b))
 }
 
-// code returns the wire code of a configurable speed.
-func (s Speed) code() (byte, error) {
-	for i, n := range configurableSpeeds {
+// speedCode returns the wire code of a configurable speed.
+func speedCode(s Speed) (byte, error) {
+	for i, n := range ConfigurableSpeeds() {
 		if n == s {
 			return byte(i + 1), nil
 		}
 	}
-	return 0, invalidf("escp: unknown speed %q (valid: %v)", string(s), configurableSpeeds)
+	return 0, invalidf("escp: unknown speed %q (valid: %v)", string(s), ConfigurableSpeeds())
 }
 
 // parsePorts decodes TLV 4096 values: port, state, lag, cfg speed, actual
@@ -162,7 +162,7 @@ func (cfg PortConfig) Validate() error {
 	if err := cfg.ID.Validate(); err != nil {
 		return err
 	}
-	if _, err := cfg.Speed.code(); err != nil {
+	if _, err := speedCode(cfg.Speed); err != nil {
 		return err
 	}
 	if cfg.FlowControl && !cfg.Speed.AllowsFlowControl() {
@@ -185,13 +185,13 @@ func (c *Client) SetPort(ctx context.Context, cfg PortConfig) error {
 	if err := cfg.Validate(); err != nil {
 		return err
 	}
-	code, _ := cfg.Speed.code() // Validate accepted the speed
-	if err := c.requirePorts(ctx, cfg.ID.set()); err != nil {
+	code, _ := speedCode(cfg.Speed) // Validate accepted the speed
+	if err := c.requirePorts(ctx, cfg.ID.AsSet()); err != nil {
 		return err
 	}
 	entry := make([]byte, portEntryLen)
 	entry[portOffPort], entry[portOffState], entry[portOffCfgSpeed], entry[portOffCfgFlow] = byte(cfg.ID), boolByte(cfg.Enabled), code, boolByte(cfg.FlowControl)
-	return nameRefusal(c.setTLVs(ctx, MethodSetPort.operation().on(cfg.ID.set()), wire.TLV{Type: wire.TLVPorts, Value: entry}), portRefusals)
+	return nameRefusal(c.setTLVs(ctx, MethodSetPort.Operation().On(cfg.ID.AsSet()), wire.TLV{Type: wire.TLVPorts, Value: entry}), portRefusals)
 }
 
 // portRefusals names the refusals of a port write that were provoked on a real switch

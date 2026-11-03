@@ -27,7 +27,7 @@ func TestDot1QVLANEncodeMatchesVendorLayout(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := tt.v.encode()
+			got := encodeDot1QVLAN(tt.v)
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Fatalf("got % x, want % x", got, tt.want)
 			}
@@ -38,7 +38,7 @@ func TestDot1QVLANEncodeMatchesVendorLayout(t *testing.T) {
 // What the client writes must read back as the same VLAN through the parser used for GETs.
 func TestDot1QVLANEncodeRoundTripsThroughParser(t *testing.T) {
 	want := Dot1QVLAN{ID: 30, Name: "media", Tagged: MustPortSet(1, 6), Untagged: MustPortSet(2, 3)}
-	value := want.encode()
+	value := encodeDot1QVLAN(want)
 	got, err := parseDot1Q([]wire.TLV{{Type: wire.TLVVLAN8021Q, Value: []byte{1}}, {Type: wire.TLVVLAN8021QVLAN, Value: value}})
 	if err != nil {
 		t.Fatal(err)

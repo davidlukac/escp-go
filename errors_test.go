@@ -155,7 +155,7 @@ func TestFailuresOfTheSwitchAreNotErrInvalid(t *testing.T) {
 		}
 	})
 	t.Run("the type matches its sentinel and the sentinel stays apart", func(t *testing.T) {
-		if err := (&invalidError{msg: "x"}); !errors.Is(err, ErrInvalid) {
+		if err := invalidf("x"); !errors.Is(err, ErrInvalid) {
 			t.Fatal("the type must match its sentinel")
 		}
 		if errors.Is(ErrInvalidConfigFile, ErrInvalid) {

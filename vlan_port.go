@@ -145,7 +145,7 @@ func (c *Client) SetPortBasedVLAN(ctx context.Context, group PortVLAN) error {
 	if err := c.requirePorts(ctx, group.Ports); err != nil {
 		return err
 	}
-	return c.setTLVs(ctx, MethodSetPortBasedVLAN.operation().on(group.Ports).replacing(Group{PortVLAN: group.ID}), wire.TLV{Type: wire.TLVVLANPortBasedVID, Value: append([]byte{byte(group.ID)}, group.Ports.Mask()...)})
+	return c.setTLVs(ctx, MethodSetPortBasedVLAN.Operation().On(group.Ports).Replacing(Group{PortVLAN: group.ID}), wire.TLV{Type: wire.TLVVLANPortBasedVID, Value: append([]byte{byte(group.ID)}, group.Ports.Mask()...)})
 }
 
 // requirePortVLANGroup refuses a group id the switch does not have. The limit is read once and kept,

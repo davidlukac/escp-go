@@ -3,10 +3,12 @@ package escp
 import (
 	"net"
 	"strings"
+
+	"github.com/davidlukac/escp-go/internal/wire"
 )
 
 // macLen is the length of an Ethernet MAC address in bytes.
-const macLen = 6
+const macLen = wire.MACLen
 
 // macTextLen is the length of its text form, "aa:bb:cc:dd:ee:ff".
 const macTextLen = 3*macLen - 1

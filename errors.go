@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"net/netip"
+
+	"github.com/davidlukac/escp-go/internal/invalid"
 )
 
 var (
@@ -17,12 +19,6 @@ var (
 	// code 4 although the credentials are fine); the *RejectedError that wraps it carries the
 	// code.
 	ErrRejected = errors.New("escp: switch rejected the request")
-	// ErrInvalid means the caller's argument was refused before any write was sent: a port or
-	// id out of range, a rate that is not a multiple of the step, a combination the switch
-	// cannot keep. The message names the value and what is allowed; test for the class with
-	// errors.Is(err, ErrInvalid). It is never returned for a reply the client cannot parse,
-	// nor for a failure of the switch.
-	ErrInvalid = errors.New("escp: invalid argument")
 	// ErrWrongSwitch means the device that answered is not the switch the client talks to: the
 	// reply carries another MAC address than Config.MAC or, when that is not set, than the one
 	// the switch reported on the client's first contact, or carries none (a real switch puts its
@@ -61,17 +57,9 @@ func (e *WrongSwitchError) Error() string {
 // Is makes errors.Is(err, ErrWrongSwitch) true.
 func (e *WrongSwitchError) Is(target error) bool { return target == ErrWrongSwitch }
 
-// invalidError is an ErrInvalid with its own message.
-type invalidError struct{ msg string }
-
-func (e *invalidError) Error() string { return e.msg }
-
-// Is makes errors.Is(err, ErrInvalid) true for every refused argument.
-func (e *invalidError) Is(target error) bool { return target == ErrInvalid }
-
 // invalidf builds an error that matches ErrInvalid and reads as the formatted message.
 func invalidf(format string, args ...any) error {
-	return &invalidError{msg: fmt.Sprintf(format, args...)}
+	return invalid.Errorf(format, args...)
 }
 
 // ReplyCode is the result code of a switch reply: zero when the request was accepted,
@@ -101,3 +89,10 @@ func (e *RejectedError) Error() string {
 
 // Is makes errors.Is(err, ErrRejected) true for every rejected write.
 func (e *RejectedError) Is(target error) bool { return target == ErrRejected }
+
+// ErrInvalid means the caller's argument was refused before any write was sent: a port or
+// id out of range, a rate that is not a multiple of the step, a combination the switch
+// cannot keep. The message names the value and what is allowed; test for the class with
+// errors.Is(err, ErrInvalid). It is never returned for a reply the client cannot parse,
+// nor for a failure of the switch.
+var ErrInvalid = invalid.Err

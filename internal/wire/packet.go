@@ -36,7 +36,8 @@ const (
 	protocolVersion = 1 // first header byte
 	// HeaderLen is the total header size.
 	HeaderLen = 32
-	macLen    = 6 // length of a MAC address
+	MACLen    = 6 // length of a MAC address
+	MaskLen   = 4 // length of a port mask
 	// TLVHeaderLen is the size of a TLV header: type (2 bytes) + length (2 bytes).
 	TLVHeaderLen = 4
 
@@ -64,8 +65,8 @@ type TLV struct {
 // Header is the 32-byte packet header.
 type Header struct {
 	Op        byte
-	SwitchMAC [macLen]byte
-	HostMAC   [macLen]byte
+	SwitchMAC [MACLen]byte
+	HostMAC   [MACLen]byte
 	Seq       uint16
 	ErrCode   int32
 	Length    uint16
@@ -108,8 +109,8 @@ func Unmarshal(b []byte) (Header, []TLV, error) {
 		return h, nil, fmt.Errorf("escp: not a valid packet (%d bytes)", len(b))
 	}
 	h.Op = b[offOp]
-	copy(h.SwitchMAC[:], b[offSwitchMAC:offSwitchMAC+macLen])
-	copy(h.HostMAC[:], b[offHostMAC:offHostMAC+macLen])
+	copy(h.SwitchMAC[:], b[offSwitchMAC:offSwitchMAC+MACLen])
+	copy(h.HostMAC[:], b[offHostMAC:offHostMAC+MACLen])
 	h.Seq = binary.BigEndian.Uint16(b[offSeq:])
 	h.ErrCode = int32(binary.BigEndian.Uint32(b[offErrCode:]))
 	h.Length = binary.BigEndian.Uint16(b[offLength:])

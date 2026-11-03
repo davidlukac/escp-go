@@ -85,7 +85,7 @@ type IGMPConfig struct {
 // the switch floods multicast traffic to every port. Toggling it was verified on a live
 // switch without interrupting traffic.
 func (c *Client) SetIGMP(ctx context.Context, cfg IGMPConfig) error {
-	return c.setTLVs(ctx, MethodSetIGMP.operation(),
+	return c.setTLVs(ctx, MethodSetIGMP.Operation(),
 		wire.TLV{Type: wire.TLVIGMPEnabled, Value: []byte{boolByte(cfg.Enabled)}},
 		wire.TLV{Type: wire.TLVIGMPSuppression, Value: []byte{boolByte(cfg.ReportSuppression)}})
 }

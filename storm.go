@@ -67,8 +67,8 @@ type StormConfig struct {
 	Rate           Kbps
 }
 
-// limited reports whether any traffic type is selected: storm control is on exactly then.
-func (cfg StormConfig) limited() bool { return cfg.UnknownUnicast || cfg.Multicast || cfg.Broadcast }
+// Limited reports whether any traffic type is selected: storm control is on exactly then.
+func (cfg StormConfig) Limited() bool { return cfg.UnknownUnicast || cfg.Multicast || cfg.Broadcast }
 
 // Validate checks the setting before it is written: a valid port, and either a traffic type with a
 // rate (a multiple of RateStep, at least one step, at most MaxBandwidth) or no traffic type
@@ -78,9 +78,9 @@ func (cfg StormConfig) Validate() error {
 		return err
 	}
 	switch {
-	case cfg.limited() && (cfg.Rate < RateStep || cfg.Rate.Validate() != nil):
+	case cfg.Limited() && (cfg.Rate < RateStep || cfg.Rate.Validate() != nil):
 		return invalidf("escp: storm control on port %d needs a rate that is a multiple of %d kbps between %d and %d, got %d", cfg.Port, RateStep, RateStep, MaxBandwidth, cfg.Rate)
-	case !cfg.limited() && cfg.Rate != 0:
+	case !cfg.Limited() && cfg.Rate != 0:
 		return invalidf("escp: storm control on port %d has a rate (%d) but no traffic type selected", cfg.Port, cfg.Rate)
 	}
 	return nil
@@ -96,8 +96,8 @@ func (c *Client) SetStormControl(ctx context.Context, cfg StormConfig) error {
 	if err := cfg.Validate(); err != nil {
 		return err
 	}
-	limited := cfg.limited()
-	if err := c.requirePorts(ctx, cfg.Port.set()); err != nil {
+	limited := cfg.Limited()
+	if err := c.requirePorts(ctx, cfg.Port.AsSet()); err != nil {
 		return err
 	}
 	if limited {
@@ -110,5 +110,5 @@ func (c *Client) SetStormControl(ctx context.Context, cfg StormConfig) error {
 	v[stormOffEnabled] = boolByte(limited)
 	v[stormOffUnknownUnicast], v[stormOffMulticast], v[stormOffBroadcast] = boolByte(cfg.UnknownUnicast), boolByte(cfg.Multicast), boolByte(cfg.Broadcast)
 	binary.BigEndian.PutUint32(v[stormOffRate:], uint32(cfg.Rate))
-	return c.setTLVs(ctx, MethodSetStormControl.operation().on(cfg.Port.set()), wire.TLV{Type: wire.TLVStormControl, Value: v})
+	return c.setTLVs(ctx, MethodSetStormControl.Operation().On(cfg.Port.AsSet()), wire.TLV{Type: wire.TLVStormControl, Value: v})
 }

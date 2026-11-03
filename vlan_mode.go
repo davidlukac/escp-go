@@ -125,7 +125,7 @@ func (c *Client) SetVLANMode(ctx context.Context, s VLANModeSetting) error {
 	var tlv wire.TLV
 	switch s.Mode {
 	case VLANModeMTU:
-		if err := c.requirePorts(ctx, s.UplinkPort.set()); err != nil {
+		if err := c.requirePorts(ctx, s.UplinkPort.AsSet()); err != nil {
 			return err
 		}
 		tlv = wire.TLV{Type: wire.TLVVLANMTU, Value: []byte{boolByte(true), byte(s.UplinkPort)}}
@@ -134,9 +134,9 @@ func (c *Client) SetVLANMode(ctx context.Context, s VLANModeSetting) error {
 	default: // VLANModeDot1Q: Validate refused every other mode
 		tlv = wire.TLV{Type: wire.TLVVLAN8021Q, Value: []byte{boolByte(true)}}
 	}
-	op := MethodSetVLANMode.operation()
+	op := MethodSetVLANMode.Operation()
 	if s.Mode == VLANModeMTU {
-		op.Ports = s.UplinkPort.set()
+		op.Ports = s.UplinkPort.AsSet()
 	}
 	return c.setTLVs(ctx, op, tlv)
 }

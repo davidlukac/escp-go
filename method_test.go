@@ -119,12 +119,12 @@ func TestMethodTextEncoding(t *testing.T) {
 // operation takes the class from the table; the helpers add the ports and the group without
 // touching the rest.
 func TestAnOperationIsBuiltFromAMethod(t *testing.T) {
-	op := MethodSetLAG.operation().on(MustPortSet(2, 3)).replacing(Group{LAG: 4})
+	op := MethodSetLAG.Operation().On(MustPortSet(2, 3)).Replacing(Group{LAG: 4})
 	want := Operation{Name: MethodSetLAG, Impact: ImpactManagement, Ports: MustPortSet(2, 3), Replaces: Group{LAG: 4}}
 	if op != want {
 		t.Fatalf("got %+v, want %+v", op, want)
 	}
-	if got := Method("SetNothing").operation(); got.Impact != 0 {
+	if got := Method("SetNothing").Operation(); got.Impact != 0 {
 		t.Fatalf("a method outside the table has class %v, want none", got.Impact)
 	}
 }

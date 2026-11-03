@@ -145,7 +145,7 @@ func (c *Client) SetQoSMode(ctx context.Context, mode QoSMode) error {
 	if err := mode.Validate(); err != nil {
 		return err
 	}
-	return c.setTLVs(ctx, MethodSetQoSMode.operation(), wire.TLV{Type: wire.TLVQoSMode, Value: []byte{byte(mode)}})
+	return c.setTLVs(ctx, MethodSetQoSMode.Operation(), wire.TLV{Type: wire.TLVQoSMode, Value: []byte{byte(mode)}})
 }
 
 // Validate checks the port and the priority. The error matches ErrInvalid.
@@ -174,7 +174,7 @@ func (c *Client) SetPortPriorities(ctx context.Context, changes []PortPriority) 
 		if named.Has(ch.Port) {
 			return invalidf("escp: port %d appears twice in the priorities", ch.Port)
 		}
-		named = named.Union(ch.Port.set())
+		named = named.Union(ch.Port.AsSet())
 	}
 	cur, err := c.QoS(ctx)
 	if err != nil {
@@ -194,5 +194,5 @@ func (c *Client) SetPortPriorities(ctx context.Context, changes []PortPriority) 
 	for _, p := range cur.Priorities { // keep the switch's port order
 		tlvs = append(tlvs, wire.TLV{Type: wire.TLVQoSPriority, Value: []byte{byte(p.Port), byte(prio[p.Port] - PriorityLowest)}})
 	}
-	return c.setTLVs(ctx, MethodSetPortPriorities.operation().on(named), tlvs...)
+	return c.setTLVs(ctx, MethodSetPortPriorities.Operation().On(named), tlvs...)
 }

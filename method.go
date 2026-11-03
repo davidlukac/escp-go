@@ -96,18 +96,18 @@ func (m *Method) UnmarshalText(text []byte) error {
 	return nil
 }
 
-// operation is the Operation of write m: its name and the Impact the settings table gives it. A
+// Operation is the Operation of write m: its name and the Impact the settings table gives it. A
 // method that is not a write in the table gets no class (the zero Impact), which every gate refuses.
-func (m Method) operation() Operation { return Operation{Name: m, Impact: impactOf(m)} }
+func (m Method) Operation() Operation { return Operation{Name: m, Impact: impactOf(m)} }
 
-// on returns o naming the ports of a write.
-func (o Operation) on(ports PortSet) Operation {
+// On returns o naming the ports of a write.
+func (o Operation) On(ports PortSet) Operation {
 	o.Ports = ports
 	return o
 }
 
-// replacing returns o replacing or removing group g.
-func (o Operation) replacing(g Group) Operation {
+// Replacing returns o replacing or removing group g.
+func (o Operation) Replacing(g Group) Operation {
 	o.Replaces = g
 	return o
 }

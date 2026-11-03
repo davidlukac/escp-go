@@ -103,7 +103,7 @@ func (c *Client) SetBandwidth(ctx context.Context, limit PortBandwidth) error {
 		return err
 	}
 	in, eg := bandwidthTLV(wire.TLVBandwidthIngress, limit.Port, limit.Ingress), bandwidthTLV(wire.TLVBandwidthEgress, limit.Port, limit.Egress)
-	if err := c.requirePorts(ctx, limit.Port.set()); err != nil {
+	if err := c.requirePorts(ctx, limit.Port.AsSet()); err != nil {
 		return err
 	}
 	if limit.Ingress != 0 {
@@ -111,7 +111,7 @@ func (c *Client) SetBandwidth(ctx context.Context, limit PortBandwidth) error {
 			return err
 		}
 	}
-	op := MethodSetBandwidth.operation().on(limit.Port.set())
+	op := MethodSetBandwidth.Operation().On(limit.Port.AsSet())
 	if err := c.setTLVs(ctx, op, in); err != nil {
 		return err
 	}

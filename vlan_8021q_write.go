@@ -41,9 +41,9 @@ func (v Dot1QVLAN) Validate() error {
 	return nil
 }
 
-// encode builds the TLV 8705 value for the VLAN, as the vendor utility does:
+// encodeDot1QVLAN builds the TLV 8705 value for the VLAN, as the vendor utility does:
 // the member mask holds every port, the tagged mask only the tagged ones.
-func (v Dot1QVLAN) encode() []byte {
+func encodeDot1QVLAN(v Dot1QVLAN) []byte {
 	return vlanEntryBytes(v.ID, v.Tagged.Union(v.Untagged).Mask(), v.Tagged.Mask(), v.Name)
 }
 
@@ -67,7 +67,7 @@ func (c *Client) SetDot1QVLAN(ctx context.Context, v Dot1QVLAN) error {
 	if err := c.requirePorts(ctx, members); err != nil {
 		return err
 	}
-	return c.setTLVs(ctx, MethodSetDot1QVLAN.operation().on(members).replacing(Group{Dot1QVLAN: v.ID}), wire.TLV{Type: wire.TLVVLAN8021QVLAN, Value: v.encode()})
+	return c.setTLVs(ctx, MethodSetDot1QVLAN.Operation().On(members).Replacing(Group{Dot1QVLAN: v.ID}), wire.TLV{Type: wire.TLVVLAN8021QVLAN, Value: encodeDot1QVLAN(v)})
 }
 
 // DeleteDot1QVLAN removes an 802.1Q VLAN: TLV 8705 with both masks empty and an
@@ -77,7 +77,7 @@ func (c *Client) DeleteDot1QVLAN(ctx context.Context, id VLANID) error {
 		return err
 	}
 	empty := make([]byte, maskLen)
-	return c.setTLVs(ctx, MethodDeleteDot1QVLAN.operation().replacing(Group{Dot1QVLAN: id}), wire.TLV{Type: wire.TLVVLAN8021QVLAN, Value: vlanEntryBytes(id, empty, empty, "")})
+	return c.setTLVs(ctx, MethodDeleteDot1QVLAN.Operation().Replacing(Group{Dot1QVLAN: id}), wire.TLV{Type: wire.TLVVLAN8021QVLAN, Value: vlanEntryBytes(id, empty, empty, "")})
 }
 
 // Validate checks the port and the VLAN id. The error matches ErrInvalid.
@@ -105,7 +105,7 @@ func (c *Client) SetPVIDs(ctx context.Context, pvids []PortPVID) error {
 		if named.Has(p.Port) {
 			return invalidf("escp: port %d appears twice in the PVIDs", p.Port)
 		}
-		named = named.Union(p.Port.set())
+		named = named.Union(p.Port.AsSet())
 	}
 	if err := c.requirePorts(ctx, named); err != nil {
 		return err
@@ -116,5 +116,5 @@ func (c *Client) SetPVIDs(ctx context.Context, pvids []PortPVID) error {
 		value := binary.BigEndian.AppendUint16([]byte{byte(p.Port)}, uint16(p.PVID))
 		tlvs = append(tlvs, wire.TLV{Type: wire.TLVVLAN8021QPVID, Value: value})
 	}
-	return c.setTLVs(ctx, MethodSetPVIDs.operation().on(named), tlvs...)
+	return c.setTLVs(ctx, MethodSetPVIDs.Operation().On(named), tlvs...)
 }
