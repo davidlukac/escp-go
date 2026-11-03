@@ -5,6 +5,22 @@ version; a breaking change is called out as such. The history before 0.1.0 is th
 `internal/escp` of [terraform-provider-tplinkeasysmart](https://github.com/davidlukac/terraform-provider-tplinkeasysmart),
 whose commits this repository keeps.
 
+## 0.7.0
+
+- **Behavior change** (no signature change; `make apidiff` reports no change of the exported API). Four things that were accepted or waited out before are refused or ended earlier now; each makes a mistake visible that went unnoticed, none changes what a correct program does:
+
+  | 0.6.0 | 0.7.0 |
+  |---|---|
+  | A `Client` without `Config.MAC` learned the switch's MAC on its first contact and never compared it again: when another device took the address over (a lease that changed hands), the client opened a session with it and wrote to it, with the credentials (#80) | the MAC of the first contact is the client's pin when `Config.MAC` is not set: a reply from a device with another non-zero MAC fails with `ErrWrongSwitch`, naming both, and nothing is written. A switch that moves (`SetIPConfig`, `EnableDHCP`) keeps its MAC. A program that meant to point one `Client` at a different switch creates a new `Client` |
+  | `Config.Validate` refused `0.0.0.0`, a multicast group and `255.255.255.255` only in the dotted form; the system resolver also reads `4294967295`, `0xffffffff`, `224.1` or `0`, and a hosts file or DNS can map a name to such an address, so `Dial` accepted them and the first write would have broadcast the password (#81) | `Dial` checks the address the lookup returned and refuses an unspecified, multicast or broadcast one with an error that matches `ErrInvalid`, naming the host and the address |
+  | `ParseMAC("00:00:00:00:00:00")` succeeded and returned the zero `MAC`, the library's "no MAC", so a `Config.MAC` read from it pinned nothing, silently (#90) | `ParseMAC` refuses the all-zero address (`ErrInvalid`), and so does `MAC.UnmarshalText`; the empty text is still "no MAC" |
+  | A call that had to wait for another call on the same client ignored its context: a 100 ms context returned after 3.8 s behind a call to a silent switch (#93) | the first lock of every public call is taken with the context: a call that waits gives up with the context's error and sends nothing. The lock a call takes after it has sent a write, to settle the outcome of a move, stays unconditional |
+
+- **Documentation:** `EnableDHCP` also confirms its result; `safety.PortGate` lets writes that name no port through, among them four that can cut the management path (`SetIPConfig`, `EnableDHCP`, `SetVLANMode`, `SetLoopPrevention`), and the guides now say that `MaxImpact` is the gate for the kind of change; `docs/architecture.md` lists every file of the root package, names the exceptions to "the settings are leaves", and a test keeps the list complete (#84); `ErrWrongSwitch` and `WrongSwitchError` describe the first-contact pin (#92).
+- **Tests (no API change):** four tests that depended on timing or on the machine no longer do: the Discover tests that expected a reply inside a window of 200 or 300 ms (#78), the port test that counted the kernel's draws (#86) and the one that depended on which TCP ports a Windows runner forbids (#101); the release test no longer inherits the `GIT_` variables of the git hook that runs it, which in a linked worktree made it commit to, and set `core.bare` in, the repository being committed to (#103).
+- **Contributors and CI:** the subtests rule is a `go/analysis` analyzer in `devtools` instead of a program in `internal` (#76); `make spell` checks American English in every tracked text file with the linter's own word list, in the pre-commit hook for any staged text file and in `make lint` (#99); a push to `main` is its own concurrency group, so a burst of merges cancels no run and the badge does not read as failing (#94); the mutation run leaves `devtools/` out (#88).
+- **Verified on hardware:** the live tests (`go test -tags live`) passed on a TL-SG108E with firmware 20250710 on the candidate: 17 passed, none failed, the three that move the management address skipped; the provider's full regression, including its disruptive scenarios on the device ports, passed with the library code of this release (78 passed, none failed, one skipped by design); the switch was left as found. `make fuzz` found the `ParseMAC` input (#90) and nothing else; the full mutation run reports efficacy 99.83%.
+
 ## 0.6.0
 
 - **Behavior change** (no signature change; `make apidiff` reports one addition, `DialContext`):
