@@ -76,17 +76,20 @@ type infoSource struct {
 	firmware string
 	err      error
 	reads    int
+	mac      escp.MAC // zero: a reader that does not know its switch
 }
 
 func (s *infoSource) Info(context.Context) (escp.Info, error) {
 	s.reads++
-	return escp.Info{Firmware: escp.ParseFirmware(s.firmware)}, s.err
+	return escp.Info{Firmware: escp.ParseFirmware(s.firmware), MAC: s.mac}, s.err
 }
+
+func (s *infoSource) SwitchMAC() escp.MAC { return s.mac }
 
 func TestFirmwareGateAllowsVerifiedBuildsAndReadsTheFirmwareOnce(t *testing.T) {
 	for _, version := range []string{"1.0.0 Build 20230218 Rel.50633", "1.0.0 Build 20250710 Rel.71093"} {
 		t.Run(version, func(t *testing.T) {
-			sw := &infoSource{firmware: version}
+			sw := &infoSource{firmware: version, mac: escp.MAC{0, 0, 0x5e, 0, 0x53, 1}}
 			gate := FirmwareGate()
 			for range 3 {
 				if err := gate(context.Background(), sw, escp.Operation{}); err != nil {
@@ -132,6 +135,58 @@ func TestFirmwareGateRefusesAFirmwareWithoutABuildDate(t *testing.T) {
 	var fe *FirmwareError
 	if err := FirmwareGate()(context.Background(), &infoSource{firmware: "custom"}, escp.Operation{}); !errors.As(err, &fe) || fe.Reason != FirmwareNoBuildDate {
 		t.Fatalf("got %v", err)
+	}
+}
+
+// One gate may serve several switches: it remembers the verdict per switch, so a verified one does
+// not vouch for another that runs a build nobody verified.
+func TestAGateSharedBetweenSwitchesChecksEachOnce(t *testing.T) {
+	good := &infoSource{firmware: "1.0.0 Build 20230218 Rel.50633", mac: escp.MAC{0, 0, 0x5e, 0, 0x53, 1}}
+	bad := &infoSource{firmware: "1.0.0 Build 20990101 Rel.1", mac: escp.MAC{0, 0, 0x5e, 0, 0x53, 2}}
+	gate := FirmwareGate()
+	ctx := context.Background()
+	for range 2 {
+		if err := gate(ctx, good, escp.Operation{}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var fe *FirmwareError
+	if err := gate(ctx, bad, escp.Operation{}); !errors.As(err, &fe) || fe.Reason != FirmwareUnverified {
+		t.Fatalf("the second switch must be checked on its own: %v", err)
+	}
+	if good.reads != 1 || bad.reads != 1 {
+		t.Fatalf("reads: good %d, bad %d, want one each", good.reads, bad.reads)
+	}
+}
+
+// The same switch behind a new address or a new client is still the same switch.
+func TestAVerifiedSwitchIsRememberedAcrossReaders(t *testing.T) {
+	mac := escp.MAC{0, 0, 0x5e, 0, 0x53, 1}
+	first := &infoSource{firmware: "1.0.0 Build 20230218 Rel.50633", mac: mac}
+	second := &infoSource{firmware: "1.0.0 Build 20230218 Rel.50633", mac: mac}
+	gate := FirmwareGate()
+	// subtests: two readers in sequence, the second depends on what the first left in the gate
+	for _, sw := range []*infoSource{first, second} {
+		if err := gate(context.Background(), sw, escp.Operation{}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if second.reads != 0 {
+		t.Fatalf("the switch was verified already, got %d reads", second.reads)
+	}
+}
+
+// A reader that does not know its switch cannot be remembered: it is checked at every write.
+func TestAReaderWithoutAMACIsCheckedAtEveryWrite(t *testing.T) {
+	sw := &infoSource{firmware: "1.0.0 Build 20230218 Rel.50633"}
+	gate := FirmwareGate()
+	for range 3 {
+		if err := gate(context.Background(), sw, escp.Operation{}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if sw.reads != 3 {
+		t.Fatalf("got %d reads for three writes, want 3", sw.reads)
 	}
 }
 

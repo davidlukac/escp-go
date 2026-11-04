@@ -74,23 +74,25 @@ func CheckFirmware(fw escp.Firmware) error {
 // FirmwareGate returns an escp.WriteGate that refuses every write while the
 // switch runs a firmware build the client was not verified against. Reads always
 // pass: they cannot change the switch, and they are how a new firmware is
-// fingerprinted. The firmware is read before the first write; a verified build is
-// remembered, a refusal or a failed read is not (the next write checks again). The
-// gate belongs to one switch: use one gate per client.
+// fingerprinted. The firmware is read before the first write to a switch; a verified build
+// is remembered for that switch, by its MAC address (Reader.SwitchMAC), a refusal or a failed read
+// is not (the next write checks again). A gate may therefore be shared by clients of several
+// switches, each is checked once; a reader that does not know its switch's MAC is checked at every
+// write.
 func FirmwareGate() escp.WriteGate {
-	g := &firmwareGate{}
+	g := &firmwareGate{verified: map[escp.MAC]bool{}}
 	return g.check
 }
 
 type firmwareGate struct {
 	mu       sync.Mutex
-	verified bool
+	verified map[escp.MAC]bool // the switches whose build was found verified
 }
 
 func (g *firmwareGate) check(ctx context.Context, sw escp.Reader, _ escp.Operation) error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	if g.verified {
+	if mac := sw.SwitchMAC(); !mac.IsZero() && g.verified[mac] {
 		return nil
 	}
 	info, err := sw.Info(ctx)
@@ -100,6 +102,10 @@ func (g *firmwareGate) check(ctx context.Context, sw escp.Reader, _ escp.Operati
 	if err := CheckFirmware(info.Firmware); err != nil {
 		return err
 	}
-	g.verified = true
+	// Info is the first contact of a client that had none, so the MAC is known now. A reader that
+	// still reports none (a double) is checked again at every write rather than remembered.
+	if mac := sw.SwitchMAC(); !mac.IsZero() {
+		g.verified[mac] = true
+	}
 	return nil
 }

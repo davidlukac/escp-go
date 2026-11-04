@@ -60,6 +60,9 @@ func TestTheSettingsTableListsEveryReaderAndWriter(t *testing.T) {
 	// the readers of the Reader interface and the others the guides name are all in the table
 	for i := range reflect.TypeOf((*Reader)(nil)).Elem().NumMethod() {
 		name := reflect.TypeOf((*Reader)(nil)).Elem().Method(i).Name
+		if name == "SwitchMAC" {
+			continue // the identity of the switch, an accessor and no page of the web UI
+		}
 		if !slices.Contains(rows, name) {
 			t.Errorf("%s is part of Reader but is not in the settings table", name)
 		}

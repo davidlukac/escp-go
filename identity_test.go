@@ -380,3 +380,37 @@ func TestAnUnpinnedClientStillTakesAReplyWithoutAMAC(t *testing.T) {
 		t.Fatalf("got %+v, %v", info, err)
 	}
 }
+
+func TestSwitchMACIsThePinOrTheMACOfTheFirstContact(t *testing.T) {
+	f := escptest.Start(t)
+	pinned := dialFast(t, f, "secret")
+	pinned.ident.pin = wantMAC
+	if got := pinned.SwitchMAC(); got != wantMAC {
+		t.Fatalf("a pinned client reports its pin: %v", got)
+	}
+	unpinned := dialFast(t, f, "secret")
+	if got := unpinned.SwitchMAC(); !got.IsZero() {
+		t.Fatalf("before the first contact an unpinned client knows nothing: %v", got)
+	}
+	if _, err := unpinned.Info(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := unpinned.SwitchMAC(); got != wantMAC {
+		t.Fatalf("after the first contact it reports the MAC of the switch: %v", got)
+	}
+}
+
+// Reading it does not wait for the call that holds the client's lock.
+func TestSwitchMACDoesNotWaitForTheLock(t *testing.T) {
+	f := escptest.Start(t)
+	c := dialFast(t, f, "secret")
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	done := make(chan MAC)
+	go func() { done <- c.SwitchMAC() }()
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("SwitchMAC waited for the client's lock")
+	}
+}

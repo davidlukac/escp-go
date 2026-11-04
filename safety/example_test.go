@@ -23,7 +23,10 @@ func (f reportedFirmware) Info(context.Context) (escp.Info, error) {
 	return escp.Info{Firmware: escp.ParseFirmware(f.version)}, nil
 }
 
-// A gate belongs to one switch: it remembers a verified build, so each switch gets its own.
+// SwitchMAC is zero: the double does not know its switch, so the gate checks it at every write.
+func (f reportedFirmware) SwitchMAC() escp.MAC { return escp.MAC{} }
+
+// A gate remembers a verified build for each switch, by its MAC address.
 func ExampleFirmwareGate() {
 	err := safety.FirmwareGate()(context.Background(), firmware("1.0.0 Build 20230218 Rel.50633"), escp.Operation{})
 	fmt.Println("verified build:", err)
