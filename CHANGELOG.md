@@ -5,6 +5,10 @@ version; a breaking change is called out as such. The history before 0.1.0 is th
 `internal/escp` of [terraform-provider-tplinkeasysmart](https://github.com/davidlukac/terraform-provider-tplinkeasysmart),
 whose commits this repository keeps.
 
+## 0.8.0
+
+- The values and their rules move to package model; a client refuses a reply without a MAC, a Timeout above 30 s and a second client of the same switch
+
 ## 0.7.0
 
 - **Behavior change** (no signature change; `make apidiff` reports no change of the exported API). Four things that were accepted or waited out before are refused or ended earlier now; each makes a mistake visible that went unnoticed, none changes what a correct program does:
