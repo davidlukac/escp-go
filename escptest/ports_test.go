@@ -160,27 +160,82 @@ func TestHelperReservingPorts(t *testing.T) {
 
 // A port whose TCP number somebody else listens on is another process's reservation (or something
 // unrelated); the search moves on to a port that is free in both.
-func TestAPortThatAnotherProcessHoldsIsSkipped(t *testing.T) {
-	// a port that is free for UDP, and the same TCP number held by a listener that stands in for
-	// another process's marker (the system may forbid that TCP number: the test cannot run then)
+// freeUDPNumber is a number in the fake's range that is free for UDP at this moment; only the number
+// is kept.
+func freeUDPNumber() (int, error) {
 	probe, err := listenLoopback()
 	if err != nil {
-		t.Fatal(err)
+		return 0, err
 	}
 	ap, err := udp.AddrPort(probe.LocalAddr())
 	if err != nil {
-		t.Fatal(err)
+		_ = probe.Close() // best effort: the address could not be read
+		return 0, err
 	}
-	held := int(ap.Port())
 	_ = probe.Close() // best effort: only the number is kept
-	other, err := net.Listen("tcp4", net.JoinHostPort("127.0.0.1", strconv.Itoa(held)))
-	if markerForbidden(err) {
-		t.Skipf("the system forbids the TCP port %d that this test needs to hold: %v", held, err)
+	return int(ap.Port()), nil
+}
+
+// holdTCPMarker takes a number from pick and holds the same TCP number, as another process holds its
+// marker. A number whose TCP side is taken is passed over for the next: `go test ./...` runs the
+// test binaries of several packages at once, and the fake switches of another one hold markers on
+// numbers from the same range. The test is skipped when the system forbids the TCP number (Windows).
+func holdTCPMarker(t *testing.T, pick func() (int, error)) (int, net.Listener) {
+	t.Helper()
+	var lastErr error
+	for range maxReservedTries {
+		held, err := pick()
+		if err != nil {
+			t.Fatal(err)
+		}
+		other, err := net.Listen("tcp4", net.JoinHostPort("127.0.0.1", strconv.Itoa(held)))
+		if markerForbidden(err) {
+			t.Skipf("the system forbids the TCP port %d that this test needs to hold: %v", held, err)
+		}
+		if err == nil {
+			t.Cleanup(func() { _ = other.Close() }) // best effort at the end of the test
+			return held, other
+		}
+		lastErr = err
 	}
+	t.Fatalf("no number free for both UDP and TCP after %d tries: %v", maxReservedTries, lastErr)
+	return 0, nil
+}
+
+// A number whose TCP side another binary of the same run holds is not the end of the test: the next
+// number is tried.
+func TestAHeldMarkerNumberIsPassedOverForTheNextOne(t *testing.T) {
+	taken, err := net.Listen("tcp4", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = other.Close() }() // best effort at the end of the test
+	defer func() { _ = taken.Close() }() // best effort at the end of the test
+	_, portText, err := net.SplitHostPort(taken.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	takenPort, err := strconv.Atoi(portText)
+	if err != nil {
+		t.Fatal(err)
+	}
+	picks := 0
+	pick := func() (int, error) {
+		picks++
+		if picks == 1 {
+			return takenPort, nil // its TCP side is held
+		}
+		return freeUDPNumber() // may itself be passed over: a test binary beside this one holds markers too
+	}
+	got, _ := holdTCPMarker(t, pick)
+	if got == takenPort || picks < 2 {
+		t.Errorf("held %d after %d picks, want a number other than %d (its TCP side is taken) after at least two picks", got, picks, takenPort)
+	}
+}
+
+func TestAPortThatAnotherProcessHoldsIsSkipped(t *testing.T) {
+	// a port that is free for UDP, and the same TCP number held by a listener that stands in for
+	// another process's marker (the system may forbid that TCP number: the test cannot run then)
+	held, _ := holdTCPMarker(t, freeUDPNumber)
 	calls := 0
 	listen := func() (*net.UDPConn, error) {
 		calls++
@@ -194,8 +249,10 @@ func TestAPortThatAnotherProcessHoldsIsSkipped(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = c.Close() }() // best effort at the end of the test
-	if got == held || calls != 2 {
-		t.Errorf("got port %d after %d tries, want a port other than %d on the second try", got, calls, held)
+	// The held number is refused, so a second try was needed; more than two is fine, because the second
+	// number can be one that a test binary running beside this one holds.
+	if got == held || calls < 2 {
+		t.Errorf("got port %d after %d tries, want a port other than %d after at least two tries", got, calls, held)
 	}
 }
 
