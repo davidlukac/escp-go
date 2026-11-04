@@ -7,6 +7,7 @@ import (
 	"net"
 
 	"github.com/davidlukac/escp-go/internal/wire"
+	"github.com/davidlukac/escp-go/model"
 )
 
 // lock takes the client's lock, which is held across a whole exchange (the switch answers one
@@ -49,14 +50,14 @@ func boolByte(b bool) byte {
 // place that sends an OpSet.) The gate runs before the lock is
 // taken because it reads through the client. op describes the write to the gate
 // (the gate gets a copy of its ports).
-func (c *Client) setTLVs(ctx context.Context, op Operation, tlvs ...wire.TLV) error {
+func (c *Client) setTLVs(ctx context.Context, op model.Operation, tlvs ...wire.TLV) error {
 	_, err := c.setTLVsSent(ctx, op, tlvs...)
 	return err
 }
 
 // setTLVsSent is setTLVs that also reports whether the gate let the write go, so that the
 // request may have reached the switch: false means nothing was sent for certain.
-func (c *Client) setTLVsSent(ctx context.Context, op Operation, tlvs ...wire.TLV) (sent bool, err error) {
+func (c *Client) setTLVsSent(ctx context.Context, op model.Operation, tlvs ...wire.TLV) (sent bool, err error) {
 	if gate := c.cfg.WriteGate; gate != nil {
 		if err := gate(ctx, c, op); err != nil {
 			c.log.DebugContext(ctx, "write refused by the gate", "operation", op.Name.String(), "impact", op.Impact.String())
@@ -115,7 +116,7 @@ func (c *Client) getTLVs(ctx context.Context, types ...wire.TLVType) ([]wire.TLV
 // what it does with a write for a port beyond them is unknown. The port count is read from
 // the switch once and kept, so the first write that names a port costs one extra read; if
 // that read fails, so does the write, with that error. It reads only, and so is not gated.
-func (c *Client) requirePorts(ctx context.Context, ports PortSet) error {
+func (c *Client) requirePorts(ctx context.Context, ports model.PortSet) error {
 	if ports.IsEmpty() {
 		return nil
 	}
@@ -123,7 +124,7 @@ func (c *Client) requirePorts(ctx context.Context, ports PortSet) error {
 	if err != nil {
 		return err
 	}
-	last := PortID(have) // the ports are numbered 1 to the count
+	last := model.PortID(have) // the ports are numbered 1 to the count
 	for _, p := range ports.Ports() {
 		if p > last {
 			return invalidf("escp: port %d does not exist: this switch has %d ports", p, have)

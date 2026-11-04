@@ -6,6 +6,7 @@ import (
 	"net"
 
 	"github.com/davidlukac/escp-go/internal/wire"
+	"github.com/davidlukac/escp-go/model"
 )
 
 // LED reports whether the switch LEDs are on.
@@ -33,5 +34,5 @@ func (c *Client) LED(ctx context.Context) (bool, error) {
 // SetLED switches the LEDs on or off. It is cosmetic: it does not touch traffic or
 // configuration, and it is the one write that is safe to try on any switch.
 func (c *Client) SetLED(ctx context.Context, on bool) error {
-	return c.setTLVs(ctx, MethodSetLED.operation(), wire.TLV{Type: wire.TLVLED, Value: []byte{boolByte(on)}})
+	return c.setTLVs(ctx, model.MethodSetLED.Operation(), wire.TLV{Type: wire.TLVLED, Value: []byte{boolByte(on)}})
 }

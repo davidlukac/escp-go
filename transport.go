@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/davidlukac/escp-go/internal/wire"
+	"github.com/davidlukac/escp-go/model"
 )
 
 // datagramConn is the part of the UDP socket that the client uses. It is a *net.UDPConn; tests wrap
@@ -107,7 +108,7 @@ func (c *Client) accept(from *net.UDPAddr, data []byte) (reply, bool) {
 	if err != nil || h.Seq != c.seq || h.Op == wire.OpDiscovery {
 		return reply{}, false
 	}
-	if !c.ident.judge(MAC(h.SwitchMAC), from.IP) {
+	if !c.ident.judge(model.MAC(h.SwitchMAC), from.IP) {
 		// the address answers, but it is another device: judge remembered it, exchange says so
 		return reply{}, false
 	}

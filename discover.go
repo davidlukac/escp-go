@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/davidlukac/escp-go/internal/wire"
+	"github.com/davidlukac/escp-go/model"
 )
 
 // defaultDiscoverWindow is how long Discover listens when DiscoverOptions.Window is zero.
@@ -56,7 +57,7 @@ type DiscoverOptions struct {
 // socket on Linux; Windows is not verified. Where the system offers no port sharing, or another
 // program holds the port exclusively (an old Easy Smart utility), binding fails and Discover
 // returns that error.
-func Discover(ctx context.Context, opts DiscoverOptions) ([]Info, error) {
+func Discover(ctx context.Context, opts DiscoverOptions) ([]model.Info, error) {
 	return discoverWith(ctx, opts, discoverEnv{interfaces: hostInterfaces, switchPort: defaultSwitchPort, hostPort: defaultHostPort})
 }
 
@@ -73,7 +74,7 @@ type discoverEnv struct {
 // netInterface is an interface that discovery can use: what is needed to build a probe.
 type netInterface struct {
 	Name       string
-	MAC        MAC
+	MAC        model.MAC
 	Broadcasts []netip.Addr // subnet broadcast address of each IPv4 address
 }
 
@@ -154,10 +155,10 @@ func selectInterfaces(all []netInterface, name string) ([]netInterface, error) {
 // probe is one discovery request: where it goes and which host MAC it carries.
 type probe struct {
 	to  *net.UDPAddr
-	mac MAC
+	mac model.MAC
 }
 
-func discoverWith(ctx context.Context, opts DiscoverOptions, env discoverEnv) ([]Info, error) {
+func discoverWith(ctx context.Context, opts DiscoverOptions, env discoverEnv) ([]model.Info, error) {
 	return discoverUntil(ctx, opts, env, nil)
 }
 
@@ -166,16 +167,16 @@ func discoverWith(ctx context.Context, opts DiscoverOptions, env discoverEnv) ([
 // switch needs 250 to 500 milliseconds to answer). It returns ErrNotFound when nobody with that
 // MAC answers within the window (two seconds unless opts.Window says otherwise). Read-only and
 // not subject to a WriteGate.
-func Locate(ctx context.Context, mac MAC, opts DiscoverOptions) (Info, error) {
+func Locate(ctx context.Context, mac model.MAC, opts DiscoverOptions) (model.Info, error) {
 	return locateWith(ctx, mac, opts, discoverEnv{interfaces: hostInterfaces, switchPort: defaultSwitchPort, hostPort: defaultHostPort})
 }
 
-func locateWith(ctx context.Context, mac MAC, opts DiscoverOptions, env discoverEnv) (Info, error) {
+func locateWith(ctx context.Context, mac model.MAC, opts DiscoverOptions, env discoverEnv) (model.Info, error) {
 	if mac.IsZero() {
-		return Info{}, invalidf("escp: Locate needs the MAC address of the switch")
+		return model.Info{}, invalidf("escp: Locate needs the MAC address of the switch")
 	}
 	want := mac.String()
-	infos, err := discoverUntil(ctx, opts, env, func(found map[string]Info) bool { _, ok := found[want]; return ok })
+	infos, err := discoverUntil(ctx, opts, env, func(found map[string]model.Info) bool { _, ok := found[want]; return ok })
 	for _, info := range infos {
 		if info.MAC == mac {
 			identified(orDiscard(opts.Logger)).DebugContext(ctx, "lookup by MAC found the switch", "mac", want, "ip", info.IP.String())
@@ -183,13 +184,13 @@ func locateWith(ctx context.Context, mac MAC, opts DiscoverOptions, env discover
 		}
 	}
 	if err != nil {
-		return Info{}, err
+		return model.Info{}, err
 	}
-	return Info{}, fmt.Errorf("%w: %s", ErrNotFound, want)
+	return model.Info{}, fmt.Errorf("%w: %s", ErrNotFound, want)
 }
 
 // discoverUntil is discoverWith with an optional condition (done) that ends the search early, checked after each reply.
-func discoverUntil(ctx context.Context, opts DiscoverOptions, env discoverEnv, done func(map[string]Info) bool) ([]Info, error) {
+func discoverUntil(ctx context.Context, opts DiscoverOptions, env discoverEnv, done func(map[string]model.Info) bool) ([]model.Info, error) {
 	if opts.Window < 0 {
 		return nil, invalidf("escp: negative discovery window %v", opts.Window)
 	}
@@ -219,7 +220,7 @@ func discoverUntil(ctx context.Context, opts DiscoverOptions, env discoverEnv, d
 }
 
 // collectReplies sends the probes, listens for the window and returns the distinct replies.
-func collectReplies(ctx context.Context, env discoverEnv, probes []probe, window time.Duration, done func(map[string]Info) bool) ([]Info, error) {
+func collectReplies(ctx context.Context, env discoverEnv, probes []probe, window time.Duration, done func(map[string]model.Info) bool) ([]model.Info, error) {
 	conn, err := bindReplyPort(ctx, env.hostPort)
 	if err != nil {
 		return nil, err
@@ -233,7 +234,7 @@ func collectReplies(ctx context.Context, env discoverEnv, probes []probe, window
 	_, _ = rand.Read(n[:])
 	seq := discoverySeq(n)
 
-	found := map[string]Info{}
+	found := map[string]model.Info{}
 	replies := &discoveryReplies{conn: conn, seq: seq, found: found, done: done}
 	start := time.Now()
 	for _, until := range []time.Time{start.Add(window / 2), start.Add(window)} {
@@ -282,8 +283,8 @@ func sendProbes(conn *net.UDPConn, env discoverEnv, probes []probe, seq uint16) 
 type discoveryReplies struct {
 	conn  *net.UDPConn
 	seq   uint16
-	found map[string]Info
-	done  func(map[string]Info) bool
+	found map[string]model.Info
+	done  func(map[string]model.Info) bool
 }
 
 // listen reads datagrams until the deadline and records the discovery replies to the sequence number.
@@ -321,12 +322,12 @@ func (r *discoveryReplies) listen(ctx context.Context, until time.Time) {
 
 // sortedInfos returns the replies ordered by IP address (then MAC); an address the reply
 // did not carry sorts first.
-func sortedInfos(found map[string]Info) []Info {
-	out := make([]Info, 0, len(found))
+func sortedInfos(found map[string]model.Info) []model.Info {
+	out := make([]model.Info, 0, len(found))
 	for _, info := range found {
 		out = append(out, info)
 	}
-	slices.SortFunc(out, func(a, b Info) int {
+	slices.SortFunc(out, func(a, b model.Info) int {
 		if c := a.IP.Compare(b.IP); c != 0 {
 			return c
 		}

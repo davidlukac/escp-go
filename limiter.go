@@ -1,6 +1,10 @@
 package escp
 
-import "context"
+import (
+	"context"
+
+	"github.com/davidlukac/escp-go/model"
+)
 
 // A port has one limiter for incoming traffic, and the switch lends it to either the ingress bandwidth limit
 // or storm control: writing one turns the other off on that port, with a normal reply and no refusal
@@ -11,7 +15,7 @@ import "context"
 // caller decides what stays.
 
 // requireNoStorm refuses an ingress limit on a port whose storm control is on.
-func (c *Client) requireNoStorm(ctx context.Context, port PortID, ingress Kbps) error {
+func (c *Client) requireNoStorm(ctx context.Context, port model.PortID, ingress model.Kbps) error {
 	rows, err := c.StormControl(ctx)
 	if err != nil {
 		return err
@@ -26,7 +30,7 @@ func (c *Client) requireNoStorm(ctx context.Context, port PortID, ingress Kbps) 
 }
 
 // requireNoIngressLimit refuses storm control on a port that has an ingress limit.
-func (c *Client) requireNoIngressLimit(ctx context.Context, port PortID) error {
+func (c *Client) requireNoIngressLimit(ctx context.Context, port model.PortID) error {
 	rows, err := c.Bandwidth(ctx)
 	if err != nil {
 		return err

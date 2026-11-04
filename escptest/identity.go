@@ -2,6 +2,7 @@ package escptest
 
 import (
 	"github.com/davidlukac/escp-go/internal/wire"
+	"github.com/davidlukac/escp-go/model"
 )
 
 // handleDiscovery answers the unauthenticated probe with the switch's identity and address: the
@@ -69,11 +70,11 @@ func DefaultLease() Lease {
 func (f *Switch) SetLease(l Lease) { f.mu.Lock(); f.lease = &l; f.mu.Unlock() }
 
 // DefaultMAC is the address the fake reports unless SetMAC says otherwise (the documentation range, RFC 7042).
-func DefaultMAC() [6]byte { return [6]byte{0x00, 0x00, 0x5e, 0x00, 0x53, 0x02} }
+func DefaultMAC() model.MAC { return model.MAC{0x00, 0x00, 0x5e, 0x00, 0x53, 0x02} }
 
 // macAddr is the MAC the switch reports; callers hold f.mu.
-func (f *Switch) macAddr() [6]byte {
-	if f.mac == ([6]byte{}) {
+func (f *Switch) macAddr() model.MAC {
+	if f.mac == (model.MAC{}) {
 		return DefaultMAC()
 	}
 	return f.mac
@@ -81,4 +82,4 @@ func (f *Switch) macAddr() [6]byte {
 
 // SetMAC changes the MAC address the switch reports in its headers and in discovery replies,
 // to make several fakes distinguishable or to play a different device at the same address.
-func (f *Switch) SetMAC(mac [6]byte) { f.mu.Lock(); f.mac = mac; f.mu.Unlock() }
+func (f *Switch) SetMAC(mac model.MAC) { f.mu.Lock(); f.mac = mac; f.mu.Unlock() }

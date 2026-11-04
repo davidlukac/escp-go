@@ -8,35 +8,17 @@ import (
 	"time"
 
 	"github.com/davidlukac/escp-go/internal/wire"
+	"github.com/davidlukac/escp-go/model"
 )
-
-// Info is what a discovery reply reports about the switch.
-type Info struct {
-	Model, Hardware string
-	// Hostname is the device description.
-	Hostname Hostname
-	// Firmware is the version the switch reports, read into its parts.
-	Firmware Firmware
-	// MAC is the switch's hardware address; the zero value when the reply carried none.
-	MAC MAC
-	// IP, Netmask and Gateway are the management address the switch reports. An address the reply
-	// did not carry is the invalid netip.Addr (Addr.IsValid is false), which is not the same as
-	// 0.0.0.0: a gateway of 0.0.0.0 means "no gateway".
-	IP, Netmask, Gateway netip.Addr
-	DHCP                 bool
-	// FactoryDefault is discovery TLV 14: the switch has never been configured
-	// (still on factory credentials).
-	FactoryDefault bool
-}
 
 // Info asks the switch to describe itself with a discovery probe: model, firmware, hardware,
 // hostname, MAC and its network settings. It needs no credentials and works on any firmware,
 // which is why a WriteGate reads the firmware through it. Each attempt is sent to the
 // switch's address and to Config.BroadcastAddr, and repeated up to Config.Retries times; if
 // nothing answers the error is ErrNoReply.
-func (c *Client) Info(ctx context.Context) (Info, error) {
+func (c *Client) Info(ctx context.Context) (model.Info, error) {
 	if err := c.lock(ctx); err != nil {
-		return Info{}, err
+		return model.Info{}, err
 	}
 	defer c.mu.Unlock()
 	return c.discover(ctx)
@@ -45,12 +27,12 @@ func (c *Client) Info(ctx context.Context) (Info, error) {
 // SwitchMAC is the MAC address of the switch this client talks to: Config.MAC or, without one, the
 // MAC the switch reported on the client's first contact. It is zero before that first contact of a
 // client that has no Config.MAC. It reads state of its own and never waits for a call in flight.
-func (c *Client) SwitchMAC() MAC { return c.ident.mac() }
+func (c *Client) SwitchMAC() model.MAC { return c.ident.mac() }
 
-func (c *Client) discover(ctx context.Context) (Info, error) {
+func (c *Client) discover(ctx context.Context) (model.Info, error) {
 	if c.dest.IP == nil {
 		if err := c.relocate(ctx); err != nil {
-			return Info{}, err
+			return model.Info{}, err
 		}
 	}
 	if c.cfg.MAC.IsZero() || c.ident.known() {
@@ -65,7 +47,7 @@ func (c *Client) discover(ctx context.Context) (Info, error) {
 	if err != nil && ctx.Err() == nil && (errors.Is(err, ErrNoReply) || errors.Is(err, context.DeadlineExceeded)) {
 		// the configured address does not answer: the switch may have another one now
 		if rerr := c.relocate(ctx); rerr != nil {
-			return Info{}, rerr
+			return model.Info{}, rerr
 		}
 		info, err = c.discoverOnce(ctx)
 	}
@@ -86,14 +68,14 @@ const defaultFirstContactBudget = 1500 * time.Millisecond
 
 // discoverOnce is one discovery exchange with the switch's current address. A reply whose MAC is not
 // Config.MAC is refused, whichever way the MAC was carried.
-func (c *Client) discoverOnce(ctx context.Context) (Info, error) {
+func (c *Client) discoverOnce(ctx context.Context) (model.Info, error) {
 	r, err := c.exchange(ctx, wire.OpDiscovery, nil, true, c.discoverTargets())
 	if err != nil {
-		return Info{}, err
+		return model.Info{}, err
 	}
 	info := infoFromReply(r)
 	if want := c.ident.mac(); !want.IsZero() && info.MAC != want {
-		return Info{}, &WrongSwitchError{Want: want, Got: info.MAC, IP: addrOf(c.dest.IP)}
+		return model.Info{}, &WrongSwitchError{Want: want, Got: info.MAC, IP: addrOf(c.dest.IP)}
 	}
 	return info, nil
 }
@@ -118,10 +100,10 @@ func (c *Client) relocate(ctx context.Context) error {
 
 // infoFromReply maps the TLVs of a discovery reply to Info; absent or
 // malformed fields stay empty.
-func infoFromReply(r reply) Info { return infoFromTLVs(r.tlvs) }
+func infoFromReply(r reply) model.Info { return infoFromTLVs(r.tlvs) }
 
 // infoFromTLVs is infoFromReply for a bare TLV list, which Discover also has.
-func infoFromTLVs(tlvs []wire.TLV) Info {
+func infoFromTLVs(tlvs []wire.TLV) model.Info {
 	r := reply{tlvs: tlvs}
 	str := func(t wire.TLVType) string { v, _ := r.tlv(t); return wire.CString(v) }
 	ip := func(t wire.TLVType) (a netip.Addr) {
@@ -130,10 +112,10 @@ func infoFromTLVs(tlvs []wire.TLV) Info {
 		}
 		return a
 	}
-	info := Info{Model: str(wire.TLVModel), Hostname: Hostname(str(wire.TLVHostname)), Firmware: ParseFirmware(str(wire.TLVFirmware)),
+	info := model.Info{Model: str(wire.TLVModel), Hostname: model.Hostname(str(wire.TLVHostname)), Firmware: model.ParseFirmware(str(wire.TLVFirmware)),
 		Hardware: str(wire.TLVHardware), IP: ip(wire.TLVIP), Netmask: ip(wire.TLVNetmask), Gateway: ip(wire.TLVGateway)}
 	if v, ok := r.tlv(wire.TLVMAC); ok {
-		info.MAC, _ = MACFromBytes(v) // a reply with a malformed MAC has none
+		info.MAC, _ = model.MACFromBytes(v) // a reply with a malformed MAC has none
 	}
 	if v, ok := r.tlv(wire.TLVDHCP); ok && len(v) == 1 {
 		info.DHCP = v[0] != 0

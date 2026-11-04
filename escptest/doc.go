@@ -2,16 +2,11 @@
 // that uses the escp client. It is a test double: no substitute for a real switch, and never to be
 // used outside tests.
 //
-// It imports only the wire codec, never the client, so the escp package's own tests can use it
-// without an import cycle. The price is that its values are plain ones, not the client's types: a
-// MAC address is a [6]byte (an escp.MAC is assignable to it and the other way round, with no
-// conversion, because one of the two is an unnamed array type), a switch port is an int
-// (int(port) for an escp.PortID), an IPv4 address is a [4]byte, and the link speeds are its own
-// LinkSpeed constants, and a protocol type is a TLVType, the fake's own integer type, written as the
-// number PROTOCOL.md lists (TLVType(4352)); no constants are exported, so the numbers have one home.
-// A typed wrapper would need a second package between the two, which the
-// consumers of this one (a handful of calls: Start, Username, Password, FreeUDPPort, Loopback,
-// EnableModel, SetMAC) do not pay for.
+// It speaks the model's types where the client does (a model.MAC, a model.PortID) and the wire
+// codec, and never imports the client, so the escp package's own tests can use it without an import
+// cycle. What is still plain: an IPv4 address is a [4]byte, the link speeds are its own LinkSpeed
+// constants, and a protocol type is a TLVType, the fake's own integer type, written as the number
+// PROTOCOL.md lists (TLVType(4352)); no constants are exported, so the numbers have one home.
 //
 // # What it does
 //

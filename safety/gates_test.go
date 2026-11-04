@@ -7,27 +7,27 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 )
 
 var errFirst, errSecond = errors.New("first gate"), errors.New("second gate")
 
-func allow(calls *[]string, name string) escp.WriteGate {
-	return func(context.Context, escp.Reader, escp.Operation) error {
+func allow(calls *[]string, name string) model.WriteGate {
+	return func(context.Context, model.Reader, model.Operation) error {
 		*calls = append(*calls, name)
 		return nil
 	}
 }
 
-func refuse(calls *[]string, name string, err error) escp.WriteGate {
-	return func(context.Context, escp.Reader, escp.Operation) error {
+func refuse(calls *[]string, name string, err error) model.WriteGate {
+	return func(context.Context, model.Reader, model.Operation) error {
 		*calls = append(*calls, name)
 		return err
 	}
 }
 
 func TestChain(t *testing.T) {
-	ctx, op := context.Background(), escp.Operation{Name: escp.MethodSetLED, Impact: escp.ImpactCosmetic}
+	ctx, op := context.Background(), model.Operation{Name: model.MethodSetLED, Impact: model.ImpactCosmetic}
 	t.Run("nothing, or only nil gates, gates nothing", func(t *testing.T) {
 		if Chain() != nil || Chain(nil, nil) != nil {
 			t.Fatal("a chain of no gates must be nil, which the client reads as no gate")
@@ -55,9 +55,9 @@ func TestChain(t *testing.T) {
 		}
 	})
 	t.Run("the operation reaches every gate unchanged", func(t *testing.T) {
-		var seen []escp.Operation
-		spy := func(_ context.Context, _ escp.Reader, o escp.Operation) error { seen = append(seen, o); return nil }
-		want := escp.Operation{Name: escp.MethodSetLAG, Ports: escp.MustPortSet(5, 6), Impact: escp.ImpactManagement}
+		var seen []model.Operation
+		spy := func(_ context.Context, _ model.Reader, o model.Operation) error { seen = append(seen, o); return nil }
+		want := model.Operation{Name: model.MethodSetLAG, Ports: model.MustPortSet(5, 6), Impact: model.ImpactManagement}
 		if err := Chain(spy, spy)(ctx, nil, want); err != nil || len(seen) != 2 || !reflect.DeepEqual(seen[0], want) || !reflect.DeepEqual(seen[1], want) {
 			t.Fatalf("err=%v seen=%+v", err, seen)
 		}
@@ -68,28 +68,28 @@ func TestMaxImpact(t *testing.T) {
 	ctx := context.Background()
 	cases := []struct {
 		name   string
-		max    escp.Impact
-		impact escp.Impact
+		max    model.Impact
+		impact model.Impact
 		refuse bool
 	}{
-		{"cosmetic under cosmetic", escp.ImpactCosmetic, escp.ImpactCosmetic, false},
-		{"traffic over cosmetic", escp.ImpactCosmetic, escp.ImpactTraffic, true},
-		{"management over cosmetic", escp.ImpactCosmetic, escp.ImpactManagement, true},
-		{"cosmetic under traffic", escp.ImpactTraffic, escp.ImpactCosmetic, false},
-		{"traffic under traffic", escp.ImpactTraffic, escp.ImpactTraffic, false},
-		{"management over traffic", escp.ImpactTraffic, escp.ImpactManagement, true},
-		{"management under management", escp.ImpactManagement, escp.ImpactManagement, false},
-		{"an operation that declares no impact is refused", escp.ImpactManagement, 0, true},
-		{"an operation with an impossible impact is refused", escp.ImpactManagement, escp.Impact(9), true},
-		{"a max that is no class refuses everything", 0, escp.ImpactCosmetic, true},
-		{"a max above the classes refuses everything", escp.Impact(4), escp.ImpactCosmetic, true},
-		{"a max far above the classes refuses everything", escp.Impact(99), escp.ImpactManagement, true},
-		{"a negative max refuses everything", escp.Impact(-1), escp.ImpactCosmetic, true},
-		{"an impossible impact is refused even under a max above the classes", escp.Impact(99), escp.Impact(50), true},
+		{"cosmetic under cosmetic", model.ImpactCosmetic, model.ImpactCosmetic, false},
+		{"traffic over cosmetic", model.ImpactCosmetic, model.ImpactTraffic, true},
+		{"management over cosmetic", model.ImpactCosmetic, model.ImpactManagement, true},
+		{"cosmetic under traffic", model.ImpactTraffic, model.ImpactCosmetic, false},
+		{"traffic under traffic", model.ImpactTraffic, model.ImpactTraffic, false},
+		{"management over traffic", model.ImpactTraffic, model.ImpactManagement, true},
+		{"management under management", model.ImpactManagement, model.ImpactManagement, false},
+		{"an operation that declares no impact is refused", model.ImpactManagement, 0, true},
+		{"an operation with an impossible impact is refused", model.ImpactManagement, model.Impact(9), true},
+		{"a max that is no class refuses everything", 0, model.ImpactCosmetic, true},
+		{"a max above the classes refuses everything", model.Impact(4), model.ImpactCosmetic, true},
+		{"a max far above the classes refuses everything", model.Impact(99), model.ImpactManagement, true},
+		{"a negative max refuses everything", model.Impact(-1), model.ImpactCosmetic, true},
+		{"an impossible impact is refused even under a max above the classes", model.Impact(99), model.Impact(50), true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			op := escp.Operation{Name: "SetX", Impact: tc.impact}
+			op := model.Operation{Name: "SetX", Impact: tc.impact}
 			err := MaxImpact(tc.max)(ctx, nil, op)
 			var got *ImpactError
 			switch {
@@ -103,7 +103,7 @@ func TestMaxImpact(t *testing.T) {
 		})
 	}
 	t.Run("message", func(t *testing.T) {
-		err := MaxImpact(escp.ImpactTraffic)(ctx, nil, escp.Operation{Name: escp.MethodSetLAG, Impact: escp.ImpactManagement})
+		err := MaxImpact(model.ImpactTraffic)(ctx, nil, model.Operation{Name: model.MethodSetLAG, Impact: model.ImpactManagement})
 		if want := "SetLAG has impact management, above the allowed traffic"; err == nil || err.Error() != want {
 			t.Fatalf("got %v, want %q", err, want)
 		}
@@ -117,9 +117,9 @@ func TestDryRun(t *testing.T) {
 		t.Fatal("a new dry run has recorded nothing")
 	}
 	gate := d.Gate()
-	a := escp.Operation{Name: escp.MethodSetPort, Ports: escp.MustPortSet(3), Impact: escp.ImpactTraffic}
-	b := escp.Operation{Name: escp.MethodSetLED, Impact: escp.ImpactCosmetic}
-	for _, op := range []escp.Operation{a, b} {
+	a := model.Operation{Name: model.MethodSetPort, Ports: model.MustPortSet(3), Impact: model.ImpactTraffic}
+	b := model.Operation{Name: model.MethodSetLED, Impact: model.ImpactCosmetic}
+	for _, op := range []model.Operation{a, b} {
 		t.Run(fmt.Sprint(op), func(t *testing.T) {
 			if err := gate(ctx, nil, op); !errors.Is(err, ErrDryRun) {
 				t.Fatalf("a dry run refuses every write with ErrDryRun, got %v", err)
@@ -127,12 +127,12 @@ func TestDryRun(t *testing.T) {
 		})
 	}
 	got := d.Operations()
-	if !reflect.DeepEqual(got, []escp.Operation{a, b}) {
-		t.Fatalf("recorded %+v, want %+v in order", got, []escp.Operation{a, b})
+	if !reflect.DeepEqual(got, []model.Operation{a, b}) {
+		t.Fatalf("recorded %+v, want %+v in order", got, []model.Operation{a, b})
 	}
 	// what is handed out is a copy
-	got[0].Ports = escp.MustPortSet(8)
-	if again := d.Operations(); again[0].Ports != escp.MustPortSet(3) {
+	got[0].Ports = model.MustPortSet(8)
+	if again := d.Operations(); again[0].Ports != model.MustPortSet(3) {
 		t.Fatalf("the record changed through a value it does not own: %+v", again[0])
 	}
 }
@@ -140,25 +140,25 @@ func TestDryRun(t *testing.T) {
 // Gates are composed as the front end wishes; a refusal by an earlier gate keeps the dry run empty.
 func TestDryRunRecordsOnlyWhatTheEarlierGatesAllowed(t *testing.T) {
 	d := NewDryRun()
-	gate := Chain(MaxImpact(escp.ImpactTraffic), d.Gate())
+	gate := Chain(MaxImpact(model.ImpactTraffic), d.Gate())
 	ctx := context.Background()
 	var tooMuch *ImpactError
-	if err := gate(ctx, nil, escp.Operation{Name: escp.MethodSetLAG, Impact: escp.ImpactManagement}); !errors.As(err, &tooMuch) {
+	if err := gate(ctx, nil, model.Operation{Name: model.MethodSetLAG, Impact: model.ImpactManagement}); !errors.As(err, &tooMuch) {
 		t.Fatalf("got %v", err)
 	}
-	if err := gate(ctx, nil, escp.Operation{Name: escp.MethodSetPort, Impact: escp.ImpactTraffic}); !errors.Is(err, ErrDryRun) {
+	if err := gate(ctx, nil, model.Operation{Name: model.MethodSetPort, Impact: model.ImpactTraffic}); !errors.Is(err, ErrDryRun) {
 		t.Fatalf("got %v", err)
 	}
-	if ops := d.Operations(); len(ops) != 1 || ops[0].Name != escp.MethodSetPort {
+	if ops := d.Operations(); len(ops) != 1 || ops[0].Name != model.MethodSetPort {
 		t.Fatalf("recorded %+v, want only SetPort", ops)
 	}
 }
 
 // The firmware gate judges the firmware, whatever the operation is.
 func TestFirmwareGateIgnoresTheOperation(t *testing.T) {
-	for _, impact := range []escp.Impact{escp.ImpactCosmetic, escp.ImpactTraffic, escp.ImpactManagement, 0} {
+	for _, impact := range []model.Impact{model.ImpactCosmetic, model.ImpactTraffic, model.ImpactManagement, 0} {
 		t.Run(fmt.Sprint(impact), func(t *testing.T) {
-			op := escp.Operation{Name: "SetX", Impact: impact}
+			op := model.Operation{Name: "SetX", Impact: impact}
 			if err := FirmwareGate()(context.Background(), &infoSource{firmware: "1.0.0 Build 20250710 Rel.71093"}, op); err != nil {
 				t.Errorf("verified build, impact %v: %v", impact, err)
 			}

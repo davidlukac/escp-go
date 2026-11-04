@@ -73,7 +73,7 @@ func TestFakeRowsKeepWhatTheSwitchDecides(t *testing.T) {
 
 func TestFakeModelEnforcesTheSwitchRules(t *testing.T) {
 	f := escptest.Start(t)
-	f.EnableModel(map[int]escptest.LinkSpeed{1: escptest.Link1000Full})
+	f.EnableModel(map[PortID]escptest.LinkSpeed{1: escptest.Link1000Full})
 	c, ctx := dialFake(t, f, escptest.Password), context.Background()
 
 	if err := c.SetPort(ctx, PortConfig{ID: 3, Enabled: true, Speed: Speed100Full}); err != nil {

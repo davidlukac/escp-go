@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 )
 
 // Support says how far a hardware and firmware combination has been verified.
@@ -30,12 +30,12 @@ const (
 // and what is known about the combination. The table is compatibility.json, embedded in the
 // package; it is the one place the README table and the firmware allow-list come from.
 type CompatibilityRow struct {
-	Model    string           `json:"model"`
-	Hardware string           `json:"hardware"`
-	Firmware string           `json:"firmware"`
-	Builds   []escp.BuildDate `json:"builds,omitempty"` // the build dates the row covers
-	Support  Support          `json:"support"`
-	Summary  string           `json:"summary,omitempty"` // markdown, what was verified or what to do
+	Model    string            `json:"model"`
+	Hardware string            `json:"hardware"`
+	Firmware string            `json:"firmware"`
+	Builds   []model.BuildDate `json:"builds,omitempty"` // the build dates the row covers
+	Support  Support           `json:"support"`
+	Summary  string            `json:"summary,omitempty"` // markdown, what was verified or what to do
 }
 
 //go:embed compatibility.json
@@ -62,7 +62,7 @@ func parseCompatibility(data []byte) ([]CompatibilityRow, error) {
 	if err := json.Unmarshal(data, &doc); err != nil {
 		return nil, err
 	}
-	seen := map[escp.BuildDate]bool{}
+	seen := map[model.BuildDate]bool{}
 	for i, r := range doc.Rows {
 		switch r.Support {
 		case SupportVerified, SupportUntried, SupportUntested, SupportUnsupported:
@@ -96,8 +96,8 @@ func CompatibilityRows() []CompatibilityRow {
 }
 
 // verifiedBuilds lists the builds of the verified rows, in order.
-func verifiedBuilds(rows []CompatibilityRow) []escp.BuildDate {
-	var out []escp.BuildDate
+func verifiedBuilds(rows []CompatibilityRow) []model.BuildDate {
+	var out []model.BuildDate
 	for _, r := range rows {
 		if r.Support == SupportVerified {
 			out = append(out, r.Builds...)

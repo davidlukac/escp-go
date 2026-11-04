@@ -95,7 +95,7 @@ func TestSetIPConfigReportsAMoveThatCannotBeConfirmed(t *testing.T) {
 var otherDevice = MAC{0xaa, 0xbb, 0xcc, 0, 0, 1}
 
 func TestClassifyLostReply(t *testing.T) {
-	mac := MAC(escptest.DefaultMAC())
+	mac := escptest.DefaultMAC()
 	info := func(mac MAC, cfg IPConfig) Info {
 		return Info{MAC: mac, IP: cfg.IP, Netmask: cfg.Netmask, Gateway: cfg.Gateway}
 	}
@@ -469,5 +469,24 @@ func TestTheZeroLostReplyOutcomeIsNoneOfTheOutcomes(t *testing.T) {
 				t.Errorf("outcome %d is the zero value", o)
 			}
 		})
+	}
+}
+
+// Only a test may move a switch to an address on this host: a client made the way a program makes
+// one refuses it before anything is sent.
+func TestSetIPConfigRefusesALoopbackAddressUnlessTheTestAllowsIt(t *testing.T) {
+	f := escptest.Start(t)
+	c := dialFast(t, f, "secret")
+	c.allowLoopback = false
+	cfg := IPConfig{IP: netip.MustParseAddr("127.0.0.9"), Netmask: netip.MustParseAddr("255.255.0.0"), Gateway: netip.MustParseAddr("127.0.0.1")}
+	if err := c.SetIPConfig(context.Background(), cfg); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("got %v, want ErrInvalid", err)
+	}
+	if n := f.WriteCount(); n != 0 {
+		t.Fatalf("nothing may be sent for a refused address, got %d writes", n)
+	}
+	c.allowLoopback = true
+	if err := cfg.ValidateAllowingLoopback(); err != nil {
+		t.Fatalf("the variant for a fake switch accepts it: %v", err)
 	}
 }

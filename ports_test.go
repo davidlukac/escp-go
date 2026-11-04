@@ -242,14 +242,14 @@ func TestParsePortsShort(t *testing.T) {
 
 func TestSpeedCodes(t *testing.T) {
 	for i, n := range ConfigurableSpeeds() {
-		got, err := n.code()
+		got, err := speedCode(n)
 		if err != nil || int(got) != i+1 || speedFromCode(got) != n {
 			t.Errorf("%s: code %d err %v name %s", n, got, err, speedFromCode(got))
 		}
 	}
 	for _, bad := range []Speed{"warp", "", SpeedLinkDown} {
 		t.Run(fmt.Sprint(bad), func(t *testing.T) {
-			if _, err := bad.code(); err == nil {
+			if _, err := speedCode(bad); err == nil {
 				t.Errorf("%q: expected an error, it cannot be configured", bad)
 			}
 		})

@@ -24,7 +24,7 @@ func dialLeasing(t *testing.T, f *escptest.Switch, opts ...dialOption) (*Client,
 	askTheFake := func(c *Client) { // the lookup needs the client, which does not exist yet
 		c.locator = func(ctx context.Context, _ MAC) (Info, error) { *lookups++; return c.discoverOnce(ctx) }
 	}
-	c := newBoundClient(t, Config{Host: "127.0.0.1", MAC: MAC(escptest.DefaultMAC()), Username: "admin", Password: "secret",
+	c := newBoundClient(t, Config{Host: "127.0.0.1", MAC: escptest.DefaultMAC(), Username: "admin", Password: "secret",
 		Timeout: 80 * time.Millisecond, Retries: 1, SwitchPort: f.UDPPort(), BroadcastAddr: escptest.Loopback()},
 		append([]dialOption{withLoopback(), askTheFake}, opts...)...)
 	t.Cleanup(func() { c.Close() })
@@ -130,7 +130,7 @@ func TestEnableDHCPReportsAWriteThatWasNotApplied(t *testing.T) {
 func TestEnableDHCPReportsASwitchThatAnswersButDoesNotLease(t *testing.T) {
 	f := escptest.Start(t)
 	c, _ := dialLeasing(t, f, withMoveWait(400*time.Millisecond), withLocator(func(context.Context, MAC) (Info, error) {
-		return Info{MAC: MAC(escptest.DefaultMAC()), IP: netip.MustParseAddr("127.0.0.1"), Netmask: netip.MustParseAddr("255.255.255.0"), Gateway: netip.MustParseAddr("127.0.0.254")}, nil
+		return Info{MAC: escptest.DefaultMAC(), IP: netip.MustParseAddr("127.0.0.1"), Netmask: netip.MustParseAddr("255.255.255.0"), Gateway: netip.MustParseAddr("127.0.0.254")}, nil
 	}))
 	err := c.EnableDHCP(context.Background())
 	if !errors.Is(err, ErrMoveUnconfirmed) || !strings.Contains(err.Error(), "DHCP off") {
@@ -227,7 +227,7 @@ func TestEnableDHCPWritesNothingWhenTheSwitchCannotBeReadFirst(t *testing.T) {
 func TestEnableDHCPKeepsWaitingForAUsableLease(t *testing.T) {
 	f := escptest.Start(t)
 	c, _ := dialLeasing(t, f, withMoveWait(400*time.Millisecond), withLocator(func(context.Context, MAC) (Info, error) {
-		return Info{MAC: MAC(escptest.DefaultMAC()), DHCP: true}, nil
+		return Info{MAC: escptest.DefaultMAC(), DHCP: true}, nil
 	}))
 	err := c.EnableDHCP(context.Background())
 	if !errors.Is(err, ErrMoveUnconfirmed) || !strings.Contains(err.Error(), "DHCP on") {

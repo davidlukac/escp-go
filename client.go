@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/davidlukac/escp-go/internal/udp"
+	"github.com/davidlukac/escp-go/model"
 )
 
 // Client talks ESCP to one switch. It is safe for concurrent use; requests
@@ -32,7 +33,7 @@ type Client struct {
 	// being moved to it (SetIPConfig); nil otherwise.
 	alsoFrom net.IP
 
-	hostMAC MAC
+	hostMAC model.MAC
 	// ident is who the client believes the switch is (the pin, the MAC of the first contact).
 	ident   identity
 	seq     uint16
@@ -70,7 +71,7 @@ type seams struct {
 	// the default in this package's tests (claimsByDefault); withClaim turns it off.
 	shared bool
 	// locator finds a switch by MAC address; the default is Locate on the interfaces of this host.
-	locator func(ctx context.Context, mac MAC) (Info, error)
+	locator func(ctx context.Context, mac model.MAC) (model.Info, error)
 }
 
 // dialOption changes how dial builds a client; only tests use it.
@@ -92,7 +93,7 @@ func withMovePoll(d time.Duration) dialOption { return func(c *Client) { c.moveP
 func withFirstContact(d time.Duration) dialOption { return func(c *Client) { c.firstContact = d } }
 
 // withLocator replaces the lookup of a switch by its MAC address.
-func withLocator(f func(ctx context.Context, mac MAC) (Info, error)) dialOption {
+func withLocator(f func(ctx context.Context, mac model.MAC) (model.Info, error)) dialOption {
 	return func(c *Client) { c.locator = f }
 }
 
@@ -243,10 +244,10 @@ func bindReplyPort(ctx context.Context, port int) (*net.UDPConn, error) {
 const discardPort = 9
 
 // localMAC returns the MAC of the interface used to reach dst, or zero.
-func localMAC(dst net.IP) MAC {
+func localMAC(dst net.IP) model.MAC {
 	probe, err := net.DialUDP("udp4", nil, &net.UDPAddr{IP: dst, Port: discardPort})
 	if err != nil {
-		return MAC{}
+		return model.MAC{}
 	}
 	defer func() { _ = probe.Close() }() // best-effort: the probe socket only reveals the local address
 	ifs, _ := net.Interfaces()
@@ -264,7 +265,7 @@ func localIP(c net.Conn) net.IP {
 // macHolding returns the hardware address of the first interface of ifs that has a six-byte hardware
 // address and holds addr among the addresses addrs lists for it; zero when there is none. An interface
 // whose addresses cannot be listed is skipped.
-func macHolding(addr net.IP, ifs []net.Interface, addrs func(net.Interface) ([]net.Addr, error)) MAC {
+func macHolding(addr net.IP, ifs []net.Interface, addrs func(net.Interface) ([]net.Addr, error)) model.MAC {
 	for _, ifc := range ifs {
 		if len(ifc.HardwareAddr) != macLen {
 			continue
@@ -275,17 +276,17 @@ func macHolding(addr net.IP, ifs []net.Interface, addrs func(net.Interface) ([]n
 		}
 		for _, a := range list {
 			if ipn, ok := a.(*net.IPNet); ok && ipn.IP.Equal(addr) {
-				return MAC(ifc.HardwareAddr)
+				return model.MAC(ifc.HardwareAddr)
 			}
 		}
 	}
-	return MAC{}
+	return model.MAC{}
 }
 
 // hostLocator is the lookup a client uses: Locate on the interfaces of this host, logging to the
 // client's logger (before it is identified: Locate does that).
-func hostLocator(log *slog.Logger) func(ctx context.Context, mac MAC) (Info, error) {
-	return func(ctx context.Context, mac MAC) (Info, error) {
+func hostLocator(log *slog.Logger) func(ctx context.Context, mac model.MAC) (model.Info, error) {
+	return func(ctx context.Context, mac model.MAC) (model.Info, error) {
 		return Locate(ctx, mac, DiscoverOptions{Logger: log})
 	}
 }

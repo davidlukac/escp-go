@@ -1,4 +1,4 @@
-package escp
+package model
 
 // Setting is one page of the switch's web UI as the library covers it: the methods that read it, the
 // methods that write it with the class of each write, and the types they use. It is the one place the

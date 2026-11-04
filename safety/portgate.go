@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 )
 
 // ErrCannotCheckPorts is what PortGate returns when it cannot establish what the ports are used
@@ -28,8 +28,8 @@ var ErrCannotCheckPorts = errors.New("safety: cannot check what the ports are us
 // before every write it checks, so it costs reads and is for a front end that wants the rule
 // enforced by the library instead of by its own code. A front end with an opt-in leaves it out.
 // Failures to look are refused with ErrCannotCheckPorts.
-func PortGate() escp.WriteGate {
-	return func(ctx context.Context, sw escp.Reader, op escp.Operation) error {
+func PortGate() model.WriteGate {
+	return func(ctx context.Context, sw model.Reader, op model.Operation) error {
 		touched := op.Ports
 		if op.Replaces.IsZero() && touched.IsEmpty() {
 			return nil
@@ -52,15 +52,15 @@ func PortGate() escp.WriteGate {
 
 // membersOf lists the ports that belong to the group now (none for no group, or one that does not
 // exist yet). A Group that names more than one kind is read for all of them, so the answer fails closed.
-func membersOf(ctx context.Context, r escp.Reader, g escp.Group) (escp.PortSet, error) {
-	var members escp.PortSet
+func membersOf(ctx context.Context, r model.Reader, g model.Group) (model.PortSet, error) {
+	var members model.PortSet
 	for _, read := range []struct {
 		named bool
-		read  func() (escp.PortSet, error)
+		read  func() (model.PortSet, error)
 	}{
-		{g.LAG != 0, func() (escp.PortSet, error) { return lagMembers(ctx, r, g.LAG) }},
-		{g.PortVLAN != 0, func() (escp.PortSet, error) { return portVLANMembers(ctx, r, g.PortVLAN) }},
-		{g.Dot1QVLAN != 0, func() (escp.PortSet, error) { return dot1qMembers(ctx, r, g.Dot1QVLAN) }},
+		{g.LAG != 0, func() (model.PortSet, error) { return lagMembers(ctx, r, g.LAG) }},
+		{g.PortVLAN != 0, func() (model.PortSet, error) { return portVLANMembers(ctx, r, g.PortVLAN) }},
+		{g.Dot1QVLAN != 0, func() (model.PortSet, error) { return dot1qMembers(ctx, r, g.Dot1QVLAN) }},
 	} {
 		if !read.named {
 			continue
@@ -74,7 +74,7 @@ func membersOf(ctx context.Context, r escp.Reader, g escp.Group) (escp.PortSet, 
 	return members, nil
 }
 
-func lagMembers(ctx context.Context, r escp.Reader, id escp.LAGID) (escp.PortSet, error) {
+func lagMembers(ctx context.Context, r model.Reader, id model.LAGID) (model.PortSet, error) {
 	lags, err := r.LAGs(ctx)
 	if err != nil {
 		return 0, err
@@ -87,7 +87,7 @@ func lagMembers(ctx context.Context, r escp.Reader, id escp.LAGID) (escp.PortSet
 	return 0, nil
 }
 
-func portVLANMembers(ctx context.Context, r escp.Reader, id escp.PortVLANID) (escp.PortSet, error) {
+func portVLANMembers(ctx context.Context, r model.Reader, id model.PortVLANID) (model.PortSet, error) {
 	v, err := r.PortBasedVLAN(ctx)
 	if err != nil {
 		return 0, err
@@ -98,7 +98,7 @@ func portVLANMembers(ctx context.Context, r escp.Reader, id escp.PortVLANID) (es
 	return 0, nil
 }
 
-func dot1qMembers(ctx context.Context, r escp.Reader, id escp.VLANID) (escp.PortSet, error) {
+func dot1qMembers(ctx context.Context, r model.Reader, id model.VLANID) (model.PortSet, error) {
 	q, err := r.Dot1Q(ctx)
 	if err != nil {
 		return 0, err

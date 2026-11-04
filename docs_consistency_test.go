@@ -89,18 +89,20 @@ func TestEveryErrorIsInTheErrorsGuide(t *testing.T) {
 func validatorList(t *testing.T) string {
 	t.Helper()
 	var types []string
-	for _, f := range parsedPackage(t, ".") {
-		for _, decl := range f.Decls {
-			fn, ok := decl.(*ast.FuncDecl)
-			if !ok || fn.Recv == nil || fn.Name.Name != "Validate" || len(fn.Recv.List) != 1 {
-				continue
-			}
-			recv := fn.Recv.List[0].Type
-			if star, ok := recv.(*ast.StarExpr); ok {
-				recv = star.X
-			}
-			if id, ok := recv.(*ast.Ident); ok && id.IsExported() {
-				types = append(types, id.Name)
+	for _, dir := range []string{".", "model"} {
+		for _, f := range parsedPackage(t, dir) {
+			for _, decl := range f.Decls {
+				fn, ok := decl.(*ast.FuncDecl)
+				if !ok || fn.Recv == nil || fn.Name.Name != "Validate" || len(fn.Recv.List) != 1 {
+					continue
+				}
+				recv := fn.Recv.List[0].Type
+				if star, ok := recv.(*ast.StarExpr); ok {
+					recv = star.X
+				}
+				if id, ok := recv.(*ast.Ident); ok && id.IsExported() {
+					types = append(types, id.Name)
+				}
 			}
 		}
 	}

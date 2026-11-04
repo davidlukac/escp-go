@@ -8,7 +8,7 @@
 // # Firmware
 //
 // The protocol is not versioned, and a newer firmware may change layouts or
-// authentication. FirmwareGate returns an escp.WriteGate that refuses every write while
+// authentication. FirmwareGate returns an model.WriteGate that refuses every write while
 // the switch runs a build outside VerifiedFirmwareBuilds, and lets reads through:
 //
 //	c, err := escp.Dial(escp.Config{Host: host, Username: user, Password: pw, WriteGate: safety.FirmwareGate()})
@@ -30,7 +30,7 @@
 // gates; put the dry run last so it only sees what the others allowed:
 //
 //	dry := safety.NewDryRun()
-//	gate := safety.Chain(safety.FirmwareGate(), safety.MaxImpact(escp.ImpactTraffic), safety.PortGate(), dry.Gate())
+//	gate := safety.Chain(safety.FirmwareGate(), safety.MaxImpact(model.ImpactTraffic), safety.PortGate(), dry.Gate())
 //
 // A ceiling on the impact alone is not a safety rule: without PortGate (or the front end's own
 // check of the ports) a write within the ceiling can still cut the uplink.

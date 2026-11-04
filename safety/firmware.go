@@ -6,7 +6,7 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 )
 
 // verifiedFirmwareBuilds is the allow-list behind VerifiedFirmwareBuilds: the builds of the
@@ -19,7 +19,7 @@ var verifiedFirmwareBuilds = verifiedBuilds(compatibility)
 // against on real switches: reads, and writes on unused ports. Any other build
 // may have changed layouts or authentication, so writes to it are refused
 // unless the user opts in. The result is a copy: changing it changes nothing.
-func VerifiedFirmwareBuilds() []escp.BuildDate { return slices.Clone(verifiedFirmwareBuilds) }
+func VerifiedFirmwareBuilds() []model.BuildDate { return slices.Clone(verifiedFirmwareBuilds) }
 
 // FirmwareReason says why a firmware check refused a write.
 type FirmwareReason int
@@ -38,9 +38,9 @@ const (
 // word the message for their users; Error is a neutral description.
 type FirmwareError struct {
 	Reason   FirmwareReason
-	Firmware escp.Firmware    // the firmware the switch reported, its build date included (not for FirmwareUnreadable)
-	Verified []escp.BuildDate // the builds that would have been accepted
-	Err      error            // the cause (FirmwareUnreadable)
+	Firmware model.Firmware    // the firmware the switch reported, its build date included (not for FirmwareUnreadable)
+	Verified []model.BuildDate // the builds that would have been accepted
+	Err      error             // the cause (FirmwareUnreadable)
 }
 
 // Error describes the refusal in neutral words (which build, what would have been accepted); front
@@ -61,7 +61,7 @@ func (e *FirmwareError) Unwrap() error { return e.Err }
 
 // CheckFirmware returns a *FirmwareError unless the firmware version names
 // a build in VerifiedFirmwareBuilds.
-func CheckFirmware(fw escp.Firmware) error {
+func CheckFirmware(fw model.Firmware) error {
 	if !fw.HasBuild() {
 		return &FirmwareError{Reason: FirmwareNoBuildDate, Firmware: fw, Verified: VerifiedFirmwareBuilds()}
 	}
@@ -79,17 +79,17 @@ func CheckFirmware(fw escp.Firmware) error {
 // is not (the next write checks again). A gate may therefore be shared by clients of several
 // switches, each is checked once; a reader that does not know its switch's MAC is checked at every
 // write.
-func FirmwareGate() escp.WriteGate {
-	g := &firmwareGate{verified: map[escp.MAC]bool{}}
+func FirmwareGate() model.WriteGate {
+	g := &firmwareGate{verified: map[model.MAC]bool{}}
 	return g.check
 }
 
 type firmwareGate struct {
 	mu       sync.Mutex
-	verified map[escp.MAC]bool // the switches whose build was found verified
+	verified map[model.MAC]bool // the switches whose build was found verified
 }
 
-func (g *firmwareGate) check(ctx context.Context, sw escp.Reader, _ escp.Operation) error {
+func (g *firmwareGate) check(ctx context.Context, sw model.Reader, _ model.Operation) error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	if mac := sw.SwitchMAC(); !mac.IsZero() && g.verified[mac] {

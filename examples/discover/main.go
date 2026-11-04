@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 )
 
 // Exit codes of the program.
@@ -32,7 +33,7 @@ const extraWait = 5 * time.Second
 
 // deps are the two things that reach the network, so that a test can aim them at a fake switch.
 type deps struct {
-	discover func(context.Context, escp.DiscoverOptions) ([]escp.Info, error)
+	discover func(context.Context, escp.DiscoverOptions) ([]model.Info, error)
 	dial     func(escp.Config) (*escp.Client, error)
 }
 
@@ -72,7 +73,7 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer, d 
 	if host == "" {
 		return exitOK
 	}
-	return printPorts(ctx, d, escp.Config{Host: host, Username: getenv("ESCP_USERNAME"), Password: escp.Password(getenv("ESCP_PASSWORD"))}, stdout, stderr)
+	return printPorts(ctx, d, escp.Config{Host: host, Username: getenv("ESCP_USERNAME"), Password: model.Password(getenv("ESCP_PASSWORD"))}, stdout, stderr)
 }
 
 // printPorts reads the ports of the switch cfg names and prints them.

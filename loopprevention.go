@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/davidlukac/escp-go/internal/wire"
+	"github.com/davidlukac/escp-go/model"
 )
 
 // LoopPrevention reports whether loop prevention (Monitoring > Loop Prevention) is on.
@@ -29,5 +30,5 @@ func parseLoopPrevention(tlvs []wire.TLV) (bool, error) {
 // detects a cabling loop, which can flood the network; turning it on is the safe direction.
 // Toggling it was verified on a live switch without interrupting traffic.
 func (c *Client) SetLoopPrevention(ctx context.Context, on bool) error {
-	return c.setTLVs(ctx, MethodSetLoopPrevention.operation(), wire.TLV{Type: wire.TLVLoopPrevention, Value: []byte{boolByte(on)}})
+	return c.setTLVs(ctx, model.MethodSetLoopPrevention.Operation(), wire.TLV{Type: wire.TLVLoopPrevention, Value: []byte{boolByte(on)}})
 }

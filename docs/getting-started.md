@@ -7,6 +7,7 @@ go get github.com/davidlukac/escp-go
 ```go
 import (
 	"github.com/davidlukac/escp-go"        // package escp: the client
+	"github.com/davidlukac/escp-go/model"  // the types: ports, MAC, settings, readings
 	"github.com/davidlukac/escp-go/safety" // write gates and the compatibility table
 )
 ```
@@ -18,7 +19,7 @@ The module needs Go 1.26.2 or later (1.26.0 and 1.26.1 can corrupt the stack in 
 ## Connect and read
 
 ```go
-c, err := escp.Dial(escp.Config{Host: "192.0.2.11", Username: "admin", Password: escp.Password(pw)})
+c, err := escp.Dial(escp.Config{Host: "192.0.2.11", Username: "admin", Password: model.Password(pw)})
 if err != nil { /* ... */ }
 defer c.Close()
 
@@ -57,8 +58,8 @@ It probes the subnet broadcast address of each usable interface (`DiscoverOption
 A switch's address can change (a lease, a move); its MAC address does not. Name it in the configuration and the client pins the identity and finds the switch when it has to:
 
 ```go
-mac, _ := escp.ParseMAC("00:00:5e:00:53:01") // escp.MAC: a comparable value; the zero value means "no MAC"
-c, err := escp.Dial(escp.Config{MAC: mac, Username: user, Password: escp.Password(pw)}) // no Host: found on the first request
+mac, _ := model.ParseMAC("00:00:5e:00:53:01") // model.MAC: a comparable value; the zero value means "no MAC"
+c, err := escp.Dial(escp.Config{MAC: mac, Username: user, Password: model.Password(pw)}) // no Host: found on the first request
 ```
 
 - With `Config.MAC` set, a device that answers with another MAC, or with none, is refused (`ErrWrongSwitch`, naming both) and nothing is written to it. The MAC is checked on every reply, the key exchange's included. A client without `Config.MAC` does the same with the MAC the switch reported on its first contact (so a device that takes the address over later is refused too); only that first contact is taken on trust, which is what `Config.MAC` removes.

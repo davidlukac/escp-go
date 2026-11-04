@@ -6,34 +6,34 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 )
 
 func TestUseOf(t *testing.T) {
-	ports := []escp.Port{
+	ports := []model.Port{
 		{ID: 1, ActualSpeed: "1000Mbps-full", LAG: 1},
-		{ID: 2, ActualSpeed: escp.SpeedLinkDown, LAG: 1},
+		{ID: 2, ActualSpeed: model.SpeedLinkDown, LAG: 1},
 		{ID: 3, ActualSpeed: "100Mbps-full"},
-		{ID: 4, ActualSpeed: escp.SpeedLinkDown},
+		{ID: 4, ActualSpeed: model.SpeedLinkDown},
 	}
 	cases := []struct {
 		name       string
-		ports      []escp.Port
+		ports      []model.Port
 		id         int
 		want       PortUse
 		wantLinkUp bool
 		wantInLAG  bool
 	}{
 		{"link up and in a LAG", ports, 1, PortUse{Exists: true, Speed: "1000Mbps-full", LAG: 1}, true, true},
-		{"link down but in a LAG", ports, 2, PortUse{Exists: true, Speed: escp.SpeedLinkDown, LAG: 1}, false, true},
+		{"link down but in a LAG", ports, 2, PortUse{Exists: true, Speed: model.SpeedLinkDown, LAG: 1}, false, true},
 		{"link up, no LAG", ports, 3, PortUse{Exists: true, Speed: "100Mbps-full"}, true, false},
-		{"unused", ports, 4, PortUse{Exists: true, Speed: escp.SpeedLinkDown}, false, false},
+		{"unused", ports, 4, PortUse{Exists: true, Speed: model.SpeedLinkDown}, false, false},
 		{"not listed", ports, 9, PortUse{}, false, false},
 		{"empty reading", nil, 1, PortUse{}, false, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := UseOf(tc.ports, escp.PortID(tc.id))
+			got := UseOf(tc.ports, model.PortID(tc.id))
 			if got != tc.want {
 				t.Fatalf("UseOf = %+v, want %+v", got, tc.want)
 			}
@@ -55,12 +55,12 @@ func TestMissingPortIsNotLinkUp(t *testing.T) {
 func TestUseOfFailsClosedOnDuplicateEntries(t *testing.T) {
 	cases := []struct {
 		name  string
-		ports []escp.Port
+		ports []model.Port
 		want  PortUse
 	}{
-		{"LAG on the second entry", []escp.Port{{ID: 5, ActualSpeed: escp.SpeedLinkDown}, {ID: 5, ActualSpeed: escp.SpeedLinkDown, LAG: 2}}, PortUse{Exists: true, Speed: escp.SpeedLinkDown, LAG: 2}},
-		{"link on the second entry", []escp.Port{{ID: 5, ActualSpeed: escp.SpeedLinkDown}, {ID: 5, ActualSpeed: "100Mbps-full"}}, PortUse{Exists: true, Speed: "100Mbps-full"}},
-		{"first entry wins when it already says used", []escp.Port{{ID: 5, ActualSpeed: "1000Mbps-full", LAG: 1}, {ID: 5, ActualSpeed: "100Mbps-full", LAG: 2}}, PortUse{Exists: true, Speed: "1000Mbps-full", LAG: 1}},
+		{"LAG on the second entry", []model.Port{{ID: 5, ActualSpeed: model.SpeedLinkDown}, {ID: 5, ActualSpeed: model.SpeedLinkDown, LAG: 2}}, PortUse{Exists: true, Speed: model.SpeedLinkDown, LAG: 2}},
+		{"link on the second entry", []model.Port{{ID: 5, ActualSpeed: model.SpeedLinkDown}, {ID: 5, ActualSpeed: "100Mbps-full"}}, PortUse{Exists: true, Speed: "100Mbps-full"}},
+		{"first entry wins when it already says used", []model.Port{{ID: 5, ActualSpeed: "1000Mbps-full", LAG: 1}, {ID: 5, ActualSpeed: "100Mbps-full", LAG: 2}}, PortUse{Exists: true, Speed: "1000Mbps-full", LAG: 1}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -71,14 +71,14 @@ func TestUseOfFailsClosedOnDuplicateEntries(t *testing.T) {
 	}
 }
 
-func checkedPorts() []escp.Port {
-	return []escp.Port{
+func checkedPorts() []model.Port {
+	return []model.Port{
 		{ID: 1, ActualSpeed: "1000Mbps-full", LAG: 1}, // linked and in LAG 1
-		{ID: 2, ActualSpeed: escp.SpeedLinkDown, LAG: 1},
+		{ID: 2, ActualSpeed: model.SpeedLinkDown, LAG: 1},
 		{ID: 3, ActualSpeed: "100Mbps-full"},
-		{ID: 4, ActualSpeed: escp.SpeedLinkDown},
-		{ID: 5, ActualSpeed: escp.SpeedLinkDown},
-		{ID: 6, ActualSpeed: escp.SpeedLinkDown, LAG: 2},
+		{ID: 4, ActualSpeed: model.SpeedLinkDown},
+		{ID: 5, ActualSpeed: model.SpeedLinkDown},
+		{ID: 6, ActualSpeed: model.SpeedLinkDown, LAG: 2},
 	}
 }
 
@@ -86,21 +86,21 @@ func TestCheckPorts(t *testing.T) {
 	cases := []struct {
 		name  string
 		rule  PortRule
-		ports escp.PortSet
+		ports model.PortSet
 		want  *PortUseError // nil: every port is free
 	}{
-		{"free ports", PortRule{}, escp.MustPortSet(4, 5), nil},
+		{"free ports", PortRule{}, model.MustPortSet(4, 5), nil},
 		{"no ports", PortRule{}, 0, nil},
-		{"a port that does not exist", PortRule{}, escp.MustPortSet(9), &PortUseError{Port: 9, Reason: PortMissing}},
-		{"a port with a link", PortRule{}, escp.MustPortSet(3), &PortUseError{Port: 3, Reason: PortLinkUp, Speed: "100Mbps-full"}},
-		{"a LAG member without a link", PortRule{}, escp.MustPortSet(2), &PortUseError{Port: 2, Reason: PortInLAG, LAG: 1}},
-		{"the link is named before the LAG", PortRule{}, escp.MustPortSet(1), &PortUseError{Port: 1, Reason: PortLinkUp, Speed: "1000Mbps-full", LAG: 1}},
-		{"a port the switch does not list is missing, whatever else is named", PortRule{}, escp.MustPortSet(9, 12), &PortUseError{Port: 9, Reason: PortMissing}},
-		{"the lowest-numbered offender is named", PortRule{}, escp.MustPortSet(4, 3, 2), &PortUseError{Port: 2, Reason: PortInLAG, LAG: 1}},
-		{"members of the tolerated LAG", PortRule{TolerateLAG: 1}, escp.MustPortSet(2), nil},
-		{"another LAG is not tolerated", PortRule{TolerateLAG: 1}, escp.MustPortSet(6), &PortUseError{Port: 6, Reason: PortInLAG, LAG: 2}},
-		{"a link is never tolerated, not even in the tolerated LAG", PortRule{TolerateLAG: 1}, escp.MustPortSet(1), &PortUseError{Port: 1, Reason: PortLinkUp, Speed: "1000Mbps-full", LAG: 1}},
-		{"no group tolerated", PortRule{TolerateLAG: 0}, escp.MustPortSet(2), &PortUseError{Port: 2, Reason: PortInLAG, LAG: 1}},
+		{"a port that does not exist", PortRule{}, model.MustPortSet(9), &PortUseError{Port: 9, Reason: PortMissing}},
+		{"a port with a link", PortRule{}, model.MustPortSet(3), &PortUseError{Port: 3, Reason: PortLinkUp, Speed: "100Mbps-full"}},
+		{"a LAG member without a link", PortRule{}, model.MustPortSet(2), &PortUseError{Port: 2, Reason: PortInLAG, LAG: 1}},
+		{"the link is named before the LAG", PortRule{}, model.MustPortSet(1), &PortUseError{Port: 1, Reason: PortLinkUp, Speed: "1000Mbps-full", LAG: 1}},
+		{"a port the switch does not list is missing, whatever else is named", PortRule{}, model.MustPortSet(9, 12), &PortUseError{Port: 9, Reason: PortMissing}},
+		{"the lowest-numbered offender is named", PortRule{}, model.MustPortSet(4, 3, 2), &PortUseError{Port: 2, Reason: PortInLAG, LAG: 1}},
+		{"members of the tolerated LAG", PortRule{TolerateLAG: 1}, model.MustPortSet(2), nil},
+		{"another LAG is not tolerated", PortRule{TolerateLAG: 1}, model.MustPortSet(6), &PortUseError{Port: 6, Reason: PortInLAG, LAG: 2}},
+		{"a link is never tolerated, not even in the tolerated LAG", PortRule{TolerateLAG: 1}, model.MustPortSet(1), &PortUseError{Port: 1, Reason: PortLinkUp, Speed: "1000Mbps-full", LAG: 1}},
+		{"no group tolerated", PortRule{TolerateLAG: 0}, model.MustPortSet(2), &PortUseError{Port: 2, Reason: PortInLAG, LAG: 1}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -145,8 +145,8 @@ func TestPortUseErrorMessages(t *testing.T) {
 // Nothing in the reading is changed by a check.
 func TestCheckPortsLeavesTheReadingAlone(t *testing.T) {
 	all := checkedPorts()
-	before := append([]escp.Port(nil), all...)
-	_ = CheckPorts(all, PortRule{}, escp.MustPortSet(1, 2, 3))
+	before := append([]model.Port(nil), all...)
+	_ = CheckPorts(all, PortRule{}, model.MustPortSet(1, 2, 3))
 	if !reflect.DeepEqual(all, before) {
 		t.Fatal("the reading was modified")
 	}

@@ -5,6 +5,7 @@ import (
 	"math/big"
 
 	"github.com/davidlukac/escp-go/internal/wire"
+	"github.com/davidlukac/escp-go/model"
 )
 
 // EnableState makes the switch remember settings: every accepted SET stores the value of each
@@ -103,7 +104,7 @@ func (f *Switch) IPSent() []byte {
 }
 
 // PortSetting is the 7-byte value of the last port SET addressed to port (nil before any).
-func (f *Switch) PortSetting(port int) []byte {
+func (f *Switch) PortSetting(port model.PortID) []byte {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return append([]byte(nil), f.portSets[byte(port)]...)

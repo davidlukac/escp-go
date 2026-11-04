@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/davidlukac/escp-go/internal/wire"
+	"github.com/davidlukac/escp-go/model"
 )
 
 // Credentials the switch accepts.
@@ -35,7 +36,7 @@ type Switch struct {
 	lastSet          []wire.TLV      // settings TLVs (credentials stripped) of the most recent accepted SET
 	portSets         map[byte][]byte // the last port row SET addressed to each port
 	setIP            []byte
-	mac              [6]byte                 // zero means the default address
+	mac              model.MAC               // zero means the default address
 	staleDiscoveries int                     // the next n discoveries still report 127.0.0.9, like a network whose caches have not caught up
 	addr             map[wire.TLVType][]byte // IP, mask and gateway as last set; discovery reports them instead of the defaults
 	led              bool

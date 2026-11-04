@@ -7,6 +7,7 @@ import (
 
 	"github.com/davidlukac/escp-go"
 	"github.com/davidlukac/escp-go/escptest"
+	"github.com/davidlukac/escp-go/model"
 	"github.com/davidlukac/escp-go/safety"
 )
 
@@ -51,7 +52,7 @@ func ExampleClient_Ports() {
 		panic(err)
 	}
 	defer func() { _ = sw.Close() }()
-	sw.EnableModel(map[int]escptest.LinkSpeed{1: escptest.Link1000Full})
+	sw.EnableModel(map[model.PortID]escptest.LinkSpeed{1: escptest.Link1000Full})
 	hostPort, err := escptest.FreePort()
 	if err != nil {
 		panic(err)
@@ -89,7 +90,7 @@ func ExampleConfig_writeGate() {
 		panic(err)
 	}
 	defer func() { _ = sw.Close() }()
-	sw.EnableModel(map[int]escptest.LinkSpeed{1: escptest.Link1000Full})
+	sw.EnableModel(map[model.PortID]escptest.LinkSpeed{1: escptest.Link1000Full})
 	hostPort, err := escptest.FreePort()
 	if err != nil {
 		panic(err)
@@ -100,7 +101,7 @@ func ExampleConfig_writeGate() {
 		Username: escptest.Username, Password: escptest.Password,
 		WriteGate: safety.Chain(
 			safety.FirmwareGate(),
-			safety.MaxImpact(escp.ImpactTraffic),
+			safety.MaxImpact(model.ImpactTraffic),
 			safety.PortGate(),
 		),
 	})
@@ -110,14 +111,14 @@ func ExampleConfig_writeGate() {
 	defer func() { _ = c.Close() }()
 
 	ctx := context.Background()
-	err = c.SetBandwidth(ctx, escp.PortBandwidth{Port: 1, Ingress: 64})
+	err = c.SetBandwidth(ctx, model.PortBandwidth{Port: 1, Ingress: 64})
 	var inUse *safety.PortUseError
 	if errors.As(err, &inUse) {
 		fmt.Println("refused:", err)
 	}
 	fmt.Println("writes reaching the switch:", sw.WriteCount())
 
-	err = c.SetBandwidth(ctx, escp.PortBandwidth{Port: 2, Ingress: 64})
+	err = c.SetBandwidth(ctx, model.PortBandwidth{Port: 2, Ingress: 64})
 	fmt.Println("port 2:", err, "- writes reaching the switch:", sw.WriteCount())
 	// Output:
 	// refused: port 1 has a link up (1000Mbps-full)
@@ -127,11 +128,11 @@ func ExampleConfig_writeGate() {
 
 // A set of ports is a value: no duplicates, ascending, and a port the switch cannot have is refused.
 func ExampleNewPortSet() {
-	set, err := escp.NewPortSet(5, 2, 3)
+	set, err := model.NewPortSet(5, 2, 3)
 	fmt.Println(set, err)
 
-	_, err = escp.NewPortSet(2, 99)
-	fmt.Println(errors.Is(err, escp.ErrInvalid), err)
+	_, err = model.NewPortSet(2, 99)
+	fmt.Println(errors.Is(err, model.ErrInvalid), err)
 	// Output:
 	// 2,3,5 <nil>
 	// true escp: invalid port 99 (valid: 1-32)

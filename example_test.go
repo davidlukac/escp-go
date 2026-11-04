@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/davidlukac/escp-go"
+	"github.com/davidlukac/escp-go/model"
 	"github.com/davidlukac/escp-go/safety"
 )
 
@@ -74,9 +75,9 @@ func ExampleDiscover() {
 // Name a switch by its MAC address: the client pins the identity (a device with another MAC is never
 // written to) and finds the switch by itself when its address is not known or has changed.
 func ExampleParseMAC() {
-	mac, err := escp.ParseMAC("00-00-5E-00-53-01")
+	mac, err := model.ParseMAC("00-00-5E-00-53-01")
 	fmt.Println(mac, err)
-	_, err = escp.ParseMAC("00005e005301")
+	_, err = model.ParseMAC("00005e005301")
 	fmt.Println(err)
 	// Output:
 	// 00:00:5e:00:53:01 <nil>
@@ -85,7 +86,7 @@ func ExampleParseMAC() {
 
 // Find one switch by its MAC address, wherever it is on the segment. Like Discover, run it on its own.
 func ExampleLocate() {
-	mac, _ := escp.ParseMAC("00:00:5e:00:53:01")
+	mac, _ := model.ParseMAC("00:00:5e:00:53:01")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	info, err := escp.Locate(ctx, mac, escp.DiscoverOptions{})
@@ -99,8 +100,8 @@ func ExampleLocate() {
 // Let the switch lease its address. The leased address is not known in advance, so the client must
 // have the switch's MAC: it looks the switch up by it and follows it to the lease.
 func ExampleClient_EnableDHCP() {
-	mac, _ := escp.ParseMAC("00:00:5e:00:53:01")
-	c, err := escp.Dial(escp.Config{MAC: mac, Username: "admin", Password: escp.Password(os.Getenv("SWITCH_PASSWORD"))})
+	mac, _ := model.ParseMAC("00:00:5e:00:53:01")
+	c, err := escp.Dial(escp.Config{MAC: mac, Username: "admin", Password: model.Password(os.Getenv("SWITCH_PASSWORD"))})
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -114,10 +115,10 @@ func ExampleClient_EnableDHCP() {
 }
 
 func ExampleParseSpeed() {
-	s, err := escp.ParseSpeed("100Mbps-full")
+	s, err := model.ParseSpeed("100Mbps-full")
 	fmt.Println(s, err)
 
-	_, err = escp.ParseSpeed("link-down") // only ever reported, never configured
+	_, err = model.ParseSpeed("link-down") // only ever reported, never configured
 	fmt.Println(err != nil)
 	// Output:
 	// 100Mbps-full <nil>
@@ -125,7 +126,7 @@ func ExampleParseSpeed() {
 }
 
 func ExampleQoSModes() {
-	for _, m := range escp.QoSModes() {
+	for _, m := range model.QoSModes() {
 		fmt.Printf("%d %s\n", int(m), m)
 	}
 	// Output:
@@ -135,7 +136,7 @@ func ExampleQoSModes() {
 }
 
 func ExampleIPConfig_Validate() {
-	ok := escp.IPConfig{IP: netip.MustParseAddr("192.0.2.11"), Netmask: netip.MustParseAddr("255.255.255.0"), Gateway: netip.MustParseAddr("192.0.2.1")}
+	ok := model.IPConfig{IP: netip.MustParseAddr("192.0.2.11"), Netmask: netip.MustParseAddr("255.255.255.0"), Gateway: netip.MustParseAddr("192.0.2.1")}
 	fmt.Println(ok.Validate())
 
 	bad := ok

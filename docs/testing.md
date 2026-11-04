@@ -5,7 +5,7 @@
 ```go
 func TestMyCode(t *testing.T) {
 	sw := escptest.Start(t) // stopped when the test ends; escptest.Listen() when there is no testing.T
-	sw.EnableModel(map[int]escptest.LinkSpeed{1: escptest.Link1000Full}) // port 1 has a link
+	sw.EnableModel(map[model.PortID]escptest.LinkSpeed{1: escptest.Link1000Full}) // port 1 has a link
 
 	c, err := escp.Dial(escp.Config{
 		Host: "127.0.0.1", SwitchPort: sw.UDPPort(), HostPort: escptest.FreeUDPPort(t),

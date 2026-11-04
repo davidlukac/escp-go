@@ -11,6 +11,7 @@ import (
 
 	"github.com/davidlukac/escp-go"
 	"github.com/davidlukac/escp-go/escptest"
+	"github.com/davidlukac/escp-go/model"
 )
 
 var errNoNetwork = errors.New("no network")
@@ -18,7 +19,7 @@ var errNoNetwork = errors.New("no network")
 // program runs the example against a fake switch: discovery finds what the test says, and the client
 // it dials talks to the fake on loopback.
 type program struct {
-	found    []escp.Info
+	found    []model.Info
 	discover error
 	env      map[string]string
 	sw       *escptest.Switch
@@ -28,7 +29,7 @@ func (p program) run(t *testing.T, args ...string) (code int, stdout, stderr str
 	t.Helper()
 	var out, errOut bytes.Buffer
 	d := deps{
-		discover: func(context.Context, escp.DiscoverOptions) ([]escp.Info, error) { return p.found, p.discover },
+		discover: func(context.Context, escp.DiscoverOptions) ([]model.Info, error) { return p.found, p.discover },
 		dial: func(cfg escp.Config) (*escp.Client, error) {
 			cfg.Host, cfg.Timeout, cfg.Retries = "127.0.0.1", 200*time.Millisecond, escp.NoRetries
 			cfg.SwitchPort, cfg.HostPort, cfg.BroadcastAddr = p.sw.UDPPort(), escptest.FreeUDPPort(t), escptest.Loopback()
@@ -41,7 +42,7 @@ func (p program) run(t *testing.T, args ...string) (code int, stdout, stderr str
 
 func TestWithoutAHostItOnlyListsTheSwitches(t *testing.T) {
 	sw := escptest.Start(t)
-	found := []escp.Info{{IP: netip.MustParseAddr("192.0.2.11"), MAC: escp.MAC{2, 0, 0, 0, 0, 1}, Hardware: "TL-SG108E 6.0", Firmware: escp.ParseFirmware("1.0.0 Build 20230218 Rel.50633")}}
+	found := []model.Info{{IP: netip.MustParseAddr("192.0.2.11"), MAC: model.MAC{2, 0, 0, 0, 0, 1}, Hardware: "TL-SG108E 6.0", Firmware: model.ParseFirmware("1.0.0 Build 20230218 Rel.50633")}}
 	code, out, errOut := program{found: found, sw: sw}.run(t)
 	if code != exitOK || errOut != "" || !strings.Contains(out, "192.0.2.11") || !strings.Contains(out, "02:00:00:00:00:01") || strings.Contains(out, "port ") {
 		t.Fatalf("code %d, stdout %q, stderr %q", code, out, errOut)
@@ -67,7 +68,7 @@ func TestADiscoveryErrorIsReportedAndTheRunGoesOn(t *testing.T) {
 
 func TestWithAHostItPrintsThePorts(t *testing.T) {
 	sw := escptest.Start(t)
-	sw.EnableModel(map[int]escptest.LinkSpeed{1: escptest.Link1000Full})
+	sw.EnableModel(map[model.PortID]escptest.LinkSpeed{1: escptest.Link1000Full})
 	env := map[string]string{"ESCP_HOST": "192.0.2.11", "ESCP_USERNAME": escptest.Username, "ESCP_PASSWORD": escptest.Password}
 	code, out, errOut := program{sw: sw, env: env}.run(t)
 	if code != exitOK || errOut != "" || !strings.Contains(out, "port 1: 1000Mbps-full") || !strings.Contains(out, "port 8: link-down") {
@@ -90,7 +91,7 @@ func TestASwitchThatDoesNotAnswerIsAnError(t *testing.T) {
 func TestADialErrorIsAnError(t *testing.T) {
 	var out, errOut bytes.Buffer
 	d := deps{
-		discover: func(context.Context, escp.DiscoverOptions) ([]escp.Info, error) { return nil, nil },
+		discover: func(context.Context, escp.DiscoverOptions) ([]model.Info, error) { return nil, nil },
 		dial:     func(escp.Config) (*escp.Client, error) { return nil, errNoNetwork },
 	}
 	code := run(nil, func(k string) string { return map[string]string{"ESCP_HOST": "x"}[k] }, &out, &errOut, d)

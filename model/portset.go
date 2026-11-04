@@ -1,4 +1,4 @@
-package escp
+package model
 
 import (
 	"encoding/binary"
@@ -35,8 +35,8 @@ func ParsePortID(s string) (PortID, error) {
 	return p, p.Validate()
 }
 
-// set is the one-port set; p must be valid.
-func (p PortID) set() PortSet { return 1 << uint(p-1) }
+// AsSet is the set of this one port; p must be valid.
+func (p PortID) AsSet() PortSet { return 1 << uint(p-1) }
 
 // String is the port number.
 func (p PortID) String() string { return strconv.Itoa(int(p)) }
