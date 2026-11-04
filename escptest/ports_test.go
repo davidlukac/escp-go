@@ -218,19 +218,17 @@ func TestAHeldMarkerNumberIsPassedOverForTheNextOne(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	free, err := freeUDPNumber()
-	if err != nil {
-		t.Fatal(err)
-	}
-	offered := []int{takenPort, free}
+	picks := 0
 	pick := func() (int, error) {
-		n := offered[0]
-		offered = offered[1:]
-		return n, nil
+		picks++
+		if picks == 1 {
+			return takenPort, nil // its TCP side is held
+		}
+		return freeUDPNumber() // may itself be passed over: a test binary beside this one holds markers too
 	}
 	got, _ := holdTCPMarker(t, pick)
-	if got != free || len(offered) != 0 {
-		t.Errorf("held %d with %d numbers left, want %d (the first number %d has its TCP side taken)", got, len(offered), free, takenPort)
+	if got == takenPort || picks < 2 {
+		t.Errorf("held %d after %d picks, want a number other than %d (its TCP side is taken) after at least two picks", got, picks, takenPort)
 	}
 }
 
@@ -251,8 +249,10 @@ func TestAPortThatAnotherProcessHoldsIsSkipped(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = c.Close() }() // best effort at the end of the test
-	if got == held || calls != 2 {
-		t.Errorf("got port %d after %d tries, want a port other than %d on the second try", got, calls, held)
+	// The held number is refused, so a second try was needed; more than two is fine, because the second
+	// number can be one that a test binary running beside this one holds.
+	if got == held || calls < 2 {
+		t.Errorf("got port %d after %d tries, want a port other than %d after at least two tries", got, calls, held)
 	}
 }
 
