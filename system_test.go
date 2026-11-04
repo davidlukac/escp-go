@@ -37,10 +37,10 @@ func TestSetHostnameRefusesToWriteWithoutAUsableIPConfiguration(t *testing.T) {
 		}
 	})
 	bad := map[string][]escptest.Setting{
-		"missing IP":      {{Type: escptest.TLVType(wire.TLVNetmask), Value: []byte{255, 255, 255, 0}}, {Type: escptest.TLVType(wire.TLVGateway), Value: []byte{10, 0, 0, 1}}},
-		"missing netmask": {{Type: escptest.TLVType(wire.TLVIP), Value: []byte{10, 0, 0, 5}}, {Type: escptest.TLVType(wire.TLVGateway), Value: []byte{10, 0, 0, 1}}},
-		"missing gateway": {{Type: escptest.TLVType(wire.TLVIP), Value: []byte{10, 0, 0, 5}}, {Type: escptest.TLVType(wire.TLVNetmask), Value: []byte{255, 255, 255, 0}}},
-		"malformed IP":    {{Type: escptest.TLVType(wire.TLVIP), Value: []byte{10, 0, 5}}, {Type: escptest.TLVType(wire.TLVNetmask), Value: []byte{255, 255, 255, 0}}, {Type: escptest.TLVType(wire.TLVGateway), Value: []byte{10, 0, 0, 1}}},
+		"missing IP":      {{Type: escptest.TLVType(wire.TLVMAC), Value: wantMAC[:]}, {Type: escptest.TLVType(wire.TLVNetmask), Value: []byte{255, 255, 255, 0}}, {Type: escptest.TLVType(wire.TLVGateway), Value: []byte{10, 0, 0, 1}}},
+		"missing netmask": {{Type: escptest.TLVType(wire.TLVMAC), Value: wantMAC[:]}, {Type: escptest.TLVType(wire.TLVIP), Value: []byte{10, 0, 0, 5}}, {Type: escptest.TLVType(wire.TLVGateway), Value: []byte{10, 0, 0, 1}}},
+		"missing gateway": {{Type: escptest.TLVType(wire.TLVMAC), Value: wantMAC[:]}, {Type: escptest.TLVType(wire.TLVIP), Value: []byte{10, 0, 0, 5}}, {Type: escptest.TLVType(wire.TLVNetmask), Value: []byte{255, 255, 255, 0}}},
+		"malformed IP":    {{Type: escptest.TLVType(wire.TLVMAC), Value: wantMAC[:]}, {Type: escptest.TLVType(wire.TLVIP), Value: []byte{10, 0, 5}}, {Type: escptest.TLVType(wire.TLVNetmask), Value: []byte{255, 255, 255, 0}}, {Type: escptest.TLVType(wire.TLVGateway), Value: []byte{10, 0, 0, 1}}},
 	}
 	for name, tlvs := range bad {
 		t.Run(name, func(t *testing.T) {

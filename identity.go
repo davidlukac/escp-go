@@ -56,12 +56,15 @@ func (i *identity) header() MAC {
 }
 
 // judge decides whether a reply that carries switch MAC got and came from ip may be accepted. A
-// device whose MAC differs from the identity is refused, and remembered for wrongDevice. The first
-// accepted reply is the first contact: its MAC is learned.
+// device whose MAC differs from the identity is refused, and remembered for wrongDevice; so is one
+// that sends no MAC at all (all zero) when there is an identity to compare with: a real switch puts
+// its MAC in every reply (captured on both of ours, see PROTOCOL.md), and an answer that does not
+// say who sent it cannot be told from a device that took the address over. Without an identity yet
+// (no pin, no reply so far) the first accepted reply is the first contact: its MAC is learned.
 func (i *identity) judge(got MAC, from net.IP) bool {
 	i.mu.Lock()
 	defer i.mu.Unlock()
-	if want := i.current(); !want.IsZero() && !got.IsZero() && got != want {
+	if want := i.current(); !want.IsZero() && got != want {
 		i.wrong = &WrongSwitchError{Want: want, Got: got, IP: addrOf(from)}
 		return false
 	}
