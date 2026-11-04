@@ -83,12 +83,13 @@ jobs:
 
           	"github.com/davidlukac/escp-go"
           	"github.com/davidlukac/escp-go/escptest"
+          	"github.com/davidlukac/escp-go/model"
           	"github.com/davidlukac/escp-go/safety"
           )
 
           func main() {
-          	mac, err := escp.ParseMAC("00:00:5e:00:53:01")
-          	fmt.Println(mac, err, safety.FirmwareGate() != nil, escptest.Username)
+          	mac, err := model.ParseMAC("00:00:5e:00:53:01")
+          	fmt.Println(mac, err, safety.FirmwareGate() != nil, escptest.Username, escp.MaxTimeout)
           }
           GO
           go mod init example.com/consumer
