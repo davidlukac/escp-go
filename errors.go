@@ -29,6 +29,11 @@ var (
 	// MAC in every reply). Nothing was written to it. The
 	// *WrongSwitchError that wraps it names both addresses.
 	ErrWrongSwitch = errors.New("escp: the device that answered is not the configured switch")
+	// ErrSwitchInUse means another Client of this process already talks to that switch (it is
+	// named by its MAC address or by its address and port). The switch keeps one session, so two
+	// clients of it fail each other; close the first one, or share it. Returned by Dial, and by the
+	// first call of a client that was closed and whose switch another client has taken since.
+	ErrSwitchInUse = errors.New("escp: another client of this process already talks to that switch")
 	// ErrNotFound means no switch with the wanted MAC address answered a discovery probe on
 	// this network (Locate, or a client configured with a MAC and no working address).
 	ErrNotFound = errors.New("escp: no switch with that MAC address answered")

@@ -12,6 +12,7 @@ Test errors with `errors.Is` and `errors.As`, never by message.
 | `ErrInvalidConfigFile` | a configuration backup that is not complete, after the download was repeated |
 | `ErrReplyTooLarge` | a fragmented reply bigger than any switch sends |
 | `ErrWrongSwitch`, `*WrongSwitchError` | the device that answered is not the switch the client talks to (`Config.MAC`, or the MAC the switch reported on the first contact), or it answered without any MAC address; nothing was written to it |
+| `ErrSwitchInUse` | another client of this process already talks to that switch (`Dial`, or the first call of a closed client whose switch was taken); close the first one or share it |
 | `ErrNotFound` | no switch with that MAC answered a discovery probe |
 | `*safety.FirmwareError`, `*safety.PortUseError`, `*safety.ImpactError` | a gate refused; nothing was sent |
 | `safety.ErrDryRun` | the dry-run gate recorded the write and sent nothing |

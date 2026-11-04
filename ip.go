@@ -182,6 +182,7 @@ func (c *Client) SetIPConfig(ctx context.Context, cfg IPConfig) error {
 		return err
 	}
 	c.dest = &net.UDPAddr{IP: net.IP(cfg.IP.AsSlice()), Port: c.dest.Port}
+	c.reclaim()
 	c.session = nil
 	return c.awaitAddress(ctx, cfg)
 }

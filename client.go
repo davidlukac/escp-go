@@ -19,7 +19,10 @@ import (
 // are serialized because the switch answers one request at a time, and a call that
 // waits its turn gives up when its context ends. Use one Client per
 // switch: two Clients for the same switch were measured to fail completely, apparently
-// because the switch keeps a single session (see the package documentation).
+// because the switch keeps a single session (see the package documentation). Within one process
+// this is enforced: Dial refuses a second client of a switch that another client has not Closed
+// (ErrSwitchInUse). A client dropped without Close gives its claim up when it is garbage collected.
+// Other processes cannot be seen, and stay the caller's rule.
 type Client struct {
 	cfg  Config
 	mu   sync.Mutex
@@ -41,6 +44,9 @@ type Client struct {
 	// groupLimit is the highest port-based VLAN group id the switch has (a PortVLANLimit), read on
 	// the first group write (unknown until then) and kept: it is hardware. Atomic like switchPorts.
 	groupLimit atomic.Int64
+	// claim is what the client holds in the registry of switches in use (registry.go); nil until
+	// the client claims its switch.
+	claim *claim
 	// seams are the knobs only tests turn; Dial sets them to their defaults.
 	seams
 	// log is Config.Logger, or a logger that discards, with the switch's host and MAC attached.
@@ -60,6 +66,9 @@ type seams struct {
 	firstContact time.Duration
 	// allowLoopback lets a test move a fake switch on 127.0.0.0/8.
 	allowLoopback bool
+	// shared lets a test put several clients on one fake switch: the client claims nothing. It is
+	// the default in this package's tests (claimsByDefault); withClaim turns it off.
+	shared bool
 	// locator finds a switch by MAC address; the default is Locate on the interfaces of this host.
 	locator func(ctx context.Context, mac MAC) (Info, error)
 }
@@ -69,6 +78,9 @@ type dialOption func(*Client)
 
 // withLoopback lets the client move a switch that lives on 127.0.0.0/8.
 func withLoopback() dialOption { return func(c *Client) { c.allowLoopback = true } }
+
+// withClaim makes this client claim its switch even in the tests, which otherwise do not.
+func withClaim() dialOption { return func(c *Client) { c.shared = false } }
 
 // withMoveWait shortens the wait for a switch that was told to move.
 func withMoveWait(d time.Duration) dialOption { return func(c *Client) { c.moveWait = d } }
@@ -151,7 +163,7 @@ func dial(ctx context.Context, r ipLookuper, cfg Config, opts ...dialOption) (*C
 		cfg.BroadcastAddr = netip.AddrFrom4([net.IPv4len]byte{255, 255, 255, 255})
 	}
 	base := clientLogger(cfg)
-	c := &Client{cfg: cfg, log: identified(base), ident: identity{pin: cfg.MAC}}
+	c := &Client{cfg: cfg, log: identified(base), ident: identity{pin: cfg.MAC}, seams: seams{shared: !claimsByDefault}}
 	c.locator = hostLocator(base) // Locate identifies itself
 	if cfg.Host == "" && !cfg.MAC.IsZero() {
 		// no address yet: the first request finds the switch by its MAC address
@@ -175,14 +187,22 @@ func dial(ctx context.Context, r ipLookuper, cfg Config, opts ...dialOption) (*C
 	for _, o := range opts {
 		o(c)
 	}
+	if err := c.claimSwitch(); err != nil {
+		return nil, err
+	}
 	return c, nil
 }
 
 // Close releases the UDP socket, if it was opened, so that another client or Discover can
-// use the reply port. A closed client opens the socket again if it is used afterwards.
+// use the reply port, and ends the client's claim on its switch, so that another client can be
+// made for it (ErrSwitchInUse). A closed client opens the socket again and claims the switch again
+// if it is used afterwards, which fails with ErrSwitchInUse when another client has taken it.
 func (c *Client) Close() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if c.claim != nil {
+		c.claim.release()
+	}
 	if c.conn == nil {
 		return nil
 	}
@@ -194,6 +214,11 @@ func (c *Client) Close() error {
 func (c *Client) open(ctx context.Context) error {
 	if c.conn != nil {
 		return nil
+	}
+	if c.claim != nil && !c.claim.held() {
+		if err := c.claimSwitch(); err != nil { // the client was closed and its switch taken since
+			return err
+		}
 	}
 	conn, err := bindReplyPort(ctx, c.cfg.HostPort)
 	if err != nil {

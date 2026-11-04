@@ -19,7 +19,8 @@
 //
 // Use one Client per switch and share it between goroutines: it sends one request at a time,
 // because the switch answers one at a time. Clients for different switches work side by side. Two
-// Clients for the same switch do not work, because the switch keeps a single session.
+// Clients for the same switch do not work, because the switch keeps a single session: within one
+// process Dial refuses the second with ErrSwitchInUse until the first is closed.
 //
 // Discover finds the switches on the network without credentials or addresses; Locate finds one
 // by its MAC address. Config.MAC pins a client to a switch, so that a request to an address that
