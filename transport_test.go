@@ -79,13 +79,13 @@ func TestAcceptFiltersForeignAndStaleDatagrams(t *testing.T) {
 			}
 		})
 	}
-	if !c.haveSwMAC || c.swMAC != (MAC{1, 2, 3, 4, 5, 6}) {
-		t.Fatalf("the switch MAC must be learned from the first accepted reply, got %x (have=%v)", c.swMAC, c.haveSwMAC)
+	if !c.ident.have || c.ident.learned != (MAC{1, 2, 3, 4, 5, 6}) {
+		t.Fatalf("the switch MAC must be learned from the first accepted reply, got %x (have=%v)", c.ident.learned, c.ident.have)
 	}
 	// a later reply with another MAC must not overwrite what we learned
 	c.accept(fromSwitch, wire.RC4Static(wire.Marshal(wire.Header{Op: wire.OpReply, Seq: 41, SwitchMAC: [6]byte{9, 9, 9, 9, 9, 9}}, nil)))
-	if c.swMAC != (MAC{1, 2, 3, 4, 5, 6}) {
-		t.Fatalf("learned MAC was overwritten: %x", c.swMAC)
+	if c.ident.learned != (MAC{1, 2, 3, 4, 5, 6}) {
+		t.Fatalf("learned MAC was overwritten: %x", c.ident.learned)
 	}
 }
 

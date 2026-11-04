@@ -263,17 +263,16 @@ func (c *Client) awaitAddress(ctx context.Context, want IPConfig) error {
 	if wait == 0 {
 		wait = ipMoveWait
 	}
-	ctx, cancel := context.WithTimeout(ctx, wait)
-	defer cancel()
-	for {
-		if info, err := c.discover(ctx); err == nil && info.IP == want.IP && !info.DHCP {
-			return nil
-		}
-		c.log.DebugContext(ctx, "the switch is not at the new address yet; asking again", "want", want.IP.String(), "poll", c.pollInterval().String())
-		select {
-		case <-ctx.Done():
-			return fmt.Errorf("%w (%s)", ErrMoveUnconfirmed, want.IP)
-		case <-time.After(c.pollInterval()):
-		}
+	moved := pollUntil(ctx, wait, c.pollInterval(),
+		func(ctx context.Context) bool {
+			info, err := c.discover(ctx)
+			return err == nil && info.IP == want.IP && !info.DHCP
+		},
+		func(ctx context.Context) {
+			c.log.DebugContext(ctx, "the switch is not at the new address yet; asking again", "want", want.IP.String(), "poll", c.pollInterval().String())
+		})
+	if !moved {
+		return fmt.Errorf("%w (%s)", ErrMoveUnconfirmed, want.IP)
 	}
+	return nil
 }

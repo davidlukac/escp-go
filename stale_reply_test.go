@@ -14,7 +14,7 @@ import (
 // sequence number. A hardware regression run read one of these as the answer to a LED read,
 // a mirror read and a LAG read.
 func discoveryShapedReply(c *Client, seq uint16) []byte {
-	return wire.RC4Static(wire.Marshal(wire.Header{Op: wire.OpReply, SwitchMAC: c.swMAC, Seq: seq},
+	return wire.RC4Static(wire.Marshal(wire.Header{Op: wire.OpReply, SwitchMAC: c.ident.learned, Seq: seq},
 		[]wire.TLV{{Type: 1, Value: []byte("TL-SG108E")}, {Type: 2, Value: []byte("switch")}, {Type: 3, Value: []byte{1, 2, 3, 4, 5, 6}}}))
 }
 
