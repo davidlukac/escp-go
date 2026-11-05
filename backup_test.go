@@ -212,3 +212,44 @@ func TestAssembleConfig(t *testing.T) {
 		})
 	}
 }
+
+// Close leaves a client reusable: the next call reopens the socket. ConfigBackup used to skip that
+// and panicked on the closed socket.
+func TestConfigBackupOnAClosedClientReopensIt(t *testing.T) {
+	f := escptest.Start(t)
+	c := dialFake(t, f, "secret")
+	ctx := context.Background()
+	if _, err := c.ConfigBackup(ctx); err != nil {
+		t.Fatal(err)
+	}
+	c.Close()
+	got, err := c.ConfigBackup(ctx)
+	if err != nil {
+		t.Fatalf("the closed client was not reopened: %v", err)
+	}
+	if want := escptest.BackupFile(); !bytes.Equal(got, want) {
+		t.Fatalf("got %d bytes that differ from the %d-byte file", len(got), len(want))
+	}
+}
+
+// A closed client that is used again claims its switch again, for ConfigBackup as for every other call.
+func TestConfigBackupOnAClosedClientWhoseSwitchWasTakenIsRefused(t *testing.T) {
+	f := escptest.Start(t)
+	cfg := Config{Host: "127.0.0.1", Username: "admin", Password: "secret", SwitchPort: f.UDPPort(), BroadcastAddr: escptest.Loopback(), Timeout: 2 * time.Second, Retries: NoRetries}
+	first, err := claimed(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := first.ConfigBackup(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	first.Close()
+	second, err := claimed(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer second.Close()
+	if _, err := first.ConfigBackup(context.Background()); !errors.Is(err, ErrSwitchInUse) {
+		t.Fatalf("got %v, want ErrSwitchInUse", err)
+	}
+}

@@ -264,7 +264,11 @@ func (c *Client) exchange(ctx context.Context, op byte, tlvs []wire.TLV, static 
 // packets follow (the header carries no index, no total and no checksum), so nothing here can
 // tell that an earlier packet was lost: the caller checks what it gets (see assembleConfig).
 func (c *Client) exchangeFragments(ctx context.Context, op byte, tlvs []wire.TLV, typ wire.TLVType) ([][]byte, error) {
-	// Callers hold c.mu and run inside withSession, so the socket is open.
+	// Callers hold c.mu. withSession does not open a client whose session is cached, and a closed
+	// client keeps its session, so the socket and the claim on the switch are checked here too.
+	if err := c.open(ctx); err != nil {
+		return nil, err
+	}
 	defer c.interruptOnDone(ctx)()
 	c.ident.forget()
 	for attempt := 0; attempt <= c.cfg.Retries; attempt++ {
