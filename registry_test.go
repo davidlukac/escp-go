@@ -229,3 +229,28 @@ func TestAMoveOntoAClaimedAddressIsNotStolen(t *testing.T) {
 		t.Fatalf("the moved client keeps the keys it had: %v", err)
 	}
 }
+
+// The tests of this package turn the claim off (TestMain); in a program a plain Dial claims its
+// switch, which is the guarantee of ErrSwitchInUse. This test runs Dial with the default a program
+// has.
+func TestDialClaimsItsSwitchByDefaultInAProgram(t *testing.T) {
+	if !claimsInAProgram {
+		t.Fatal("a client does not claim its switch by default")
+	}
+	claimsByDefault = claimsInAProgram
+	t.Cleanup(func() { claimsByDefault = false })
+	cfg := Config{Host: "127.0.0.1", SwitchPort: escptest.FreeUDPPort(t)}
+	first, err := Dial(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Dial(cfg); !errors.Is(err, ErrSwitchInUse) {
+		t.Fatalf("a second Dial: got %v, want ErrSwitchInUse", err)
+	}
+	first.Close()
+	second, err := Dial(cfg)
+	if err != nil {
+		t.Fatalf("after Close the switch is free: %v", err)
+	}
+	second.Close()
+}
