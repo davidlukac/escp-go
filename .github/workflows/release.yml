@@ -2,7 +2,7 @@
 # repository is the release (the module proxy serves any tag), so this workflow does what is left:
 # it checks the tag, re-runs the checks on the tagged tree, writes the GitHub release whose notes
 # are the CHANGELOG section of that version, then asks the proxy and pkg.go.dev for the version and
-# proves that a fresh module can install it and build against all three packages.
+# proves that a fresh module can install it and build the program in examples/consumer against it.
 #
 # Procedure (RELEASING.md): the release PR is merged, `scripts/release.sh --tag X.Y.Z` tags the merge
 # commit, a maintainer pushes that tag (the push is what publishes). To re-run for a tag
@@ -71,26 +71,14 @@ jobs:
             echo "not served yet, attempt $i"; sleep 20
           done
           exit 1
+      # The program is examples/consumer of the tagged tree: the same file that every pull request
+      # compiles, so it cannot fall behind the API the way a copy inside this workflow did.
       - name: A fresh module installs it and builds against every package
         run: |
+          src="$PWD/examples/consumer/main.go"
           dir="$(mktemp -d)"
+          cp "$src" "$dir/main.go"
           cd "$dir"
-          cat > main.go <<'GO'
-          package main
-
-          import (
-          	"fmt"
-
-          	"github.com/davidlukac/escp-go"
-          	"github.com/davidlukac/escp-go/escptest"
-          	"github.com/davidlukac/escp-go/safety"
-          )
-
-          func main() {
-          	mac, err := escp.ParseMAC("00:00:5e:00:53:01")
-          	fmt.Println(mac, err, safety.FirmwareGate() != nil, escptest.Username)
-          }
-          GO
           go mod init example.com/consumer
           GOWORK=off GOFLAGS=-mod=mod GOPROXY=https://proxy.golang.org go get "$MODULE@$TAG"
           GOWORK=off GOPROXY=https://proxy.golang.org go run .
