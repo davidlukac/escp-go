@@ -73,6 +73,11 @@ func (c *Client) SetPortPriorities(ctx context.Context, changes []model.PortPrio
 		}
 		named = named.Union(ch.Port.AsSet())
 	}
+	end, err := c.beginModify(ctx)
+	if err != nil {
+		return err
+	}
+	defer end()
 	cur, err := c.QoS(ctx)
 	if err != nil {
 		return err

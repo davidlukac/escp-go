@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sync"
 
 	"github.com/davidlukac/escp-go/internal/wire"
 	"github.com/davidlukac/escp-go/model"
@@ -17,28 +18,51 @@ import (
 // The calls that must run to the end whatever their context says (settling the outcome of a write
 // that may have been applied) take c.mu directly.
 func (c *Client) lock(ctx context.Context) error {
+	if err := acquire(ctx, &c.mu); err != nil {
+		return err
+	}
+	if c.closed {
+		c.mu.Unlock()
+		return ErrClosed
+	}
+	return nil
+}
+
+// acquire takes mu unless ctx ends first. It returns ctx's error with nothing held, or nil with mu
+// held; a lock that arrives after ctx ended is handed straight back.
+func acquire(ctx context.Context, mu *sync.Mutex) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 	got := make(chan struct{})
 	go func() {
-		c.mu.Lock()
+		mu.Lock()
 		close(got)
 	}()
 	select {
 	case <-got:
-		if c.closed {
-			c.mu.Unlock()
-			return ErrClosed
-		}
 		return nil
 	case <-ctx.Done():
 		go func() { // the lock arrives later and is handed straight back
 			<-got
-			c.mu.Unlock()
+			mu.Unlock()
 		}()
 		return ctx.Err()
 	}
+}
+
+// beginModify starts a call that reads a setting, changes part of it and writes all of it back:
+// SetHostname, SetIPConfig and EnableDHCP (the System page) and SetPortPriorities (every port's
+// priority). Two such calls at once would each write back what they read, and the later write
+// would undo the change of the earlier one. c.mu cannot be held from the read to the write, because
+// the write gate reads through the client, so these calls hold c.modify instead. It returns ctx's
+// error with nothing held, or the function that ends the call; it is taken before c.mu, never
+// while holding it.
+func (c *Client) beginModify(ctx context.Context) (end func(), err error) {
+	if err := acquire(ctx, &c.modify); err != nil {
+		return nil, err
+	}
+	return c.modify.Unlock, nil
 }
 
 func boolByte(b bool) byte {

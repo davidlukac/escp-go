@@ -34,6 +34,11 @@ func (c *Client) EnableDHCP(ctx context.Context) error {
 	if c.cfg.MAC.IsZero() {
 		return invalidf("escp: EnableDHCP needs Config.MAC: the leased address is not known in advance, and the switch can only be found again by its MAC")
 	}
+	end, err := c.beginModify(ctx)
+	if err != nil {
+		return err
+	}
+	defer end()
 	info, err := c.Info(ctx)
 	if err != nil {
 		return err

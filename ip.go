@@ -77,6 +77,11 @@ func (c *Client) SetIPConfig(ctx context.Context, cfg model.IPConfig) error {
 	if err := c.validateIPConfig(cfg); err != nil {
 		return err
 	}
+	end, err := c.beginModify(ctx)
+	if err != nil {
+		return err
+	}
+	defer end()
 	info, err := c.Info(ctx)
 	if err != nil {
 		return err

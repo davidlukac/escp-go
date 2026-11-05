@@ -25,10 +25,13 @@ import (
 // (ErrSwitchInUse). A client dropped without Close gives its claim up when it is garbage collected.
 // Other processes cannot be seen, and stay the caller's rule.
 type Client struct {
-	cfg  Config
-	mu   sync.Mutex
-	conn datagramConn
-	dest *net.UDPAddr
+	cfg Config
+	mu  sync.Mutex
+	// modify serializes the calls that read a setting, change part of it and write it all back
+	// (see beginModify). It is taken before mu and never while holding it.
+	modify sync.Mutex
+	conn   datagramConn
+	dest   *net.UDPAddr
 	// alsoFrom is a second address replies are accepted from while the switch is
 	// being moved to it (SetIPConfig); nil otherwise.
 	alsoFrom net.IP
