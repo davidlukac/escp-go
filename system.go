@@ -48,6 +48,11 @@ func (c *Client) SetHostname(ctx context.Context, name model.Hostname) error {
 	if err := name.Validate(); err != nil {
 		return err
 	}
+	end, err := c.beginModify(ctx)
+	if err != nil {
+		return err
+	}
+	defer end()
 	info, err := c.Info(ctx)
 	if err != nil {
 		return err

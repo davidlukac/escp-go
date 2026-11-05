@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/netip"
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/davidlukac/escp-go/escptest"
 	"github.com/davidlukac/escp-go/internal/wire"
@@ -214,4 +216,93 @@ func TestWriteNeedsThePortCount(t *testing.T) {
 			t.Fatalf("the switch received %d writes", n)
 		}
 	})
+}
+
+// Two calls that each read a setting and write all of it back must not run at the same time: the
+// later write would undo the change of the earlier one (two SetPortPriorities for different ports
+// lost one of them; SetHostname wrote back a stale address). The gate holds the first call after
+// its read until the second has had every chance to run.
+func TestReadModifyWriteCallsDoNotUndoEachOther(t *testing.T) {
+	f := escptest.Start(t)
+	f.EnableModel(nil)
+	var calls atomic.Int32
+	inGate := make(chan struct{})
+	release := make(chan struct{})
+	gate := func(ctx context.Context, sw Reader, op Operation) error {
+		if calls.Add(1) == 1 {
+			close(inGate)
+			select {
+			case <-release:
+			case <-time.After(10 * time.Second):
+			}
+		}
+		return nil
+	}
+	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 5 * time.Second,
+		SwitchPort: f.UDPPort(), BroadcastAddr: escptest.Loopback(), WriteGate: gate}, withLoopback())
+	t.Cleanup(func() { c.Close() })
+	ctx := context.Background()
+	first := make(chan error, 1)
+	go func() { first <- c.SetPortPriorities(ctx, []PortPriority{{Port: 3, Priority: PriorityHighest}}) }()
+	<-inGate
+	second := make(chan error, 1)
+	go func() { second <- c.SetPortPriorities(ctx, []PortPriority{{Port: 4, Priority: PriorityHighest}}) }()
+	select {
+	case err := <-second:
+		// Without the lock the second call finishes while the first is held; the first then
+		// writes back what it read before, without the second's change.
+		close(release)
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(300 * time.Millisecond): // the second waits for the first, as it must
+		close(release)
+		if err := <-second; err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := <-first; err != nil {
+		t.Fatal(err)
+	}
+	got, err := c.QoS(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range got.Priorities {
+		if (p.Port == 3 || p.Port == 4) && p.Priority != PriorityHighest {
+			t.Errorf("port %d has priority %d: the change was undone by the other call", p.Port, p.Priority)
+		}
+	}
+}
+
+// A read-modify-write call that is canceled while it waits for another one returns the context's
+// error and sends nothing.
+func TestReadModifyWriteCallsGiveUpWhenTheirContextEnds(t *testing.T) {
+	f := escptest.Start(t)
+	f.EnableModel(nil)
+	c := dialFake(t, f, "secret")
+	canceled, cancel := context.WithCancel(context.Background())
+	cancel()
+	cases := []struct {
+		name string
+		call func() error
+	}{
+		{"SetHostname", func() error { return c.SetHostname(canceled, "sw-test") }},
+		{"SetIPConfig", func() error {
+			return c.SetIPConfig(canceled, IPConfig{IP: netip.MustParseAddr("192.0.2.13"), Netmask: netip.MustParseAddr("255.255.255.0"), Gateway: netip.MustParseAddr("192.0.2.1")})
+		}},
+		{"SetPortPriorities", func() error {
+			return c.SetPortPriorities(canceled, []PortPriority{{Port: 3, Priority: PriorityHighest}})
+		}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := tc.call(); !errors.Is(err, context.Canceled) {
+				t.Fatalf("got %v, want context.Canceled", err)
+			}
+		})
+	}
+	if n := len(f.AllSets()); n != 0 {
+		t.Fatalf("the canceled calls sent %d writes", n)
+	}
 }
