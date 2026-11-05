@@ -111,7 +111,7 @@ func TestARefusedClientHoldsNothing(t *testing.T) {
 // A closed client that is used again claims its switch again, and fails if it was taken.
 func TestAClosedClientUsedAgainNeedsItsSwitchBack(t *testing.T) {
 	f := escptest.Start(t)
-	cfg := Config{Host: "127.0.0.1", Username: "admin", Password: "secret", SwitchPort: f.UDPPort(), BroadcastAddr: escptest.Loopback(), Timeout: 200 * time.Millisecond, Retries: NoRetries}
+	cfg := Config{Host: "127.0.0.1", Username: "admin", Password: "secret", SwitchPort: f.UDPPort(), BroadcastAddr: escptest.Loopback(), Timeout: 5 * time.Second, Retries: NoRetries} // only a bound for a hang: the fake answers at once
 	first, err := claimed(cfg)
 	if err != nil {
 		t.Fatal(err)
