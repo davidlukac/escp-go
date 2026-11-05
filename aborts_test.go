@@ -3,6 +3,8 @@ package escp
 import (
 	"context"
 	"errors"
+	"fmt"
+	"os"
 	"testing"
 	"time"
 
@@ -22,6 +24,16 @@ import (
 
 // hangGuard is how long a call that returns at once in a healthy run may take before it counts as hung.
 const hangGuard = 3 * time.Second
+
+// abortRun ends the whole test run with a failure. A lock that was kept would hold up every later
+// test of the package, and the examples, which Go runs after the tests even when one failed, each
+// end in a Close that waits for it: a failed test is not enough to end the run. The message goes
+// to the standard error stream, because the output of a test that has not finished is lost on exit.
+func abortRun(t *testing.T, format string, args ...any) {
+	t.Helper()
+	fmt.Fprintf(os.Stderr, "--- FAIL: %s\n    "+format+"\n", append([]any{t.Name()}, args...)...)
+	os.Exit(1)
+}
 
 // A call that returns, with a result or with an error, has let go of the client: the next call, from
 // a client or from Close, is not left waiting. The check takes the lock itself, under a deadline.
@@ -47,8 +59,7 @@ func TestACallThatReturnsLeavesTheClientFree(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), hangGuard)
 			defer cancel()
 			if err := c.lock(ctx); err != nil {
-				c.mu.Unlock() // the hold that was kept: the Close of the cleanup would wait for it as well
-				t.Fatalf("%s returned and left the client locked: %v", tc.name, err)
+				abortRun(t, "%s returned and left the client locked: %v", tc.name, err)
 			}
 			c.mu.Unlock()
 		})
