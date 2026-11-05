@@ -108,8 +108,9 @@ func TestARefusedClientHoldsNothing(t *testing.T) {
 	other.Close()
 }
 
-// A closed client that is used again claims its switch again, and fails if it was taken.
-func TestAClosedClientUsedAgainNeedsItsSwitchBack(t *testing.T) {
+// Close ends the claim for good: another client can take the switch, and the closed client does not
+// get it back.
+func TestAClosedClientDoesNotGetItsSwitchBack(t *testing.T) {
 	f := escptest.Start(t)
 	cfg := Config{Host: "127.0.0.1", Username: "admin", Password: "secret", SwitchPort: f.UDPPort(), BroadcastAddr: escptest.Loopback(), Timeout: 5 * time.Second, Retries: NoRetries} // only a bound for a hang: the fake answers at once
 	first, err := claimed(cfg)
@@ -124,14 +125,18 @@ func TestAClosedClientUsedAgainNeedsItsSwitchBack(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := first.Info(context.Background()); !errors.Is(err, ErrSwitchInUse) {
-		t.Fatalf("got %v, want ErrSwitchInUse for the client whose switch was taken", err)
+	if _, err := first.Info(context.Background()); !errors.Is(err, ErrClosed) {
+		t.Fatalf("got %v, want ErrClosed for the closed client", err)
 	}
 	second.Close()
-	if _, err := first.Info(context.Background()); err != nil {
-		t.Fatalf("with the switch free again the first client works: %v", err)
+	if _, err := first.Info(context.Background()); !errors.Is(err, ErrClosed) {
+		t.Fatalf("with the switch free again the closed client stays closed: got %v", err)
 	}
-	first.Close()
+	third, err := claimed(cfg)
+	if err != nil {
+		t.Fatalf("a new client for the free switch: %v", err)
+	}
+	third.Close()
 }
 
 // A client dropped without Close gives its claim up when it is collected.

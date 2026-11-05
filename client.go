@@ -48,6 +48,8 @@ type Client struct {
 	// claim is what the client holds in the registry of switches in use (registry.go); nil until
 	// the client claims its switch.
 	claim *claim
+	// closed is set by Close and never cleared; guarded by mu.
+	closed bool
 	// seams are the knobs only tests turn; Dial sets them to their defaults.
 	seams
 	// log is Config.Logger, or a logger that discards, with the switch's host and MAC attached.
@@ -194,13 +196,15 @@ func dial(ctx context.Context, r ipLookuper, cfg Config, opts ...dialOption) (*C
 	return c, nil
 }
 
-// Close releases the UDP socket, if it was opened, so that another client or Discover can
-// use the reply port, and ends the client's claim on its switch, so that another client can be
-// made for it (ErrSwitchInUse). A closed client opens the socket again and claims the switch again
-// if it is used afterwards, which fails with ErrSwitchInUse when another client has taken it.
+// Close ends the client for good: it releases the UDP socket, if it was opened, so that another
+// client or Discover can use the reply port, and ends the client's claim on its switch, so that
+// another client can be made for it (ErrSwitchInUse). Every later call of the client returns
+// ErrClosed and sends nothing; make a new client with Dial. Close waits for a call in flight and
+// is safe to call more than once.
 func (c *Client) Close() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.closed = true
 	if c.claim != nil {
 		c.claim.release()
 	}
@@ -215,11 +219,6 @@ func (c *Client) Close() error {
 func (c *Client) open(ctx context.Context) error {
 	if c.conn != nil {
 		return nil
-	}
-	if c.claim != nil && !c.claim.held() {
-		if err := c.claimSwitch(); err != nil { // the client was closed and its switch taken since
-			return err
-		}
 	}
 	conn, err := bindReplyPort(ctx, c.cfg.HostPort)
 	if err != nil {
