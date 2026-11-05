@@ -199,12 +199,14 @@ func TestAnAddressThatStopsAnsweringIsLookedUpAgainByMAC(t *testing.T) {
 	f := escptest.Start(t)
 	f.DropFirst(2) // the first discovery (to the address and to the broadcast address) goes unanswered
 	c, calls := dialMAC(t, f, "127.0.0.1", wantMAC, nil)
+	c.cfg.RelocateByMAC = true
 	if _, err := c.Info(context.Background()); err != nil || *calls != 1 {
 		t.Fatalf("Info = %v after %d lookups, want success after one", err, *calls)
 	}
 	f2 := escptest.Start(t)
 	f2.DropFirst(2)
 	c, _ = dialMAC(t, f2, "127.0.0.1", wantMAC, func(MAC) (Info, error) { return Info{}, ErrNotFound })
+	c.cfg.RelocateByMAC = true
 	if _, err := c.Info(context.Background()); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("got %v, want the failed lookup", err)
 	}
@@ -213,6 +215,7 @@ func TestAnAddressThatStopsAnsweringIsLookedUpAgainByMAC(t *testing.T) {
 func TestASessionThatDiesIsRetriedAtTheAddressFoundByMAC(t *testing.T) {
 	f := escptest.Start(t)
 	c, calls := dialMAC(t, f, "127.0.0.1", wantMAC, nil)
+	c.cfg.RelocateByMAC = true
 	if err := c.SetLED(context.Background(), false); err != nil {
 		t.Fatal(err)
 	}
@@ -274,6 +277,7 @@ func TestADeadAddressGetsAShortBudgetBeforeTheLookup(t *testing.T) {
 	f := escptest.Start(t)
 	f.DropFirst(2)
 	c, calls := dialMAC(t, f, "127.0.0.1", wantMAC, nil)
+	c.cfg.RelocateByMAC = true
 	c.cfg.Timeout = time.Minute // the budget, not the per-attempt timeout, ends the wait
 	start := time.Now()
 	if _, err := c.Info(context.Background()); err != nil || *calls != 1 {
@@ -449,4 +453,29 @@ func TestAClientDoesNotFollowALookupToAnAddressThatIsNotOneDevice(t *testing.T) 
 			}
 		})
 	}
+}
+
+// A client that was given an address keeps to it: the answer to a lookup is not authenticated, so
+// without Config.RelocateByMAC a switch that stops answering at Host is not looked up, at first
+// contact or when its session dies, and a lookup is never asked for.
+func TestAClientWithAnAddressAndAMACKeepsToTheAddressUnlessToldOtherwise(t *testing.T) {
+	t.Run("first contact", func(t *testing.T) {
+		f := escptest.Start(t)
+		f.DropFirst(2)
+		c, calls := dialMAC(t, f, "127.0.0.1", wantMAC, nil)
+		if _, err := c.Info(context.Background()); !errors.Is(err, ErrNoReply) || *calls != 0 {
+			t.Fatalf("Info = %v after %d lookups, want ErrNoReply and none", err, *calls)
+		}
+	})
+	t.Run("a session that dies", func(t *testing.T) {
+		f := escptest.Start(t)
+		c, calls := dialMAC(t, f, "127.0.0.1", wantMAC, nil)
+		if err := c.SetLED(context.Background(), false); err != nil {
+			t.Fatal(err)
+		}
+		f.ClearSession()
+		if _, err := c.LED(context.Background()); *calls != 0 {
+			t.Fatalf("LED = %v after %d lookups, want none", err, *calls)
+		}
+	})
 }

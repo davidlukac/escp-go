@@ -71,8 +71,8 @@ func (c *Client) withSession(ctx context.Context, fn func() error) error {
 		err := fn()
 		if errors.Is(err, ErrNoReply) && !retried {
 			c.session = nil
-			c.log.WarnContext(ctx, "no reply; opening a new session", "lookup_by_mac", !c.cfg.MAC.IsZero())
-			if !c.cfg.MAC.IsZero() {
+			c.log.WarnContext(ctx, "no reply; opening a new session", "lookup_by_mac", c.mayRelocate())
+			if c.mayRelocate() {
 				_ = c.relocate(ctx) // best effort: the address may have changed; the retry says if not
 			}
 			continue

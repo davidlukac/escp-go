@@ -45,13 +45,22 @@ type Config struct {
 	// 255.255.255.255) is refused, whether it is written out or a name resolves to it.
 	Host string
 	// MAC, when set, pins the identity of the switch: a device that answers with another MAC
-	// address is never written to (the request fails with ErrWrongSwitch). With no Host, or when
-	// Host does not answer, the switch is looked up by MAC with a discovery probe on the first
-	// request and again when it stops answering (its address may have changed); nothing is sent
-	// by Dial. Without it the client pins itself to the MAC the switch reports on its first
+	// address is never written to (the request fails with ErrWrongSwitch). With no Host the switch
+	// is looked up by MAC with a discovery probe on the first request and again when it stops
+	// answering (its address may have changed); with a Host the client keeps to that address
+	// unless RelocateByMAC is set. Nothing is sent by Dial. Without it the client pins itself to the MAC the switch reports on its first
 	// contact, so a device that takes the address over later is refused the same way; only the
 	// first contact is then taken on trust.
 	MAC model.MAC
+
+	// RelocateByMAC lets a client that has both Host and MAC look its switch up by the MAC when
+	// the switch does not answer at Host, and follow it to the address found. It is off by
+	// default: the answer to a lookup is not authenticated, so a client that was given an address
+	// keeps to it. A client with a MAC and no Host always looks the switch up (it has no address
+	// to keep to), and SetIPConfig and EnableDHCP follow their own switch whatever this says.
+	// Turn it on for a switch whose address is not stable (a DHCP lease the configuration still
+	// names).
+	RelocateByMAC bool
 	// Username and Password are sent with every write and every authenticated read.
 	Username string
 	Password model.Password
