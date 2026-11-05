@@ -35,7 +35,7 @@ func (c *Client) discover(ctx context.Context) (model.Info, error) {
 			return model.Info{}, err
 		}
 	}
-	if c.cfg.MAC.IsZero() || c.ident.known() {
+	if c.cfg.MAC.IsZero() || c.ident.known() || !c.mayRelocate() {
 		return c.discoverOnce(ctx)
 	}
 	// First contact with a switch that is pinned by MAC: the address gets a short budget (a switch
@@ -52,6 +52,12 @@ func (c *Client) discover(ctx context.Context) (model.Info, error) {
 		info, err = c.discoverOnce(ctx)
 	}
 	return info, err
+}
+
+// mayRelocate reports whether the client may look its switch up by MAC and follow it to the
+// address found: it has a MAC and either no address of its own or Config.RelocateByMAC.
+func (c *Client) mayRelocate() bool {
+	return !c.cfg.MAC.IsZero() && (c.cfg.Host == "" || c.cfg.RelocateByMAC)
 }
 
 // firstContactBudget returns how long the configured address gets to answer the first discovery.
