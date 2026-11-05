@@ -12,7 +12,8 @@ import (
 
 // lock takes the client's lock, which is held across a whole exchange (the switch answers one
 // request at a time), and gives up when ctx ends first: a call that queues behind another one must
-// not outlive its own context. It returns ctx's error, with nothing held, or nil with the lock held.
+// not outlive its own context. It returns ctx's error, or ErrClosed for a closed client, with nothing
+// held, or nil with the lock held.
 // The calls that must run to the end whatever their context says (settling the outcome of a write
 // that may have been applied) take c.mu directly.
 func (c *Client) lock(ctx context.Context) error {
@@ -26,6 +27,10 @@ func (c *Client) lock(ctx context.Context) error {
 	}()
 	select {
 	case <-got:
+		if c.closed {
+			c.mu.Unlock()
+			return ErrClosed
+		}
 		return nil
 	case <-ctx.Done():
 		go func() { // the lock arrives later and is handed straight back

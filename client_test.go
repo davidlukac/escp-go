@@ -173,9 +173,47 @@ func TestCloseReleasesTheSocket(t *testing.T) {
 	if c.conn != nil {
 		t.Fatal("Close must forget the socket")
 	}
-	// the client is reusable: the next request binds again
-	if _, err := c.Info(context.Background()); err != nil {
-		t.Fatalf("reuse after Close: %v", err)
+	if err := c.Close(); err != nil {
+		t.Fatalf("a second Close: %v", err)
+	}
+}
+
+// Close ends a client for good: every call that takes the client returns ErrClosed and sends
+// nothing, reads, writes and the configuration download alike.
+func TestACallOnAClosedClientReturnsErrClosedAndSendsNothing(t *testing.T) {
+	ctx := context.Background()
+	cases := []struct {
+		name string
+		call func(c *Client) error
+	}{
+		{"Info", func(c *Client) error { _, err := c.Info(ctx); return err }},
+		{"LED", func(c *Client) error { _, err := c.LED(ctx); return err }},
+		{"Ports", func(c *Client) error { _, err := c.Ports(ctx); return err }},
+		{"SetLED", func(c *Client) error { return c.SetLED(ctx, true) }},
+		{"ConfigBackup", func(c *Client) error { _, err := c.ConfigBackup(ctx); return err }},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			f := escptest.Start(t)
+			f.EnableModel(nil)
+			c := dialFake(t, f, "secret")
+			if _, err := c.Info(ctx); err != nil {
+				t.Fatal(err)
+			}
+			if err := c.Close(); err != nil {
+				t.Fatal(err)
+			}
+			sets := len(f.AllSets())
+			if err := tc.call(c); !errors.Is(err, ErrClosed) {
+				t.Fatalf("got %v, want ErrClosed", err)
+			}
+			if got := len(f.AllSets()); got != sets {
+				t.Fatalf("the closed client sent %d more writes", got-sets)
+			}
+			if c.conn != nil {
+				t.Fatal("the closed client opened its socket again")
+			}
+		})
 	}
 }
 

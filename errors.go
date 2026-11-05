@@ -29,8 +29,11 @@ var (
 	// ErrSwitchInUse means another Client of this process already talks to that switch (it is
 	// named by its MAC address or by its address and port). The switch keeps one session, so two
 	// clients of it fail each other; close the first one, or share it. Returned by Dial, and by the
-	// first call of a client that was closed and whose switch another client has taken since.
+	// first contact of a client whose switch another client holds (see Client.Close).
 	ErrSwitchInUse = errors.New("escp: another client of this process already talks to that switch")
+	// ErrClosed means the Client was closed: Close ends a client for good, and every later call
+	// returns this error without sending anything. Make a new client with Dial.
+	ErrClosed = errors.New("escp: the client is closed")
 	// ErrNotFound means no switch with the wanted MAC address answered a discovery probe on
 	// this network (Locate, or a client configured with a MAC and no working address).
 	ErrNotFound = errors.New("escp: no switch with that MAC address answered")
