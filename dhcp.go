@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/netip"
 	"time"
 
 	"github.com/davidlukac/escp-go/model"
@@ -113,11 +114,25 @@ func onOff(on bool) string {
 	return "off"
 }
 
+// usableAddress reports whether the client may send to the address a lookup returned: an IPv4
+// address that names one device. An answer to a broadcast probe is not authenticated, so what it
+// carries is checked like a configured host (Config.Validate): not unspecified, multicast or the
+// limited broadcast; and loopback only for a client that talks to loopback itself (a fake switch).
+func (c *Client) usableAddress(a netip.Addr) bool {
+	if !a.Is4() || namesMoreThanOneDevice(a) {
+		return false
+	}
+	if a.IsLoopback() {
+		return c.cfg.BroadcastAddr.IsLoopback() || (c.dest != nil && c.dest.IP.IsLoopback())
+	}
+	return true
+}
+
 // follow points the client at the address a lookup found the switch at, with a fresh session.
 // Callers hold c.mu. The destination is changed in place, because requests in flight hold it.
 func (c *Client) follow(found model.Info) error {
 	ip := net.IP(found.IP.AsSlice())
-	if !found.IP.Is4() {
+	if !c.usableAddress(found.IP) {
 		return fmt.Errorf("%w: %s answered without a usable address", ErrNotFound, c.cfg.MAC)
 	}
 	c.dest.IP = ip

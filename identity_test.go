@@ -3,6 +3,7 @@ package escp
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net"
 	"net/netip"
 	"strings"
@@ -412,5 +413,40 @@ func TestSwitchMACDoesNotWaitForTheLock(t *testing.T) {
 	case <-done:
 	case <-time.After(10 * time.Second):
 		t.Fatal("SwitchMAC waited for the client's lock")
+	}
+}
+
+// The answer to a broadcast probe is not authenticated, so the address it carries is checked like a
+// configured host: a client does not follow a lookup to an address that names more than one device
+// (or to loopback, unless it talks to loopback itself).
+func TestAClientDoesNotFollowALookupToAnAddressThatIsNotOneDevice(t *testing.T) {
+	cases := []struct {
+		name string
+		ip   string
+		ok   bool
+	}{
+		{"a unicast address", "192.0.2.50", true},
+		{"the limited broadcast", "255.255.255.255", false},
+		{"multicast", "224.0.0.1", false},
+		{"unspecified", "0.0.0.0", false},
+		{"loopback, for a client that talks to a real network", "127.0.0.1", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := &Client{cfg: Config{MAC: MAC{2, 0, 0, 0, 0, 9}, BroadcastAddr: netip.MustParseAddr("192.0.2.255")}, dest: &net.UDPAddr{IP: net.IPv4(192, 0, 2, 10), Port: 29808}, log: slog.New(slog.DiscardHandler)}
+			err := c.follow(Info{IP: netip.MustParseAddr(tc.ip)})
+			if tc.ok {
+				if err != nil || !c.dest.IP.Equal(net.ParseIP(tc.ip)) {
+					t.Fatalf("got %v, destination %s", err, c.dest.IP)
+				}
+				return
+			}
+			if !errors.Is(err, ErrNotFound) {
+				t.Fatalf("got %v, want ErrNotFound", err)
+			}
+			if !c.dest.IP.Equal(net.IPv4(192, 0, 2, 10)) {
+				t.Fatalf("the destination changed to %s", c.dest.IP)
+			}
+		})
 	}
 }
