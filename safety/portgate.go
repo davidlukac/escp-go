@@ -18,9 +18,11 @@ var ErrCannotCheckPorts = errors.New("safety: cannot check what the ports are us
 // at the ports the operation names and, for a write that replaces or removes a group of ports
 // (a LAG, a port-based VLAN, an 802.1Q VLAN), at the group's current members too, because
 // taking the uplink out of VLAN 1 is as dangerous as naming it. A LAG's own idle members are
-// tolerated when the LAG itself is edited; a link never is. Operations that touch no port
-// pass without a read, and that includes writes that can cut the management path without
-// naming a port (a new address or DHCP, the VLAN mode, loop prevention): the gate answers
+// tolerated when the LAG itself is edited; a link never is. A write that changes every port
+// (Operation.AllPorts: the VLAN mode) touches all of them, so it passes only on a switch with no
+// link and no LAG at all. Operations that touch no port pass without a read, and that includes
+// writes that can cut the management path without naming a port (a new address or DHCP,
+// loop prevention): the gate answers
 // "is this port free?", MaxImpact answers "what kind of change is this?", and a front end
 // that offers those writes needs a confirmation of its own for them.
 //
@@ -31,7 +33,7 @@ var ErrCannotCheckPorts = errors.New("safety: cannot check what the ports are us
 func PortGate() model.WriteGate {
 	return func(ctx context.Context, sw model.Reader, op model.Operation) error {
 		touched := op.Ports
-		if op.Replaces.IsZero() && touched.IsEmpty() {
+		if op.Replaces.IsZero() && touched.IsEmpty() && !op.AllPorts {
 			return nil
 		}
 		members, err := membersOf(ctx, sw, op.Replaces)
@@ -39,12 +41,17 @@ func PortGate() model.WriteGate {
 			return fmt.Errorf("%w: %w", ErrCannotCheckPorts, err)
 		}
 		touched = touched.Union(members)
-		if touched.IsEmpty() {
+		if touched.IsEmpty() && !op.AllPorts {
 			return nil
 		}
 		all, err := sw.Ports(ctx)
 		if err != nil {
 			return fmt.Errorf("%w: %w", ErrCannotCheckPorts, err)
+		}
+		if op.AllPorts { // a write that changes every port touches every port the switch has
+			for _, p := range all {
+				touched = touched.Union(p.ID.AsSet())
+			}
 		}
 		return CheckPorts(all, PortRule{TolerateLAG: op.Replaces.LAG}, touched)
 	}

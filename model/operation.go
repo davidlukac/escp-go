@@ -111,4 +111,8 @@ type Operation struct {
 	// Replaces is the group the write replaces or removes, when it does: its current members lose
 	// their membership unless the write names them again.
 	Replaces Group
+	// AllPorts is set by a write that changes how every port of the switch behaves, whichever
+	// ports it names: a change of the VLAN mode. A gate that protects ports treats such a write
+	// as touching all of them (safety.PortGate does).
+	AllPorts bool
 }

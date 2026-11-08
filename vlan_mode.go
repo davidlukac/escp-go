@@ -26,7 +26,7 @@ func (c *Client) VLANMode(ctx context.Context) (model.VLANModeSetting, error) {
 
 // SetVLANMode makes the given VLAN mode the active one; the switch turns the other two off and
 // discards their settings, which can cut every connection, including the management path.
-// Callers must guard. With the MTU VLAN every port can only talk to the uplink port. Writing
+// Callers must guard: the gate is told the write touches every port (Operation.AllPorts). With the MTU VLAN every port can only talk to the uplink port. Writing
 // the mode the switch already has is harmless but not skipped: compare with VLANMode first.
 func (c *Client) SetVLANMode(ctx context.Context, s model.VLANModeSetting) error {
 	if err := s.Validate(); err != nil {
@@ -45,6 +45,7 @@ func (c *Client) SetVLANMode(ctx context.Context, s model.VLANModeSetting) error
 		tlv = wire.TLV{Type: wire.TLVVLAN8021Q, Value: []byte{boolByte(true)}}
 	}
 	op := model.MethodSetVLANMode.Operation()
+	op.AllPorts = true // the new mode applies to every port, and the switch discards the old mode's settings
 	if s.Mode == model.VLANModeMTU {
 		op.Ports = s.UplinkPort.AsSet()
 	}

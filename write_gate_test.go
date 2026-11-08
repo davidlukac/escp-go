@@ -239,7 +239,7 @@ var writeOperations = map[Method]Operation{
 	MethodSetLAG:            {Name: MethodSetLAG, Ports: MustPortSet(2, 3), Replaces: Group{LAG: 1}},
 	MethodSetLoopPrevention: {Name: MethodSetLoopPrevention},
 	MethodSetPVIDs:          {Name: MethodSetPVIDs, Ports: MustPortSet(2)},
-	MethodSetVLANMode:       {Name: MethodSetVLANMode, Ports: MustPortSet(8)},
+	MethodSetVLANMode:       {Name: MethodSetVLANMode, Ports: MustPortSet(8), AllPorts: true},
 	MethodSetIPConfig:       {Name: MethodSetIPConfig},
 	MethodEnableDHCP:        {Name: MethodEnableDHCP},
 }
