@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/davidlukac/escp-go/escptest"
+	"github.com/davidlukac/escp-go/model"
 )
 
 // claimed dials a client that claims its switch, as a program's clients do.
@@ -189,13 +190,17 @@ func TestConcurrentDialsOfOneSwitchLetExactlyOneIn(t *testing.T) {
 
 // A switch that moves keeps its client's claim, now at the new address.
 func TestAMovedSwitchIsClaimedAtItsNewAddress(t *testing.T) {
-	c, err := claimed(Config{Host: "127.0.0.1", SwitchPort: escptest.FreeUDPPort(t)})
+	// with a MAC, so that the client's own MAC key is among the keys it renews: a client is not
+	// refused for a key it holds itself
+	c, err := claimed(Config{Host: "127.0.0.1", MAC: model.MAC{9, 9, 9, 9, 9, 3}, SwitchPort: escptest.FreeUDPPort(t)})
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { c.Close() })
 	c.dest.IP = []byte{127, 0, 0, 2}
-	c.reclaim()
+	if err := c.reclaim(); err != nil {
+		t.Fatalf("a free address is claimed without a word: %v", err)
+	}
 	other, err := claimed(Config{Host: "127.0.0.2", SwitchPort: c.dest.Port})
 	if !errors.Is(err, ErrSwitchInUse) {
 		if err == nil {
@@ -210,7 +215,8 @@ func TestAMovedSwitchIsClaimedAtItsNewAddress(t *testing.T) {
 	old.Close()
 }
 
-// Another client holding the address a switch moves to is logged, not stolen from.
+// Another client holding the address a switch moves to is not stolen from: the moved client is
+// refused with ErrSwitchInUse, and stays refused while the other holds it.
 func TestAMoveOntoAClaimedAddressIsNotStolen(t *testing.T) {
 	port := escptest.FreeUDPPort(t)
 	holder, err := claimed(Config{Host: "127.0.0.2", SwitchPort: port})
@@ -224,9 +230,66 @@ func TestAMoveOntoAClaimedAddressIsNotStolen(t *testing.T) {
 	}
 	t.Cleanup(func() { c.Close() })
 	c.dest.IP = []byte{127, 0, 0, 2}
-	c.reclaim()
+	if err := c.reclaim(); !errors.Is(err, ErrSwitchInUse) {
+		t.Fatalf("got %v, want ErrSwitchInUse for a move onto a claimed address", err)
+	}
 	if _, err := claimed(Config{Host: "127.0.0.1", SwitchPort: port}); !errors.Is(err, ErrSwitchInUse) {
 		t.Fatalf("the moved client keeps the keys it had: %v", err)
+	}
+	if err := c.reclaim(); !errors.Is(err, ErrSwitchInUse) {
+		t.Fatalf("the refusal stands until the other client lets go: %v", err)
+	}
+	holder.Close()
+	if err := c.reclaim(); err != nil {
+		t.Fatalf("with the address free the moved client gets its claim: %v", err)
+	}
+}
+
+// A client that names its switch by address and one that names it by MAC are two clients of one
+// switch, whichever speaks to it first: the MAC the switch reports on the first contact is claimed,
+// and the client that comes second is refused instead of breaking the first one's session.
+func TestAClientByAddressAndAClientByMACOfOneSwitchAreRefused(t *testing.T) {
+	cfgAddr := func(f *escptest.Switch) Config {
+		return Config{Host: "127.0.0.1", Username: "admin", Password: "secret", SwitchPort: f.UDPPort(), BroadcastAddr: escptest.Loopback(), Timeout: 5 * time.Second, Retries: NoRetries}
+	}
+	for _, tt := range []struct {
+		name     string
+		macFirst bool // the client by MAC is made (claims the MAC) before the other speaks
+	}{
+		{"the client by MAC is made first", true},
+		{"the client by MAC is made after the first contact of the other", false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			f := escptest.Start(t)
+			mac := model.MAC{0, 0, 0x5e, 0, 0x53, 0x42}
+			f.SetMAC(mac)
+			byAddr, err := claimed(cfgAddr(f))
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { byAddr.Close() })
+			var byMAC *Client
+			if tt.macFirst {
+				cfg := cfgAddr(f)
+				cfg.Host, cfg.MAC = "", mac
+				if byMAC, err = claimed(cfg); err != nil {
+					t.Fatal(err)
+				}
+				t.Cleanup(func() { byMAC.Close() })
+				if _, err := byAddr.Info(context.Background()); !errors.Is(err, ErrSwitchInUse) {
+					t.Fatalf("the first contact of the client by address: got %v, want ErrSwitchInUse", err)
+				}
+				return
+			}
+			if _, err := byAddr.Info(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+			cfg := cfgAddr(f)
+			cfg.Host, cfg.MAC = "", mac
+			if _, err := claimed(cfg); !errors.Is(err, ErrSwitchInUse) {
+				t.Fatalf("a client by MAC for a switch the other client has spoken to: got %v, want ErrSwitchInUse", err)
+			}
+		})
 	}
 }
 
@@ -253,4 +316,28 @@ func TestDialClaimsItsSwitchByDefaultInAProgram(t *testing.T) {
 		t.Fatalf("after Close the switch is free: %v", err)
 	}
 	second.Close()
+}
+
+// A switch that SetIPConfig moves onto an address another client holds: the write has happened,
+// the call says whose address it is instead of waiting for a switch that is not there.
+func TestSetIPConfigOntoAClaimedAddressSaysSo(t *testing.T) {
+	f := escptest.Start(t)
+	cfg := Config{Host: "127.0.0.1", Username: "admin", Password: "secret", SwitchPort: f.UDPPort(), BroadcastAddr: escptest.Loopback(), Timeout: 5 * time.Second, Retries: NoRetries}
+	holder, err := claimed(Config{Host: "127.0.0.2", SwitchPort: f.UDPPort()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { holder.Close() })
+	c, err := claimed(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { c.Close() })
+	err = c.SetIPConfig(context.Background(), cfgOf("127.0.0.2", "255.255.255.0", "127.0.0.254"))
+	if !errors.Is(err, ErrSwitchInUse) || !strings.Contains(err.Error(), "127.0.0.2") {
+		t.Fatalf("got %v, want ErrSwitchInUse naming the new address", err)
+	}
+	if n := f.WriteCount(); n != 1 {
+		t.Fatalf("the write was sent once, got %d", n)
+	}
 }

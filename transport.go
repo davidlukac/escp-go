@@ -245,6 +245,9 @@ func (c *Client) exchange(ctx context.Context, op byte, tlvs []wire.TLV, static 
 		rep, err := c.recv(ctx, c.attemptDeadline(ctx))
 		if err == nil {
 			c.log.DebugContext(ctx, "reply received", "op", wire.OpName(rep.op), "seq", c.seq, "error_code", int(rep.err), "tlvs", tlvTypes(rep.tlvs), "bytes", tlvBytes(rep.tlvs))
+			if err := c.reclaim(); err != nil { // the first contact names the switch by its MAC
+				return reply{}, err
+			}
 			return rep, nil
 		}
 		if !errors.Is(err, errSilent) {

@@ -6,6 +6,8 @@ import (
 	"runtime"
 	"strconv"
 	"sync"
+
+	"github.com/davidlukac/escp-go/model"
 )
 
 // A switch keeps one session and replies to one fixed UDP port, so two clients of one switch fail
@@ -32,12 +34,13 @@ type claim struct {
 	keys []string // guarded by registry.mu
 }
 
-// claimKeys names the switch by what identifies it: the MAC when configured, the address and port
-// when known (a client that finds its switch by MAC has no address before its first request).
-func claimKeys(cfg Config, dest *net.UDPAddr) []string {
+// claimKeys names the switch by what identifies it: its MAC when known (configured, or reported
+// on the first contact), the address and port when known (a client that finds its switch by MAC has
+// no address before its first request).
+func claimKeys(mac model.MAC, dest *net.UDPAddr) []string {
 	var keys []string
-	if !cfg.MAC.IsZero() {
-		keys = append(keys, "mac "+cfg.MAC.String())
+	if !mac.IsZero() {
+		keys = append(keys, "mac "+mac.String())
 	}
 	if dest != nil && dest.IP != nil {
 		keys = append(keys, "addr "+net.JoinHostPort(dest.IP.String(), strconv.Itoa(dest.Port)))
@@ -92,16 +95,17 @@ func (c *Client) claimSwitch() error {
 		c.claim = &claim{}
 		runtime.AddCleanup(c, (*claim).release, c.claim)
 	}
-	return c.claim.acquire(claimKeys(c.cfg, c.dest))
+	return c.claim.acquire(claimKeys(c.ident.mac(), c.dest))
 }
 
-// reclaim follows the switch to its new address; a claim another client took meanwhile is not
-// stolen, and is logged: the move itself has happened.
-func (c *Client) reclaim() {
+// reclaim brings the client's claim up to date with what it has learned: the MAC the switch
+// reported on the first contact, or the address the switch moved to. A claim another client holds
+// is not stolen: the client gets ErrSwitchInUse (the first contact, or the move, has happened, but
+// two clients of one switch fail each other, so it does not go on), and so does every later call
+// until the other client lets go. Callers hold c.mu.
+func (c *Client) reclaim() error {
 	if c.shared || c.claim == nil || !c.claim.held() {
-		return
+		return nil
 	}
-	if err := c.claim.acquire(claimKeys(c.cfg, c.dest)); err != nil {
-		c.log.Warn("the switch's new address is claimed by another client", "error", err.Error())
-	}
+	return c.claim.acquire(claimKeys(c.ident.mac(), c.dest))
 }

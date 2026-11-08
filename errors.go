@@ -34,7 +34,9 @@ var (
 	// ErrSwitchInUse means another Client of this process already talks to that switch (it is
 	// named by its MAC address or by its address and port). The switch keeps one session, so two
 	// clients of it fail each other; close the first one, or share it. Returned by Dial, and by the
-	// first contact of a client whose switch another client holds (see Client.Close).
+	// call that finds out later: the first contact of a client made with an address only (the MAC the
+	// switch reports is what the other client holds), or a move of the switch onto an address another
+	// client holds. A client that got it keeps getting it until the other client is closed.
 	ErrSwitchInUse = errors.New("escp: another client of this process already talks to that switch")
 	// ErrClosed means the Client was closed: Close ends a client for good, and every later call
 	// returns this error without sending anything. Make a new client with Dial.
