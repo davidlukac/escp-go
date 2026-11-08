@@ -81,7 +81,9 @@ type Config struct {
 	SwitchPort int
 	HostPort   int
 	// BroadcastAddr is where discovery probes go besides the switch's own address;
-	// default 255.255.255.255.
+	// default 255.255.255.255. The lookup of a client that finds its switch by MAC probes the
+	// interfaces of this host, unless BroadcastAddr is another address: then it probes that one
+	// only, on SwitchPort and HostPort.
 	BroadcastAddr netip.Addr
 
 	// WriteGate, when set, is consulted before every write; see WriteGate.
