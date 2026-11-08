@@ -14,7 +14,7 @@ Test errors with `errors.Is` and `errors.As`, never by message.
 | `ErrReplyTooLarge` | a fragmented reply bigger than any switch sends |
 | `ErrWrongSwitch`, `*WrongSwitchError` | the device that answered is not the switch the client talks to (`Config.MAC`, or the MAC the switch reported on the first contact), or it answered without any MAC address; nothing was written to it |
 | `ErrSwitchInUse` | another client of this process already talks to that switch (`Dial`, or the first call of a client made with an address when the other client names the switch by its MAC, or a move onto an address the other holds); close the first one or share it |
-| `ErrClosed` | the client was closed (`Close` ends a client for good); make a new one with `Dial` |
+| `ErrClosed` | the client was closed (`Close` ends a client for good, and the call in flight with it), or was not made by `Dial` (the zero `Client`); make a new one with `Dial` |
 | `ErrNotFound` | no switch with that MAC answered a discovery probe |
 | `*safety.FirmwareError`, `*safety.PortUseError`, `*safety.ImpactError` | a gate refused; nothing was sent |
 | `safety.ErrDryRun` | the dry-run gate recorded the write and sent nothing |

@@ -18,14 +18,50 @@ import (
 // The calls that must run to the end whatever their context says (settling the outcome of a write
 // that may have been applied) take c.mu directly.
 func (c *Client) lock(ctx context.Context) error {
+	if c.stop == nil { // the zero Client: not made by Dial, closed
+		return ErrClosed
+	}
 	if err := acquire(ctx, &c.mu); err != nil {
 		return err
 	}
-	if c.closed {
+	if c.closed || c.closing() {
 		c.mu.Unlock()
 		return ErrClosed
 	}
 	return nil
+}
+
+// closing reports whether Close has begun, which is before it holds the lock.
+func (c *Client) closing() bool {
+	select {
+	case <-c.stop:
+		return true
+	default:
+		return false
+	}
+}
+
+// withStop returns ctx ended also when Close begins, and the function that releases it. An exchange
+// uses the result for everything it waits on, so that Close does not wait for a silent switch.
+func (c *Client) withStop(ctx context.Context) (context.Context, context.CancelFunc) {
+	ctx, cancel := context.WithCancelCause(ctx)
+	go func() {
+		select {
+		case <-c.stop:
+			cancel(ErrClosed)
+		case <-ctx.Done():
+		}
+	}()
+	return ctx, func() { cancel(context.Canceled) }
+}
+
+// closedBy turns the cancellation that withStop caused into ErrClosed, and leaves any other error
+// as it is.
+func closedBy(ctx context.Context, err error) error {
+	if err != nil && errors.Is(context.Cause(ctx), ErrClosed) {
+		return ErrClosed
+	}
+	return err
 }
 
 // acquire takes mu unless ctx ends first. It returns ctx's error with nothing held, or nil with mu
@@ -59,6 +95,9 @@ func acquire(ctx context.Context, mu *sync.Mutex) error {
 // error with nothing held, or the function that ends the call; it is taken before c.mu, never
 // while holding it.
 func (c *Client) beginModify(ctx context.Context) (end func(), err error) {
+	if c.stop == nil {
+		return nil, ErrClosed
+	}
 	if err := acquire(ctx, &c.modify); err != nil {
 		return nil, err
 	}
