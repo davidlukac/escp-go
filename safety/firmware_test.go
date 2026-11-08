@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/davidlukac/escp-go/model"
 )
@@ -213,5 +214,47 @@ func TestTheZeroFirmwareReasonIsNoneOfTheReasons(t *testing.T) {
 				t.Errorf("reason %d is the zero value", r)
 			}
 		})
+	}
+}
+
+// blockedSource is a switch whose Info never returns until its context ends: a silent switch.
+type blockedSource struct {
+	model.Reader
+	mac     model.MAC
+	reading chan struct{} // closed when Info has started
+}
+
+func (s *blockedSource) Info(ctx context.Context) (model.Info, error) {
+	close(s.reading)
+	<-ctx.Done()
+	return model.Info{}, ctx.Err()
+}
+
+func (s *blockedSource) SwitchMAC() model.MAC { return s.mac }
+
+// A gate shared by the clients of several switches must not let one silent switch hold up the
+// writes to the others: the firmware read of the first runs without the gate's lock.
+func TestAFirmwareGateSharedByTwoSwitchesIsNotHeldUpBySilenceOfOne(t *testing.T) {
+	gate := FirmwareGate()
+	silent := &blockedSource{mac: model.MAC{0, 0, 0x5e, 0, 0x53, 1}, reading: make(chan struct{})}
+	ctx, stop := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- gate(ctx, silent, model.Operation{}) }()
+	<-silent.reading // the first switch is being read, and never answers
+	healthy := &infoSource{firmware: "1.0.0 Build 20230218 Rel.50633", mac: model.MAC{0, 0, 0x5e, 0, 0x53, 2}}
+	answered := make(chan error, 1)
+	go func() { answered <- gate(context.Background(), healthy, model.Operation{}) }()
+	select {
+	case err := <-answered:
+		if err != nil {
+			t.Fatalf("the healthy switch was refused: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("a write to a healthy switch waits for the silent one")
+	}
+	stop()
+	var fe *FirmwareError
+	if err := <-done; !errors.As(err, &fe) || fe.Reason != FirmwareUnreadable {
+		t.Fatalf("the silent switch: got %v, want an unreadable-firmware refusal", err)
 	}
 }

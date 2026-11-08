@@ -89,10 +89,12 @@ type firmwareGate struct {
 	verified map[model.MAC]bool // the switches whose build was found verified
 }
 
+// check never holds g.mu across the read of the firmware: a switch that is slow or silent would
+// otherwise stall the writes to every other switch that shares the gate, and the wait would ignore
+// the caller's context. Two first writes to one switch at the same time may both read it; a client
+// serializes its calls, so for one client that does not happen.
 func (g *firmwareGate) check(ctx context.Context, sw model.Reader, _ model.Operation) error {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	if mac := sw.SwitchMAC(); !mac.IsZero() && g.verified[mac] {
+	if g.isVerified(sw.SwitchMAC()) {
 		return nil
 	}
 	info, err := sw.Info(ctx)
@@ -104,8 +106,21 @@ func (g *firmwareGate) check(ctx context.Context, sw model.Reader, _ model.Opera
 	}
 	// Info is the first contact of a client that had none, so the MAC is known now. A reader that
 	// still reports none (a double) is checked again at every write rather than remembered.
-	if mac := sw.SwitchMAC(); !mac.IsZero() {
-		g.verified[mac] = true
-	}
+	g.remember(sw.SwitchMAC())
 	return nil
+}
+
+func (g *firmwareGate) isVerified(mac model.MAC) bool {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return !mac.IsZero() && g.verified[mac]
+}
+
+func (g *firmwareGate) remember(mac model.MAC) {
+	if mac.IsZero() {
+		return
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.verified[mac] = true
 }
