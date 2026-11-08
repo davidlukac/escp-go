@@ -158,6 +158,13 @@ func TestIPConfigValidatePrefixBounds(t *testing.T) {
 		{"/30", IPConfig{IP: netip.MustParseAddr("10.1.2.1"), Netmask: netip.MustParseAddr("255.255.255.252"), Gateway: netip.MustParseAddr("10.1.2.2")}, false},
 		{"/31 is too narrow", IPConfig{IP: netip.MustParseAddr("10.1.2.1"), Netmask: netip.MustParseAddr("255.255.255.254"), Gateway: netip.MustParseAddr("10.1.2.0")}, true},
 		{"a mask that is not a prefix", cfg("255.0.255.0"), true},
+		{"an address in 0.0.0.0/8", IPConfig{IP: netip.MustParseAddr("0.1.2.3"), Netmask: netip.MustParseAddr("255.255.255.0"), Gateway: netip.MustParseAddr("0.1.2.4")}, true},
+		{"an address in the reserved 240.0.0.0/4", IPConfig{IP: netip.MustParseAddr("240.1.2.3"), Netmask: netip.MustParseAddr("255.255.255.0"), Gateway: netip.MustParseAddr("240.1.2.4")}, true},
+		{"an address of the limited broadcast's block", IPConfig{IP: netip.MustParseAddr("255.255.255.7"), Netmask: netip.MustParseAddr("255.255.255.0"), Gateway: netip.MustParseAddr("255.255.255.8")}, true},
+		{"a link-local address", IPConfig{IP: netip.MustParseAddr("169.254.1.2"), Netmask: netip.MustParseAddr("255.255.0.0"), Gateway: netip.MustParseAddr("169.254.1.3")}, true},
+		{"the first address below the reserved block", IPConfig{IP: netip.MustParseAddr("239.255.0.9"), Netmask: netip.MustParseAddr("255.255.255.0"), Gateway: netip.MustParseAddr("239.255.0.8")}, true}, // multicast, refused as before
+		{"an address just below 240.0.0.0 that is a host", IPConfig{IP: netip.MustParseAddr("223.255.255.9"), Netmask: netip.MustParseAddr("255.255.255.0"), Gateway: netip.MustParseAddr("223.255.255.1")}, false},
+		{"an address of 1.0.0.0/8, just above the reserved first block", IPConfig{IP: netip.MustParseAddr("1.2.3.4"), Netmask: netip.MustParseAddr("255.255.255.0"), Gateway: netip.MustParseAddr("1.2.3.1")}, false},
 		{"an address that is not IPv4", IPConfig{IP: netip.MustParseAddr("2001:db8::1"), Netmask: netip.MustParseAddr("255.255.255.0"), Gateway: netip.MustParseAddr("10.1.2.4")}, true},
 	})
 }

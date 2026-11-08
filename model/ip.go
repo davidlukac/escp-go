@@ -61,9 +61,15 @@ func validateIPConfig(cfg IPConfig, allowLoopback bool) error {
 }
 
 // isUsableHost reports whether ip can be a switch's own address in subnet: a host address (neither the
-// network nor the broadcast address), not unspecified, not multicast, and not loopback unless allowed.
+// network nor the broadcast address), not unspecified, not multicast, not reserved (0.0.0.0/8 "this
+// network", 240.0.0.0/4 reserved, which holds the limited broadcast) and not link-local (169.254.0.0/16),
+// and not loopback unless allowed. A switch moved to such an address cannot be reached by any host
+// that follows the usual rules, and nothing but a reset brings it back.
 func isUsableHost(ip net.IP, subnet net.IPNet, allowLoopback bool) bool {
-	if ip.IsUnspecified() || ip.IsMulticast() || (ip.IsLoopback() && !allowLoopback) {
+	if ip.IsUnspecified() || ip.IsMulticast() || ip.IsLinkLocalUnicast() || (ip.IsLoopback() && !allowLoopback) {
+		return false
+	}
+	if v4 := ip.To4(); v4 != nil && (v4[0] == 0 || v4[0] >= 240) {
 		return false
 	}
 	return isHostAddress(ip, subnet)
