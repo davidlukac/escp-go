@@ -61,9 +61,9 @@ func (c *Client) DeleteDot1QVLAN(ctx context.Context, id model.VLANID) error {
 	return c.setTLVs(ctx, model.MethodDeleteDot1QVLAN.Operation().Replacing(model.Group{Dot1QVLAN: id}), wire.TLV{Type: wire.TLVVLAN8021QVLAN, Value: vlanEntryBytes(id, empty, empty, "")})
 }
 
-// SetPVIDs sets the default VLAN of the given ports, the same PortPVID entries Dot1Q reads: one TLV
+// SetPVIDs sets the default VLAN of the given ports, the same model.PortPVID entries Dot1Q reads: one TLV
 // 8706 per port, in port order, with the port (1 byte) and the pvid (2 bytes). A port may appear
-// once. The first entry that is not valid (PortPVID.Validate) or repeats a port is reported, in the
+// once. The first entry that is not valid (model.PortPVID.Validate) or repeats a port is reported, in the
 // order given, and nothing is sent. The VLAN must exist and the 802.1Q mode must be on; callers must
 // guard linked ports.
 func (c *Client) SetPVIDs(ctx context.Context, pvids []model.PortPVID) error {

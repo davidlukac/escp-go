@@ -4,7 +4,9 @@ The library writes nowhere on its own. Pass a `*slog.Logger` in `Config.Logger` 
 
 ```go
 logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
-client, err := escp.Dial(escp.Config{ /* ... */ Logger: logger.With("request_id", id)})
+client, err := escp.Dial(escp.Config{ /* ... */ Host: host, Logger: logger.With("request_id", id)})
+if err != nil { /* ... */ }
+defer client.Close()
 ```
 
 `log/slog` is the standard library's structured logger and needs no dependency. A program on zap, zerolog or logr keeps its own pipeline through the `slog.Handler` bridges those projects provide (`zapslog`, `logr.FromSlogHandler` and their kin).
@@ -15,15 +17,15 @@ Every line carries `component=escp`, which identifies the library the way a logg
 
 ## Context fields
 
-What you attach with `Logger.With` (a request id, a tenant) comes along on every line. Every message is logged with the context of the call (slog's `...Context` methods), so a handler can add what lives in the context, such as a trace id: the mapped diagnostic context of other logging frameworks. The library puts nothing into the context and defines no context keys.
+What you attach with `Logger.With` (a request id, a tenant) comes along on every line. Messages are logged with the context of the call (slog's `...Context` methods), so a handler can add what lives in the context, such as a trace id: the mapped diagnostic context of other logging frameworks. The one exception is the warning that a client following its switch to a new address found that address claimed by another client, which is logged without a context. The library puts nothing into the context and defines no context keys.
 
 ## Levels
 
 The levels are slog's four.
 
-- **Debug** is the protocol: each request and reply with the operation, sequence number, TLV types and sizes, and each fragment.
+- **Debug** is the protocol: each request and reply with the operation, sequence number, TLV types and sizes, each fragment, and a write the gate refused (with `operation` and `impact`).
 - **Info** is the lifecycle: a session established, the switch located by MAC and where, a write with its operation and impact, a lease obtained.
-- **Warn** is a recoverable anomaly: no reply and a retry, a session reopened, a final fragment missing, a download repeated.
+- **Warn** is a recoverable anomaly: no reply and a retry, a session reopened, a final fragment missing, a download repeated, the address a switch moved to being claimed by another client.
 - **Error** is not used: failures are returned, not logged.
 
 ## Attributes
@@ -43,12 +45,12 @@ The levels are slog's four.
 | `operation`, `impact`, `ports` | the write as a gate sees it: the method, its impact class, the ports it names | writes |
 | `lookup_by_mac` | whether the client will look the switch up by its MAC (a bool) | a session reopened |
 | `ip` | the address found for the switch, or the lease it was given | lookups, DHCP |
-| `want`, `poll`, `error` | the address awaited after a move, the pause between probes, the error of the write that got no reply | `SetIPConfig`, `EnableDHCP` |
+| `want`, `poll`, `error` | the address awaited after a move, the pause between probes, the error of the write that got no reply, or of the refused claim on the new address | `SetIPConfig`, `EnableDHCP` |
 | `interfaces`, `probes`, `window`, `switches` | how many interfaces and probes a discovery used, how long it listens, how many switches answered | `Discover`, `Locate` |
 
 ## Contract
 
-- **Attribute names are the contract**: lower case, snake_case, one meaning each (the table below lists every one; a test fails when the code logs one that is not listed). New names may be added in any release (a setting the hardware of a later model has, such as PoE, brings its own); an existing name is not renamed, repurposed or removed before a major version, and a level change of an existing message counts as a change. Message texts may change.
+- **Attribute names are the contract**: lower case, snake_case, one meaning each (the table above lists every one; a test fails when the code logs one that is not listed). New names may be added in any release (a setting the hardware of a later model has, such as PoE, brings its own); an existing name is not renamed, repurposed or removed before a major version, and a level change of an existing message counts as a change. Message texts may change.
 - **No secrets.** TLV *values* are never logged, only their types and sizes, so no message carries the password, the user name or the session key. `Config` is never logged as a whole. MAC and IP addresses are logged: they identify the switch for the person who owns the log.
 - **No printing.** No `fmt.Print*` or `log.*` in library code; a lint rule enforces it.
 

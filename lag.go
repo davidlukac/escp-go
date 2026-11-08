@@ -78,7 +78,7 @@ func (c *Client) LAGs(ctx context.Context) ([]model.LAG, error) {
 
 // SetLAG creates or replaces a link aggregation group: TLV 4608 with the group
 // id and the member port mask. An empty port set removes the group. Group
-// and ports are checked against LAG.Validate first. The switch itself refuses
+// and ports are checked against model.LAG.Validate first. The switch itself refuses
 // ports that conflict with mirroring, a port-based VLAN, a bandwidth limit or
 // storm control, and member ports that differ in speed, negotiation, flow control,
 // enabled state or (in port-based QoS mode) QoS priority, or that are half duplex;

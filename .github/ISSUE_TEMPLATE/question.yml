@@ -1,0 +1,16 @@
+name: Question
+description: How to use the library, or how a call behaves
+labels: [question]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: What do you want to know?
+      description: What you tried, and what you expected. Redact hosts, credentials and MAC addresses.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Library version and Go version
+      placeholder: escp-go v0.8.0, go1.26.2

@@ -63,7 +63,7 @@ fuzz:
 # Mutation testing (gremlins, pinned in devtools/go.mod): every covered conditional, boundary and arithmetic
 # operator of the code is flipped one at a time and the tests of its package must fail. A mutant that
 # survives is a behavior no test pins. `make mutation` runs them all (about 15 minutes with 8 workers;
-# EFFICACY=90 fails below that share of caught mutants, WORKERS=n sets the parallelism);
+# EFFICACY=90 fails below that share of caught mutants, WORKERS=n sets the parallelism, default 4);
 # `make mutation-diff` only the lines changed since BASE (default origin/main), which is what a pull
 # request runs. The report is build/mutation.json. Left out: the fake switch (escptest, judged by the
 # tests of the code that uses it) and the programs (the coverage tool, the report tool, the release, fuzz and documentation tools, the example, and the
@@ -99,8 +99,8 @@ pkgdoc-serve:
 compat-table:
 	go test ./safety -run TestReadmeCompatibilityTable -update-readme
 
-# Rewrites the settings table of the README and the class lists of docs/writing-safely.md from escp.Settings
-# (settings.go); a test fails when they are stale.
+# Rewrites the settings table of the README and the class lists of docs/writing-safely.md from model.Settings
+# (model/settings.go); a test fails when they are stale.
 settings-docs:
 	go test . -run TestTheGeneratedTablesAreCurrent -update-docs
 

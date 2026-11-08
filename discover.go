@@ -163,10 +163,9 @@ func discoverWith(ctx context.Context, opts DiscoverOptions, env discoverEnv) ([
 }
 
 // Locate finds the switch with the given MAC address: a discovery probe like Discover's that
-// stops at the first reply from that switch, so it normally returns in well under a second (a
-// switch needs 250 to 500 milliseconds to answer). It returns ErrNotFound when nobody with that
-// MAC answers within the window (two seconds unless opts.Window says otherwise). Read-only and
-// not subject to a WriteGate.
+// stops at the first reply from that switch, so it normally returns in well under a second. It returns
+// ErrNotFound when nobody with that MAC answers within the window (two seconds unless opts.Window
+// says otherwise). Read-only and not subject to a WriteGate.
 func Locate(ctx context.Context, mac model.MAC, opts DiscoverOptions) (model.Info, error) {
 	return locateWith(ctx, mac, opts, discoverEnv{interfaces: hostInterfaces, switchPort: defaultSwitchPort, hostPort: defaultHostPort})
 }

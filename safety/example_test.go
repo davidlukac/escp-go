@@ -9,7 +9,7 @@ import (
 	"github.com/davidlukac/escp-go/safety"
 )
 
-// firmware is an escp.Reader that reports a fixed firmware version. A gate is handed the client in
+// firmware is a model.Reader that reports a fixed firmware version. A gate is handed the client in
 // real use; a test hands it a double that implements the reads the gate makes and embeds the
 // interface for the rest (a read the gate was not expected to make panics).
 func firmware(version string) model.Reader { return reportedFirmware{version: version} }

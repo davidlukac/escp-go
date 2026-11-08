@@ -11,8 +11,8 @@ import (
 )
 
 // The fake cannot name the client's types (see the package documentation), so what it takes and
-// returns for a MAC address must stay assignable to escp.MAC without a conversion: a front end
-// writes sw.SetMAC(mac) with an escp.MAC and mac := escptest.DefaultMAC() into one. These
+// returns for a MAC address must stay assignable to model.MAC without a conversion: a front end
+// writes sw.SetMAC(mac) with a model.MAC and mac := escptest.DefaultMAC() into one. These
 // declarations stop compiling if the fake's type ever stops being an unnamed [6]byte.
 var (
 	_ model.MAC = escptest.DefaultMAC()

@@ -22,7 +22,7 @@ const leaseWait = 60 * time.Second
 // advance, so the call needs Config.MAC (otherwise ErrInvalid): the client looks the switch up by it
 // until discovery reports the DHCP flag on with a usable address, then follows it, so later calls on
 // this client go to the leased address. The switch is silent for a moment while it asks for the
-// lease (measured: about two seconds), and it ignores a static address written while it leases
+// lease (measured on firmware 20250710: about two seconds), and it ignores a static address written while it leases
 // one, so SetIPConfig is the way back.
 //
 // The write may be applied without a reply. When it got none and the lookup finds the switch static

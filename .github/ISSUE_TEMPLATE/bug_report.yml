@@ -26,14 +26,14 @@ body:
     id: version
     attributes:
       label: Library version and Go version
-      placeholder: escp-go v0.1.0, go1.27
+      placeholder: escp-go v0.8.0, go1.26.2
     validations:
       required: true
   - type: textarea
     id: code
     attributes:
       label: Minimal code and the log output
-      description: A Debug-level slog output (see "Logging" in the README) shows what the client sent. Redact hosts, credentials and MAC addresses.
+      description: A Debug-level slog output (see [docs/logging.md](https://github.com/davidlukac/escp-go/blob/main/docs/logging.md)) shows what the client sent. Redact hosts, credentials and MAC addresses.
       render: go
   - type: checkboxes
     id: safety

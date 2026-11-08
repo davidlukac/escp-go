@@ -32,7 +32,8 @@ func (c *Client) LED(ctx context.Context) (bool, error) {
 }
 
 // SetLED switches the LEDs on or off. It is cosmetic: it does not touch traffic or
-// configuration, and it is the one write that is safe to try on any switch.
+// configuration, which makes it the least risky write to try first on a switch. A FirmwareGate
+// still refuses it on a build the library was not verified against.
 func (c *Client) SetLED(ctx context.Context, on bool) error {
 	return c.setTLVs(ctx, model.MethodSetLED.Operation(), wire.TLV{Type: wire.TLVLED, Value: []byte{boolByte(on)}})
 }

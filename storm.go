@@ -49,7 +49,7 @@ func (c *Client) StormControl(ctx context.Context) ([]model.PortStorm, error) {
 
 // SetStormControl configures storm control on one port. Following the vendor
 // utility: selecting any traffic type requires a rate (a multiple of 64 kbps,
-// at least 64, at most MaxBandwidth); selecting none disables it and the
+// at least 64, at most model.MaxBandwidth); selecting none disables it and the
 // rate must be 0. A rate on a port that carries traffic drops its excess
 // broadcast/multicast; callers must guard against that. Storm control is refused (ErrInvalid) on a port that has an
 // ingress limit: the switch would remove the limit without saying so.

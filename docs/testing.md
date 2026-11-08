@@ -12,11 +12,15 @@ func TestMyCode(t *testing.T) {
 		BroadcastAddr: escptest.Loopback(),
 		Username: escptest.Username, Password: escptest.Password,
 	})
+	if err != nil { t.Fatal(err) }
+	defer c.Close()
 	// ... use c, then ask the fake what it saw: sw.WriteCount(), sw.AllSets(), sw.LastSet()
 }
 ```
 
 `Config.SwitchPort`, `HostPort` and `BroadcastAddr` exist only for this; a real switch always uses UDP ports 29808 and 29809. The package documentation has runnable examples.
+
+**One fake is one switch, and a switch has one client.** A second `escp.Dial` for the same fake while the first client is open fails with `escp.ErrSwitchInUse`, as it would for a real switch (the library refuses two clients of one switch within a process). Close the first client (the `defer c.Close()` above does it when the test ends) or start a second fake with `escptest.Start` for the second client. A client with `Config.MAC` is claimed by that MAC as well as by the address, so give two fakes that are used at once their own `SetMAC` when their clients set `Config.MAC`.
 
 ## What it does
 
@@ -35,6 +39,7 @@ The naming is one convention: `Enable...` switches a behavior on, `Set...` seeds
 Faults are set inside `Configure`, which holds the switch's lock:
 
 ```go
+// fragment of the test above (sw is its fake switch)
 sw.Configure(func(f *escptest.Faults) {
 	f.RejectSetsFrom = 2 // reject the second authenticated SET and every later one
 })

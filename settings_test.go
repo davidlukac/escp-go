@@ -171,7 +171,7 @@ func TestTheGeneratedTablesAreCurrent(t *testing.T) {
 				}
 				return
 			}
-			t.Errorf("%s is out of date with escp.Settings: run `make settings-docs` and commit the result", g.file)
+			t.Errorf("%s is out of date with model.Settings: run `make settings-docs` and commit the result", g.file)
 		})
 	}
 }

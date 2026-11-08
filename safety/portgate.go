@@ -9,7 +9,7 @@ import (
 )
 
 // ErrCannotCheckPorts is what PortGate returns when it cannot establish what the ports are used
-// for: the reader it was given cannot list them, or reading them failed. The write is refused,
+// for: reading them failed. The write is refused,
 // because a gate that cannot look must not wave a write through.
 var ErrCannotCheckPorts = errors.New("safety: cannot check what the ports are used for")
 

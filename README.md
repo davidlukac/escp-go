@@ -50,7 +50,10 @@ c, err := escp.Dial(escp.Config{
 	Host: host, Username: user, Password: model.Password(pw),
 	WriteGate: safety.Chain(safety.FirmwareGate(), safety.MaxImpact(model.ImpactTraffic), safety.PortGate()),
 })
+if err != nil { /* ... */ }
+defer c.Close()
 err = c.SetBandwidth(ctx, model.PortBandwidth{Port: 3, Ingress: 10240}) // traffic: allowed, if port 3 is free
+if err != nil { /* a gate refused it, or the switch did */ }
 ```
 
 The ceiling `ImpactTraffic` keeps out everything that can cut the management path (the address, VLANs, port settings, link aggregation, mirroring, loop prevention); a front end that does write those allows `ImpactManagement` and relies on `PortGate` and its own confirmation ([Writing safely](docs/writing-safely.md#impact)).
@@ -72,7 +75,8 @@ The examples in the [package documentation](https://pkg.go.dev/github.com/davidl
 
 | Package | Import path | What it is |
 |---|---|---|
-| `escp` | `github.com/davidlukac/escp-go` | the client, the domain types, validators, `Discover` |
+| `escp` | `github.com/davidlukac/escp-go` | the client (`Dial`, `Client`, `Config`), `Discover` and `Locate`, and the errors |
+| `model` | `github.com/davidlukac/escp-go/model` | the values (`PortID`, `PortSet`, `MAC`, `Info`, every reading and setting), their validation and limits, what a write gate is told (`Operation`, `Impact`) and `Settings()` |
 | `safety` | `github.com/davidlukac/escp-go/safety` | write gates (firmware, ports, impact, dry run) and the compatibility table |
 | `escptest` | `github.com/davidlukac/escp-go/escptest` | a fake switch on a loopback UDP port, for tests |
 
@@ -107,7 +111,7 @@ Deliberately **not** offered: user account, config restore, reboot, factory rese
 
 - **Ports are numbers from 1**: a `PortID` for one, a `PortSet` for a set (a comparable value held as the wire bitmap: no duplicates, ascending, `Union`/`Minus`/`Intersect`; `model.NewPortSet(2, 3)` refuses a port outside 1 to `MaxPort`).
 - **Closed sets are types** with a list function and, where the names are text, a `Parse...` function: `Speed` (`ConfigurableSpeeds`, `ParseSpeed`), `QoSMode` (`QoSModes`, `ParseQoSMode`), `VLANMode` (`VLANModes`, `ParseVLANMode`), and `Priority` (1 to 4, as the web UI shows it). Each has `Validate() error`, like every input type. The spellings are the web UI's and the Terraform provider's; consumers keep them in saved state, so they do not change.
-- **Values encode as text and read back.** `MAC`, `PortSet`, `Firmware`, `Speed`, `QoSMode`, `VLANMode` and `Impact` have `MarshalText`/`UnmarshalText` (the names and forms above), so `encoding/json` (and the YAML and TOML libraries) write `"00:00:5e:00:53:01"`, `"2,3,5"` and `"port-based"` and decode them, refusing what is no value; every reading survives a round trip (`TestReadingsSurviveJSON`). `Password` encodes as `[redacted]` on purpose and does not read back; `ConfigFile` encodes as base64.
+- **Values encode as text and read back.** `MAC`, `PortSet`, `Firmware`, `QoSMode`, `Impact` and `Method` have `MarshalText`/`UnmarshalText`, and the string types `Speed` and `VLANMode` encode as their names and have an `UnmarshalText` that refuses a name that is no value, so `encoding/json` (and the YAML and TOML libraries) write `"00:00:5e:00:53:01"`, `"2,3,5"` and `"port-based"` and decode them, refusing what is no value; every reading survives a round trip (`TestReadingsSurviveJSON`). `Password` encodes as `[redacted]` on purpose and does not read back; `ConfigFile` encodes as base64.
 - **Readers return values, not pointers.** Counters in `PortStats` are the switch's 32-bit counters and wrap.
 - **Limits and validators are public** so a front end can refuse a bad value before it reaches the client: every input type has a `Validate` method (<!-- validators:begin (generated from model.Settings: make settings-docs) -->`Config`, `Dot1QVLAN`, `Hostname`, `IPConfig`, `Impact`, `Kbps`, `LAG`, `LAGID`, `Method`, `Mirror`, `PortBandwidth`, `PortConfig`, `PortID`, `PortPVID`, `PortPriority`, `PortVLAN`, `PortVLANID`, `Priority`, `QoSMode`, `Speed`, `StormConfig`, `VLANID`, `VLANMode`, `VLANModeSetting`, `VLANName`<!-- validators:end -->), a writer refuses exactly what the method refuses, and the constants they use are exported (`MaxPort`, `RateStep`, `MaxBandwidth`, `LAGGroupCount`, ...).
 
@@ -136,4 +140,4 @@ This is an independent project. It is not affiliated with, endorsed by or suppor
 
 ## See also
 
-[Documentation index](docs/README.md) · [PROTOCOL.md](PROTOCOL.md) (wire format and measured behavior) · [CONTRIBUTING.md](CONTRIBUTING.md) (how to add or change a setting) · [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) · [RELEASING.md](RELEASING.md) · [SECURITY.md](SECURITY.md)
+[Documentation index](docs/README.md) · [questions and reports](https://github.com/davidlukac/escp-go/issues/new/choose) (open an issue with the form that fits) · [PROTOCOL.md](PROTOCOL.md) (wire format and measured behavior) · [CONTRIBUTING.md](CONTRIBUTING.md) (how to add or change a setting) · [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) · [RELEASING.md](RELEASING.md) · [SECURITY.md](SECURITY.md)

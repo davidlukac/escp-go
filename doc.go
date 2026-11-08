@@ -2,6 +2,12 @@
 // by the TL-SG108E v6 switches. It reads and writes the switch's settings, finds switches on the
 // network and validates every value before anything is sent.
 //
+// This package is the client: Dial, Client, Config, Discover and Locate, and the errors. The values
+// the client reads and writes (PortID, PortSet, MAC, Info, Speed, every reading and setting, and
+// their validation and limits) live in package model
+// (github.com/davidlukac/escp-go/model); the write gates are in package safety and the fake
+// switch for tests in package escptest.
+//
 // The switch is real network equipment with no console: a wrong write can cut the management path
 // or the uplink, and recovery is a physical factory reset. The protocol has no real secrecy either
 // (see Security). Read the guide "Writing safely" before the first write.
@@ -20,7 +26,9 @@
 // Use one Client per switch and share it between goroutines: it sends one request at a time,
 // because the switch answers one at a time. Clients for different switches work side by side. Two
 // Clients for the same switch do not work, because the switch keeps a single session: within one
-// process Dial refuses the second with ErrSwitchInUse until the first is closed.
+// process Dial refuses the second with ErrSwitchInUse until the first is closed (two processes
+// are not detected and still break each other). Close ends a client for good: every later call
+// returns ErrClosed, and a new client is made with Dial.
 //
 // Discover finds the switches on the network without credentials or addresses; Locate finds one
 // by its MAC address. Config.MAC pins a client to a switch, so that a request to an address that
@@ -34,15 +42,17 @@
 // sent), asks the optional Config.WriteGate with the write's Operation and Impact, and only then
 // sends it. The safety package provides gates for firmware builds the client was not verified
 // against, for a ceiling on the impact, for ports in use and for a dry run, and Chain combines
-// them. The client does not know which ports carry traffic and, apart from SetIPConfig and EnableDHCP
-// (which wait for the switch at its new address), does not read back after a write: deciding
-// whether a write is prudent and checking the result are the caller's job. There is no reset; to restore a setting, write the value you recorded.
+// them. The client does not know which ports carry traffic and, apart from SetIPConfig and
+// EnableDHCP (which wait for the switch at its new address), does not read back after a write:
+// deciding whether a write is prudent and checking the result are the caller's job. There is no
+// reset; to restore a setting, write the value you recorded.
 //
 // # Errors
 //
 // Test errors with errors.Is and errors.As, never by message: ErrInvalid (refused before any
 // write), ErrNoReply, ErrRejected and *RejectedError (the switch refused a write), ErrWrongSwitch,
-// ErrNotFound, ErrMoveUnconfirmed, ErrNoInterface, ErrInvalidConfigFile and ErrReplyTooLarge. The
+// ErrNotFound, ErrSwitchInUse (a second client of a switch in this process), ErrClosed (a call on a
+// closed client), ErrMoveUnconfirmed, ErrNoInterface, ErrInvalidConfigFile and ErrReplyTooLarge. The
 // gates of package safety return their own typed errors.
 //
 // # Logging
@@ -62,8 +72,9 @@
 //
 // The module is version 0: until a 1.0 release, exported names, types and error values may change
 // in any minor version, and every change is listed in CHANGELOG.md. Where something outside the
-// code depends on a spelling (the names of Speed and QoSMode values are kept in saved state by
-// the Terraform provider), the doc comment of that name says so.
+// code depends on a spelling (the names of Speed, QoSMode and VLANMode values are kept in saved
+// state by the Terraform provider), the doc comment of that name says so. Gates and test doubles
+// that implement model.Reader should embed it: it may gain methods in a minor version.
 //
 // # Security
 //

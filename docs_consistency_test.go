@@ -6,6 +6,7 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"testing"
@@ -129,6 +130,29 @@ func TestTheArchitectureGuideNamesEveryFileOfTheRootPackage(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			if !strings.Contains(guide, "`"+f+"`") && !strings.Contains(guide, "`"+name+"`") {
 				t.Errorf("docs/architecture.md does not mention %s (as `%s` or `%s`)", f, f, name)
+			}
+		})
+	}
+}
+
+// goFileRef is a Go file named in backticks in a guide: `ports.go`, `model/ports.go`.
+var goFileRef = regexp.MustCompile("`([A-Za-z0-9_./-]+\\.go)`")
+
+// The other direction of the test above: a file the guide names must exist where the guide puts it,
+// so that a file that moved to another package (the model split took a dozen out of the root) cannot
+// stay listed as one of the root. A name without a directory is a file of the root package; one of
+// the model is written `model/name.go`.
+func TestTheArchitectureGuideNamesOnlyFilesThatExist(t *testing.T) {
+	guide := readText(t, filepath.Join("docs", "architecture.md"))
+	refs := goFileRef.FindAllStringSubmatch(guide, -1)
+	if len(refs) < 20 {
+		t.Fatalf("found only %d file names in the guide: the scan is broken", len(refs))
+	}
+	for _, m := range refs {
+		name := m[1]
+		t.Run(name, func(t *testing.T) {
+			if _, err := os.Stat(filepath.FromSlash(name)); err != nil {
+				t.Errorf("docs/architecture.md names %s, which does not exist (a file of the model is written model/name.go)", name)
 			}
 		})
 	}

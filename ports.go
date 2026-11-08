@@ -73,7 +73,7 @@ func (c *Client) Ports(ctx context.Context) ([]model.Port, error) {
 
 // SetPort writes the configuration of one port: admin state, speed and flow
 // control (7-byte TLV 4096 as sent by the vendor utility). Flow control can only be
-// on with speed auto or 1000Mbps-full (see Speed.AllowsFlowControl): any other
+// on with speed auto or 1000Mbps-full (see model.Speed.AllowsFlowControl): any other
 // combination is refused before anything is sent, because the switch would accept
 // it and silently keep flow control off. Changing a port that carries traffic can
 // cut connectivity; callers must guard against that.
