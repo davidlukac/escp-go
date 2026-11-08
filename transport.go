@@ -51,6 +51,11 @@ const maxDatagram = 4096
 // spoofed sender from growing the buffer until the deadline.
 const maxFragmentedReply = 64 << 10
 
+// maxFragmentPackets bounds the number of packets of one fragmented reply, whatever they carry:
+// the configuration file is two, and a packet without the wanted TLV adds no bytes, so the byte
+// cap alone would not end a sender that never stops.
+const maxFragmentPackets = 64
+
 type reply struct {
 	op   byte
 	err  ReplyCode
@@ -278,7 +283,7 @@ func (c *Client) exchangeFragments(ctx context.Context, op byte, tlvs []wire.TLV
 			return nil, err
 		}
 		c.log.DebugContext(ctx, "request sent", "op", wire.OpName(op), "seq", c.seq, "attempt", attempt+1, "tlvs", tlvTypes(tlvs), "bytes", tlvBytes(tlvs))
-		got, err := c.collectFragments(ctx, typ)
+		got, err := c.collectFragments(ctx, typ, c.attemptDeadline(ctx))
 		if err != nil {
 			return nil, err
 		}
@@ -298,15 +303,17 @@ type fragments struct {
 	parts    [][]byte // the values of the wanted TLV, one per packet
 	bytes    int      // their total length
 	complete bool     // a packet without the fragment flag arrived
+	packets  int      // the packets received, whatever they carried
 }
 
 // collectFragments reads the packets of one reply until the last one arrives or the switch goes
-// silent (then the result is incomplete). A refusal by the switch and a reply larger than any real
-// one are errors.
-func (c *Client) collectFragments(ctx context.Context, typ wire.TLVType) (fragments, error) {
+// silent or the deadline of the attempt passes (then the result is incomplete): the deadline is one
+// for the whole reply, not one per packet, so a sender that keeps sending cannot hold the call.
+// A refusal by the switch and a reply larger than any real one (in bytes or in packets) are errors.
+func (c *Client) collectFragments(ctx context.Context, typ wire.TLVType, deadline time.Time) (fragments, error) {
 	var got fragments
 	for {
-		rep, err := c.recv(ctx, c.attemptDeadline(ctx))
+		rep, err := c.recv(ctx, deadline)
 		if errors.Is(err, errSilent) {
 			return got, nil
 		}
@@ -316,12 +323,13 @@ func (c *Client) collectFragments(ctx context.Context, typ wire.TLVType) (fragme
 		if rep.err != 0 {
 			return got, &RejectedError{Code: rep.err}
 		}
+		got.packets++
 		if part, found := rep.joined(typ); found {
 			got.parts = append(got.parts, part)
 			got.bytes += len(part)
 			c.log.DebugContext(ctx, "fragment received", "seq", c.seq, "packet", len(got.parts), "bytes", len(part), "more", rep.fragment != 0)
 		}
-		if got.bytes > maxFragmentedReply {
+		if got.bytes > maxFragmentedReply || got.packets > maxFragmentPackets {
 			return got, ErrReplyTooLarge
 		}
 		if rep.fragment == 0 {

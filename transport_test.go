@@ -438,7 +438,7 @@ func TestAFragmentedReplyOfExactlyTheLimitIsAcceptedAndOneByteMoreIsRefused(t *t
 				conn.left = append(conn.left, wire.RC4Static(pkt))
 			}
 			c.conn = conn
-			got, err := c.collectFragments(context.Background(), typ)
+			got, err := c.collectFragments(context.Background(), typ, c.attemptDeadline(context.Background()))
 			if !errors.Is(err, tc.wantErr) {
 				t.Fatalf("error %v, want %v", err, tc.wantErr)
 			}
@@ -449,5 +449,58 @@ func TestAFragmentedReplyOfExactlyTheLimitIsAcceptedAndOneByteMoreIsRefused(t *t
 				t.Errorf("refused after %d bytes, want %d", got.bytes, tc.wantSize)
 			}
 		})
+	}
+}
+
+// slowFragmentsConn answers every read, after a pause, with one more packet that says more follow.
+type slowFragmentsConn struct {
+	datagramConn
+	from  *net.UDPAddr
+	pkt   []byte
+	pause time.Duration
+}
+
+func (s *slowFragmentsConn) SetReadDeadline(time.Time) error { return nil }
+
+func (s *slowFragmentsConn) ReadFromUDP(b []byte) (int, *net.UDPAddr, error) {
+	time.Sleep(s.pause)
+	return copy(b, s.pkt), s.from, nil
+}
+
+// The deadline of a fragmented reply is one for the whole reply: a sender that keeps sending
+// packets cannot restart it with each one.
+func TestTheDeadlineOfAFragmentedReplyIsOneForTheWholeReply(t *testing.T) {
+	c, err := Dial(Config{Host: "127.0.0.1", SwitchPort: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.seq = 7
+	pkt := wire.Marshal(wire.Header{Op: wire.OpReply, Seq: c.seq, Fragment: 1}, []wire.TLV{{Type: 768, Value: []byte{1}}})
+	c.conn = &slowFragmentsConn{from: &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 1}, pkt: wire.RC4Static(pkt), pause: 20 * time.Millisecond}
+	got, err := c.collectFragments(context.Background(), 768, time.Now().Add(100*time.Millisecond))
+	if err != nil || got.complete {
+		t.Fatalf("complete=%v err=%v, want an incomplete reply and no error when the deadline passes", got.complete, err)
+	}
+	if got.packets >= maxFragmentPackets {
+		t.Fatalf("%d packets were read: the deadline did not end the reply", got.packets)
+	}
+}
+
+// A packet that carries nothing of the wanted TLV adds no bytes, so the packets are counted too.
+func TestAFragmentedReplyOfTooManyPacketsIsRefusedWhateverTheyCarry(t *testing.T) {
+	c, err := Dial(Config{Host: "127.0.0.1", SwitchPort: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.seq = 7
+	conn := &repliesConn{from: &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 1}}
+	for range maxFragmentPackets + 1 {
+		pkt := wire.Marshal(wire.Header{Op: wire.OpReply, Seq: c.seq, Fragment: 1}, nil)
+		conn.left = append(conn.left, wire.RC4Static(pkt))
+	}
+	c.conn = conn
+	got, err := c.collectFragments(context.Background(), 768, c.attemptDeadline(context.Background()))
+	if !errors.Is(err, ErrReplyTooLarge) || got.packets != maxFragmentPackets+1 {
+		t.Fatalf("packets=%d err=%v, want ErrReplyTooLarge at packet %d", got.packets, err, maxFragmentPackets+1)
 	}
 }
