@@ -41,9 +41,10 @@ func (b *BuildDate) UnmarshalText(text []byte) error {
 // part anything matches on, the build date, read out of it once. It is a comparable value: two are
 // equal when the switch reported the same string. The zero value is "no firmware reported".
 type Firmware struct {
-	// Build is the eight-digit build date ("20230218"); empty when the string has no build that
-	// stands alone ("Build 2025071012" is not a build date).
-	Build BuildDate
+	// build is the eight-digit build date ("20230218"); empty when the string has no build that
+	// stands alone ("Build 2025071012" is not a build date). It is not exported so that no caller
+	// can make a Firmware whose build date and string disagree; BuildDate reads it.
+	build BuildDate
 	raw   string
 }
 
@@ -55,7 +56,7 @@ var firmwareBuildPattern = regexp.MustCompile(`Build (\d{8})\b`)
 func ParseFirmware(s string) Firmware {
 	f := Firmware{raw: s}
 	if m := firmwareBuildPattern.FindStringSubmatch(s); m != nil {
-		f.Build = BuildDate(m[1])
+		f.build = BuildDate(m[1])
 	}
 	return f
 }
@@ -76,5 +77,8 @@ func (f *Firmware) UnmarshalText(text []byte) error {
 // IsZero reports whether the switch reported no firmware version.
 func (f Firmware) IsZero() bool { return f.raw == "" }
 
+// BuildDate is the eight-digit build date the string names ("20230218"); empty when it names none.
+func (f Firmware) BuildDate() BuildDate { return f.build }
+
 // HasBuild reports whether the string names a build date.
-func (f Firmware) HasBuild() bool { return f.Build != "" }
+func (f Firmware) HasBuild() bool { return f.build != "" }

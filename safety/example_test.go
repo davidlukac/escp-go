@@ -34,7 +34,7 @@ func ExampleFirmwareGate() {
 	err = safety.FirmwareGate()(context.Background(), firmware("1.0.0 Build 20990101 Rel.1"), model.Operation{})
 	var refused *safety.FirmwareError
 	if errors.As(err, &refused) && refused.Reason == safety.FirmwareUnverified {
-		fmt.Println("refused build", refused.Firmware.Build, "- verified:", refused.Verified)
+		fmt.Println("refused build", refused.Firmware.BuildDate(), "- verified:", refused.Verified)
 	}
 	// Output:
 	// verified build: <nil>

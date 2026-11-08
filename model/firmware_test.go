@@ -26,8 +26,8 @@ func TestParseFirmware(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.version, func(t *testing.T) {
 			got := ParseFirmware(tt.version)
-			if got.Build != tt.want || got.HasBuild() != tt.ok || got.String() != tt.version {
-				t.Errorf("ParseFirmware(%q) = build %q, has %t, string %q; want build %q, has %t, the string as it came", tt.version, got.Build, got.HasBuild(), got.String(), tt.want, tt.ok)
+			if got.BuildDate() != tt.want || got.HasBuild() != tt.ok || got.String() != tt.version {
+				t.Errorf("ParseFirmware(%q) = build %q, has %t, string %q; want build %q, has %t, the string as it came", tt.version, got.BuildDate(), got.HasBuild(), got.String(), tt.want, tt.ok)
 			}
 		})
 	}
