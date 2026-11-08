@@ -33,7 +33,7 @@ func TestCheckFirmware(t *testing.T) {
 		t.Run(tt.version, func(t *testing.T) {
 			err := CheckFirmware(model.ParseFirmware(tt.version))
 			var fe *FirmwareError
-			if !errors.As(err, &fe) || fe.Reason != tt.reason || fe.Firmware.Build != tt.build || fe.Firmware != model.ParseFirmware(tt.version) || !strings.Contains(err.Error(), tt.frag) {
+			if !errors.As(err, &fe) || fe.Reason != tt.reason || fe.Firmware.BuildDate() != tt.build || fe.Firmware != model.ParseFirmware(tt.version) || !strings.Contains(err.Error(), tt.frag) {
 				t.Errorf("CheckFirmware(%q) = %#v, want reason %d build %q containing %q", tt.version, err, tt.reason, tt.build, tt.frag)
 			}
 			if !slices.Equal(fe.Verified, VerifiedFirmwareBuilds()) {
@@ -107,7 +107,7 @@ func TestFirmwareGateRefusesAnUnverifiedBuildAndDoesNotRememberTheRefusal(t *tes
 	sw := &infoSource{firmware: "1.0.0 Build 20990101 Rel.1"}
 	gate := FirmwareGate()
 	var fe *FirmwareError
-	if err := gate(context.Background(), sw, model.Operation{}); !errors.As(err, &fe) || fe.Reason != FirmwareUnverified || fe.Firmware.Build != "20990101" {
+	if err := gate(context.Background(), sw, model.Operation{}); !errors.As(err, &fe) || fe.Reason != FirmwareUnverified || fe.Firmware.BuildDate() != "20990101" {
 		t.Fatalf("got %v", err)
 	}
 	sw.firmware = "1.0.0 Build 20230218 Rel.50633" // the switch now reports a verified build

@@ -52,7 +52,7 @@ func (e *FirmwareError) Error() string {
 	case FirmwareNoBuildDate:
 		return fmt.Sprintf("the firmware version %q has no build date, so it cannot be matched against the verified builds %v", e.Firmware, e.Verified)
 	default:
-		return fmt.Sprintf("firmware build %s has not been verified with this version of the client (verified: %v)", e.Firmware.Build, e.Verified)
+		return fmt.Sprintf("firmware build %s has not been verified with this version of the client (verified: %v)", e.Firmware.BuildDate(), e.Verified)
 	}
 }
 
@@ -65,7 +65,7 @@ func CheckFirmware(fw model.Firmware) error {
 	if !fw.HasBuild() {
 		return &FirmwareError{Reason: FirmwareNoBuildDate, Firmware: fw, Verified: VerifiedFirmwareBuilds()}
 	}
-	if !slices.Contains(verifiedFirmwareBuilds, fw.Build) {
+	if !slices.Contains(verifiedFirmwareBuilds, fw.BuildDate()) {
 		return &FirmwareError{Reason: FirmwareUnverified, Firmware: fw, Verified: VerifiedFirmwareBuilds()}
 	}
 	return nil
