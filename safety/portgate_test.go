@@ -87,6 +87,8 @@ func TestPortGate(t *testing.T) {
 		{"an 802.1Q VLAN that does not exist yet has no old members", model.Operation{Name: model.MethodSetDot1QVLAN, Ports: model.MustPortSet(4), Replaces: model.Group{Dot1QVLAN: 99}}, nil, 2},
 		{"an 802.1Q VLAN without a linked member", model.Operation{Name: model.MethodSetDot1QVLAN, Ports: model.MustPortSet(4), Replaces: model.Group{Dot1QVLAN: 20}}, &PortUseError{Port: 6, Reason: PortLinkUp, Speed: "100Mbps-full"}, 2},
 		{"rewriting VLAN 1 so that it drops the uplink is refused", model.Operation{Name: model.MethodSetDot1QVLAN, Ports: model.MustPortSet(3, 4), Replaces: model.Group{Dot1QVLAN: 1}}, &PortUseError{Port: 1, Reason: PortLinkUp, Speed: "1000Mbps-full", LAG: 1}, 2},
+		{"a write that changes every port is refused for the first linked one", model.Operation{Name: model.MethodSetVLANMode, AllPorts: true}, &PortUseError{Port: 1, Reason: PortLinkUp, Speed: "1000Mbps-full", LAG: 1}, 1},
+		{"a write that changes every port is refused although the port it names is free", model.Operation{Name: model.MethodSetVLANMode, Ports: model.MustPortSet(3), AllPorts: true}, &PortUseError{Port: 1, Reason: PortLinkUp, Speed: "1000Mbps-full", LAG: 1}, 1},
 		{"deleting VLAN 1 names no port and is still refused", model.Operation{Name: model.MethodDeleteDot1QVLAN, Replaces: model.Group{Dot1QVLAN: 1}}, &PortUseError{Port: 1, Reason: PortLinkUp, Speed: "1000Mbps-full", LAG: 1}, 2},
 	}
 	for _, tc := range cases {
@@ -162,5 +164,18 @@ func TestPortGateUsesTheNamedPortsEvenWhenTheGroupIsEmpty(t *testing.T) {
 	var got *PortUseError
 	if !errors.As(err, &got) || got.Port != 6 {
 		t.Fatalf("got %v, want port 6 refused", err)
+	}
+}
+
+// A write that changes every port passes on a switch that has no link and no LAG at all.
+func TestPortGateLetsAWriteThatChangesEveryPortPassOnAnIdleSwitch(t *testing.T) {
+	sw := &switchView{ports: []model.Port{{ID: 1, ActualSpeed: model.SpeedLinkDown}, {ID: 2, ActualSpeed: model.SpeedLinkDown}}}
+	if err := PortGate()(context.Background(), sw, model.Operation{Name: model.MethodSetVLANMode, AllPorts: true}); err != nil {
+		t.Fatalf("an idle switch: %v", err)
+	}
+	sw.ports[1].LAG = 1
+	var got *PortUseError
+	if err := PortGate()(context.Background(), sw, model.Operation{Name: model.MethodSetVLANMode, AllPorts: true}); !errors.As(err, &got) || got.Port != 2 || got.Reason != PortInLAG {
+		t.Fatalf("a port in a LAG: got %v", err)
 	}
 }

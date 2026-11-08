@@ -35,7 +35,7 @@ A gate is a plain function, `func(ctx, model.Reader, model.Operation) error`; wr
 
 `PortGate` reads through the client it guards, before every write it checks. A front end with an opt-in of its own (an "allow disruptive" flag) leaves it out and uses `safety.UseOf` and `safety.CheckPorts` to decide.
 
-**`PortGate` only sees ports.** A write that names no port passes it without a read, and some of those can cut the management path: a new address or DHCP (`SetIPConfig`, `EnableDHCP`), the VLAN mode (`SetVLANMode`) and loop prevention (`SetLoopPrevention`) are `ImpactManagement` and name no port. Port safety and the kind of change are two separate questions: `PortGate` answers the first, `MaxImpact` the second, and a front end that offers those writes needs its own confirmation for them (a flag, a prompt) whatever `PortGate` says.
+**`PortGate` only sees ports.** A write that names no port passes it without a read, and some of those can cut the management path: a new address or DHCP (`SetIPConfig`, `EnableDHCP`) and loop prevention (`SetLoopPrevention`) are `ImpactManagement` and name no port. A change of the VLAN mode (`SetVLANMode`) is told to the gate as touching every port (`Operation.AllPorts`), so `PortGate` lets it pass only on a switch with no link and no LAG at all. Port safety and the kind of change are two separate questions: `PortGate` answers the first, `MaxImpact` the second, and a front end that offers those writes needs its own confirmation for them (a flag, a prompt) whatever `PortGate` says.
 
 ## Impact
 
