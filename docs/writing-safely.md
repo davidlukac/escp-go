@@ -59,6 +59,14 @@ The methods of each class (generated from `model.Settings`, the one table the wr
 
 **Choosing a ceiling.** `MaxImpact(ImpactTraffic)` is the strict gate: it refuses every method of the third class, so a front end that only tunes rates and QoS cannot cut anything by mistake. A front end that does write port settings or VLANs allows `ImpactManagement` and puts its protection elsewhere: `PortGate` (free ports only), its own confirmation, a dry run first.
 
+## When a write gets no answer
+
+A write whose reply never comes is **not** known to have failed: the switch may have applied it and lost only the answer. `exchange` sends it `Retries+1` times with the same content, and a write that cannot cut the management path (`ImpactCosmetic`, `ImpactTraffic`) is run once more after a new session key, so the switch may have received it up to twice that often. The call returns `*UnconfirmedWriteError` (it matches `ErrWriteUnconfirmed`, and `ErrNoReply` as before; a failed key exchange before the write is only `ErrNoReply`, nothing was sent). Do not read it as "not applied":
+
+- read the setting back and compare with what you meant to write; for an absolute value (every setting but the address ones) writing it again is safe;
+- a write of `ImpactManagement` is **never** repeated after a new session key, because a second send can be refused for what the first one already did (`DeleteDot1QVLAN` of a VLAN that is gone answers with a rejection that looks like "it did not work"); the session is dropped, so the next call keys again;
+- `SetIPConfig` and `EnableDHCP` settle the outcome themselves and return `ErrMoveUnconfirmed` when they cannot.
+
 ## What the client does not do
 
 - It does not know which ports carry traffic. Deciding whether a write is prudent (is the port in use? in a link aggregation group?) and verifying the result are the caller's job; `PortGate` and `safety.UseOf` answer the common question.

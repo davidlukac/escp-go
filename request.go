@@ -104,6 +104,9 @@ func (c *Client) setTLVsSent(ctx context.Context, op model.Operation, tlvs ...wi
 			{Type: wire.TLVPassword, Value: append([]byte(c.cfg.Password.Reveal()), 0)},
 		}, tlvs...)
 		r, err := c.exchange(ctx, wire.OpSet, req, false, []*net.UDPAddr{c.dest})
+		if errors.Is(err, ErrNoReply) {
+			return &UnconfirmedWriteError{Method: op.Name, Err: err}
+		}
 		if err != nil {
 			return err
 		}
@@ -112,6 +115,20 @@ func (c *Client) setTLVsSent(ctx context.Context, op model.Operation, tlvs ...wi
 		}
 		return nil
 	})
+}
+
+// repeatable reports whether a write may be run a second time after a new session key. Only the
+// writes that cannot cut the management path are: they set absolute values, so a repeat is
+// harmless. A management write may depend on the state its first send changed (a VLAN it deleted,
+// the address it moved), so it is not repeated: the caller learns that the outcome is unknown.
+func repeatable(m model.Method) bool {
+	switch m.Operation().Impact {
+	case model.ImpactCosmetic, model.ImpactTraffic:
+		return true
+	case model.ImpactManagement:
+		return false
+	}
+	return false // a method outside the table has no class: fail closed
 }
 
 // getTLVs reads one or more setting types with an authenticated session and
