@@ -62,7 +62,10 @@ func (i *identity) header() model.MAC {
 // that sends no MAC at all (all zero) when there is an identity to compare with: a real switch puts
 // its MAC in every reply (captured on both of ours, see PROTOCOL.md), and an answer that does not
 // say who sent it cannot be told from a device that took the address over. Without an identity yet
-// (no pin, no reply so far) the first accepted reply is the first contact: its MAC is learned.
+// (no pin, no reply so far) the first accepted reply is the first contact: its MAC is learned. A
+// first reply that carries no MAC is accepted as it comes but teaches nothing: the client stays
+// without an identity (known is false) until a reply names a switch, instead of "learning" the
+// zero address, which would be no identity and would accept any device that answers later.
 func (i *identity) judge(got model.MAC, from net.IP) bool {
 	i.mu.Lock()
 	defer i.mu.Unlock()
@@ -70,7 +73,7 @@ func (i *identity) judge(got model.MAC, from net.IP) bool {
 		i.wrong = &WrongSwitchError{Want: want, Got: got, IP: addrOf(from)}
 		return false
 	}
-	if !i.have {
+	if !i.have && !got.IsZero() {
 		i.learned, i.have = got, true
 	}
 	return true

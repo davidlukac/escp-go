@@ -84,6 +84,25 @@ func TestAReplyWithoutAMACIsRefusedWhenThereIsAnIdentity(t *testing.T) {
 	}
 }
 
+// A first reply without a MAC is taken as it comes but does not become the identity: the client
+// goes on without one, and the first reply that names a switch is the first contact. (It used to
+// "learn" the zero address, after which any device that answered was accepted for good.)
+func TestAFirstReplyWithoutAMACDoesNotBecomeTheIdentity(t *testing.T) {
+	var id identity
+	if !id.judge(MAC{}, ipFrom) {
+		t.Fatal("the first reply is accepted as it comes")
+	}
+	if id.known() || !id.mac().IsZero() {
+		t.Fatalf("a reply without a MAC was taken as the identity: known=%v mac=%v", id.known(), id.mac())
+	}
+	if !id.judge(macPin, ipFrom) || !id.known() || id.mac() != macPin {
+		t.Fatalf("the first reply that names a switch is the first contact: known=%v mac=%v", id.known(), id.mac())
+	}
+	if id.judge(macOther, ipFrom) {
+		t.Fatal("a device other than the one the first contact named was accepted")
+	}
+}
+
 // Reading the identity never waits for the lock of the client: it is safe beside the exchanges.
 func TestTheIdentityIsSafeForConcurrentUse(t *testing.T) {
 	id := identity{pin: macPin}
