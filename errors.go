@@ -27,8 +27,9 @@ var (
 	ErrRejected = errors.New("escp: switch rejected the request")
 	// ErrWrongSwitch means the device that answered is not the switch the client talks to: the
 	// reply carries another MAC address than Config.MAC or, when that is not set, than the one
-	// the switch reported on the client's first contact, or carries none (a real switch puts its
-	// MAC in every reply). Nothing was written to it. The
+	// the switch reported on the client's first contact, or carries none once a MAC is known (a client that has no identity yet takes a first
+	// reply without one as it comes, and learns the MAC from the first reply that names a switch; a
+	// real switch puts its MAC in every reply). Nothing was written to it. The
 	// *WrongSwitchError that wraps it names both addresses.
 	ErrWrongSwitch = errors.New("escp: the device that answered is not the configured switch")
 	// ErrSwitchInUse means another Client of this process already talks to that switch (it is

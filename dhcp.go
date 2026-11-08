@@ -69,7 +69,7 @@ func (c *Client) EnableDHCP(ctx context.Context) error {
 	}
 	ctx, release := c.withStop(ctx) // the lease wait ends when Close begins
 	defer release()
-	return c.cutShortBy(c.awaitLease(ctx, before, err))
+	return c.cutShortBy(c.awaitLease(ctx, before, plainNoReply(err)))
 }
 
 // awaitLease polls for the switch by MAC until it reports DHCP on with a usable address, then points
@@ -102,7 +102,10 @@ func (c *Client) awaitLease(ctx context.Context, before model.IPConfig, lost err
 	if !leased {
 		return leaseNotConfirmed(before, last, seen, lost)
 	}
-	return followed
+	if followed != nil {
+		return fmt.Errorf("the switch has leased %s: %w", last.IP, followed)
+	}
+	return nil
 }
 
 // leaseNotConfirmed says what is known when no lease was reported in time.

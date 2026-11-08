@@ -66,15 +66,23 @@ func (c *Client) ensureSession(ctx context.Context) error {
 // that fn reports as unconfirmed and that is not repeatable (see repeatable): fn has resent it
 // already, so the session is dropped for the next call and the outcome is returned as it is.
 func (c *Client) withSession(ctx context.Context, fn func() error) error {
+	var first error // the unconfirmed write of the first pass, when there was one
 	for retried := false; ; retried = true {
 		if err := c.ensureSession(ctx); err != nil {
+			if first != nil { // the write of the first pass was sent: the caller must still hear that
+				return fmt.Errorf("%w; the new session key was not answered either: %w", first, err)
+			}
 			return err
 		}
 		err := fn()
 		if errors.Is(err, ErrNoReply) && !retried {
 			c.session = nil
-			if unconfirmed := (*UnconfirmedWriteError)(nil); errors.As(err, &unconfirmed) && !repeatable(unconfirmed.Method) {
-				return err
+			unconfirmed := (*UnconfirmedWriteError)(nil)
+			if errors.As(err, &unconfirmed) {
+				if !repeatable(unconfirmed.Method) {
+					return err
+				}
+				first = err
 			}
 			c.log.WarnContext(ctx, "no reply; opening a new session", "lookup_by_mac", c.mayRelocate())
 			if c.mayRelocate() {

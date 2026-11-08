@@ -136,7 +136,7 @@ func (c *Client) finishMove(ctx context.Context, m moveOutcome) error {
 		}
 		ctx, release := c.withStop(ctx) // the settle ends when Close begins, whatever budget it has
 		defer release()
-		err = c.settleLostReply(ctx, m.mac, m.before, m.want, err)
+		err = c.settleLostReply(ctx, m.mac, m.before, m.want, plainNoReply(err))
 	}
 	c.alsoFrom = nil
 	if err != nil {

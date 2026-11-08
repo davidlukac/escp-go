@@ -88,8 +88,9 @@ func acquire(ctx context.Context, mu *sync.Mutex) error {
 }
 
 // beginModify starts a call that reads a setting, changes part of it and writes all of it back:
-// SetHostname, SetIPConfig and EnableDHCP (the System page) and SetPortPriorities (every port's
-// priority). Two such calls at once would each write back what they read, and the later write
+// SetHostname, SetIPConfig and EnableDHCP (the System page), SetPortPriorities (every port's
+// priority) and SetBandwidth and SetStormControl (each checks the other's setting of the port
+// before it writes its own). Two such calls at once would each write back what they read, and the later write
 // would undo the change of the earlier one. c.mu cannot be held from the read to the write, because
 // the write gate reads through the client, so these calls hold c.modify instead. It returns ctx's
 // error with nothing held, or the function that ends the call; it is taken before c.mu, never
@@ -139,6 +140,14 @@ func (c *Client) setTLVsSent(ctx context.Context, op model.Operation, tlvs ...wi
 	defer c.mu.Unlock()
 	c.log.InfoContext(ctx, "write", "operation", op.Name.String(), "impact", op.Impact.String(), "ports", op.Ports.String())
 	return true, c.withSession(ctx, func() error {
+		if !repeatable(op.Name) {
+			// A write that is not sent twice first proves that the switch still knows the session: a
+			// read that gets no answer re-keys (and is repeated), where the write could only be reported
+			// as unconfirmed although the switch cannot have decrypted it.
+			if _, err := c.exchange(ctx, wire.OpGet, []wire.TLV{{Type: wire.TLVLED}}, false, []*net.UDPAddr{c.dest}); err != nil {
+				return err
+			}
+		}
 		req := append([]wire.TLV{
 			{Type: wire.TLVUsername, Value: append([]byte(c.cfg.Username), 0)},
 			{Type: wire.TLVPassword, Value: append([]byte(c.cfg.Password.Reveal()), 0)},
