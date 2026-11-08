@@ -233,7 +233,10 @@ func (c *Client) send(op byte, tlvs []wire.TLV, static bool, to []*net.UDPAddr) 
 
 // exchange sends one packet and waits for the reply with the same sequence
 // number from the switch, retrying on silence. Callers hold c.mu.
-func (c *Client) exchange(ctx context.Context, op byte, tlvs []wire.TLV, static bool, to []*net.UDPAddr) (reply, error) {
+func (c *Client) exchange(ctx context.Context, op byte, tlvs []wire.TLV, static bool, to []*net.UDPAddr) (rep reply, err error) {
+	ctx, release := c.withStop(ctx)
+	defer release()
+	defer func() { err = closedBy(ctx, err) }()
 	if err := c.open(ctx); err != nil {
 		return reply{}, err
 	}
@@ -271,7 +274,10 @@ func (c *Client) exchange(ctx context.Context, op byte, tlvs []wire.TLV, static 
 // flag arrives. A missing final fragment restarts the request. The flag says only that more
 // packets follow (the header carries no index, no total and no checksum), so nothing here can
 // tell that an earlier packet was lost: the caller checks what it gets (see assembleConfig).
-func (c *Client) exchangeFragments(ctx context.Context, op byte, tlvs []wire.TLV, typ wire.TLVType) ([][]byte, error) {
+func (c *Client) exchangeFragments(ctx context.Context, op byte, tlvs []wire.TLV, typ wire.TLVType) (parts [][]byte, err error) {
+	ctx, release := c.withStop(ctx)
+	defer release()
+	defer func() { err = closedBy(ctx, err) }()
 	// Callers hold c.mu and run inside withSession, so the socket is open.
 	defer c.interruptOnDone(ctx)()
 	c.ident.forget()

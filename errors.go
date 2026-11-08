@@ -39,7 +39,9 @@ var (
 	// client holds. A client that got it keeps getting it until the other client is closed.
 	ErrSwitchInUse = errors.New("escp: another client of this process already talks to that switch")
 	// ErrClosed means the Client was closed: Close ends a client for good, and every later call
-	// returns this error without sending anything. Make a new client with Dial.
+	// returns this error without sending anything. Make a new client with Dial. A call that Close
+	// cut short returns it too (a write it was sending may have been applied), and so does every
+	// call of a Client that Dial did not make (the zero value).
 	ErrClosed = errors.New("escp: the client is closed")
 	// ErrNotFound means no switch with the wanted MAC address answered a discovery probe on
 	// this network (Locate, or a client configured with a MAC and no working address).

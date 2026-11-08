@@ -53,6 +53,11 @@ type Client struct {
 	claim *claim
 	// closed is set by Close and never cleared; guarded by mu.
 	closed bool
+	// stop is closed by Close (once, see stopOnce) before it waits for the lock, so that the call in
+	// flight ends at once and the calls queued behind it give up. Nil in a Client that was not made
+	// by Dial: the zero Client, which is closed.
+	stop     chan struct{}
+	stopOnce sync.Once
 	// seams are the knobs only tests turn; Dial sets them to their defaults.
 	seams
 	// log is Config.Logger, or a logger that discards, with the switch's host and MAC attached.
@@ -169,7 +174,7 @@ func dial(ctx context.Context, r ipLookuper, cfg Config, opts ...dialOption) (*C
 		cfg.BroadcastAddr = limitedBroadcast
 	}
 	base := clientLogger(cfg)
-	c := &Client{cfg: cfg, log: identified(base), ident: identity{pin: cfg.MAC}, seams: seams{shared: !claimsByDefault}}
+	c := &Client{cfg: cfg, log: identified(base), ident: identity{pin: cfg.MAC}, seams: seams{shared: !claimsByDefault}, stop: make(chan struct{})}
 	c.locator = hostLocator(base, cfg) // Locate identifies itself
 	if cfg.Host == "" && !cfg.MAC.IsZero() {
 		// no address yet: the first request finds the switch by its MAC address
@@ -202,9 +207,15 @@ func dial(ctx context.Context, r ipLookuper, cfg Config, opts ...dialOption) (*C
 // Close ends the client for good: it releases the UDP socket, if it was opened, so that another
 // client or Discover can use the reply port, and ends the client's claim on its switch, so that
 // another client can be made for it (ErrSwitchInUse). Every later call of the client returns
-// ErrClosed and sends nothing; make a new client with Dial. Close waits for a call in flight and
-// is safe to call more than once.
+// ErrClosed and sends nothing; make a new client with Dial. Close ends the call in flight (it
+// returns ErrClosed, a write it was sending may have been applied) and the calls waiting behind it
+// instead of waiting for them, so it returns in moments; a lookup of the switch by its MAC that is
+// running ends within its own window (two seconds at most). It is safe to call more than once.
 func (c *Client) Close() error {
+	if c == nil || c.stop == nil {
+		return nil // the zero Client is closed already
+	}
+	c.stopOnce.Do(func() { close(c.stop) })
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.closed = true
