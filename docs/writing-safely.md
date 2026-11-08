@@ -63,7 +63,7 @@ The methods of each class (generated from `model.Settings`, the one table the wr
 
 - It does not know which ports carry traffic. Deciding whether a write is prudent (is the port in use? in a link aggregation group?) and verifying the result are the caller's job; `PortGate` and `safety.UseOf` answer the common question.
 - Apart from `SetIPConfig` and `EnableDHCP`, which wait for the switch to answer at its new address (or to report its lease), no write reads back to check that it took effect.
-- A few writes read first, so they can send the rest unchanged or refuse a combination the switch would silently break: `SetHostname`, `SetIPConfig` and `EnableDHCP` (the discovery reply), `SetPortPriorities` (the QoS page), `SetBandwidth` and `SetStormControl` (the other one's page: an ingress limit and storm control exclude each other), and every write that names a port (the port count, once). These reads are not gated; their comments say so.
+- A few writes read first, so they can send the rest unchanged or refuse a combination the switch would silently break: `SetHostname`, `SetIPConfig` and `EnableDHCP` (the discovery reply), `SetPortPriorities` (the QoS page), `SetBandwidth` and `SetStormControl` (the other one's page: an ingress limit and storm control exclude each other), `SetPortBasedVLAN` (the port-based VLAN page and the port count, once, for the limit on group ids), and every write that names a port (the port count, once). These reads are not gated; their comments say so.
 - **Restoring is explicit.** There is no "reset": to put a setting back, write the value you recorded before.
 
 Deliberately **not** offered: user account and password, config restore, reboot, factory reset and firmware upgrade.

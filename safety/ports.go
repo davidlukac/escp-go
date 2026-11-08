@@ -14,7 +14,7 @@ type PortUse struct {
 	// Exists reports whether the switch has the port at all. When false, the other
 	// fields are zero.
 	Exists bool
-	// Speed is the negotiated speed as the client reports it (escp.SpeedLinkDown
+	// Speed is the negotiated speed as the client reports it (model.SpeedLinkDown
 	// without a link).
 	Speed model.Speed
 	// LAG is the link aggregation group the port belongs to, 0 for none.

@@ -71,7 +71,7 @@ func CheckFirmware(fw model.Firmware) error {
 	return nil
 }
 
-// FirmwareGate returns an escp.WriteGate that refuses every write while the
+// FirmwareGate returns a model.WriteGate that refuses every write while the
 // switch runs a firmware build the client was not verified against. Reads always
 // pass: they cannot change the switch, and they are how a new firmware is
 // fingerprinted. The firmware is read before the first write to a switch; a verified build

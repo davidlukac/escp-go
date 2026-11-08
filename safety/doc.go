@@ -8,10 +8,10 @@
 // # Firmware
 //
 // The protocol is not versioned, and a newer firmware may change layouts or
-// authentication. FirmwareGate returns an model.WriteGate that refuses every write while
+// authentication. FirmwareGate returns a model.WriteGate that refuses every write while
 // the switch runs a build outside VerifiedFirmwareBuilds, and lets reads through:
 //
-//	c, err := escp.Dial(escp.Config{Host: host, Username: user, Password: pw, WriteGate: safety.FirmwareGate()})
+//	c, err := escp.Dial(escp.Config{Host: host, Username: user, Password: model.Password(pw), WriteGate: safety.FirmwareGate()})
 //
 // A front end that offers an opt-in leaves the gate out (a nil WriteGate gates nothing).
 // A refusal is a *FirmwareError; branch on its Reason and word the message for your users.

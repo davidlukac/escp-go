@@ -36,7 +36,9 @@ for _, p := range ports {
 
 - `Dial` sends nothing and binds no socket; the first call does the key exchange. A host name is looked up while you dial, and `Dial` cannot be told to stop waiting for it: use `DialContext(ctx, cfg)` when the name may be slow to resolve, so `ctx` bounds or cancels the lookup (a literal address and a MAC need none).
 - Every method that talks to the switch takes a `context.Context`. Canceling it stops the call, and nothing is written once it is done; that includes a call that is still waiting for another call on the same client.
-- **One `Client` per switch.** A `Client` is safe for concurrent use but sends one request at a time, because the switch answers one at a time. Clients for different switches work side by side, in one process or on one host. Two clients for the same switch do not work: the switch keeps one session, so each key exchange invalidates the other client's.
+- **One `Client` per switch.** A `Client` is safe for concurrent use but sends one request at a time, because the switch answers one at a time. Clients for different switches work side by side, in one process or on one host. Two clients for the same switch do not work: the switch keeps one session, so each key exchange invalidates the other client's. Within one process `Dial` refuses the second client with `ErrSwitchInUse` until the first is closed (or garbage collected); two processes cannot see each other and still break each other, which stays your rule to keep.
+- **`Close` is final.** It releases the socket and the claim on the switch; every later call of that client returns `ErrClosed` and sends nothing. Make a new client with `Dial`.
+- **Time.** A request waits `Config.Timeout` (3 seconds unless you set it, at most `MaxTimeout`) for a reply and is repeated `Config.Retries` times (2 unless you set it, at most `MaxRetries`) before the call fails with `ErrNoReply`. A call makes up to four requests, plus a discovery on a client's first call, so with the defaults a silent switch holds a call for up to 36 seconds (45 on the first call); `Config.Retries` has the arithmetic. The context you pass ends the wait earlier.
 - Switches always reply to UDP port 29809 whoever asked, so every client on a host shares that port and each keeps only the replies from its own switch. The library sets up the sharing on Linux, macOS, FreeBSD and Windows (observed with real switches on macOS; the tests show a broadcast reaching every sharing socket on Linux); on any other system the second bind fails, so only one client per host works.
 - The reads are named for what they return (`Ports`, `QoS`, `LED`, `Dot1Q`); the writes are `Set...` and `Delete...`. The table in the [README](../README.md#what-it-can-read-and-write) lists them all.
 
@@ -46,6 +48,7 @@ for _, p := range ports {
 
 ```go
 switches, err := escp.Discover(ctx, escp.DiscoverOptions{Window: 2 * time.Second})
+if err != nil { /* ... */ }
 for _, s := range switches {
 	fmt.Println(s.IP, s.MAC, s.Hardware, s.Firmware)
 }
@@ -60,6 +63,8 @@ A switch's address can change (a lease, a move); its MAC address does not. Name 
 ```go
 mac, _ := model.ParseMAC("00:00:5e:00:53:01") // model.MAC: a comparable value; the zero value means "no MAC"
 c, err := escp.Dial(escp.Config{MAC: mac, Username: user, Password: model.Password(pw)}) // no Host: found on the first request
+if err != nil { /* ... */ }
+defer c.Close()
 ```
 
 - With `Config.MAC` set, a device that answers with another MAC, or with none, is refused (`ErrWrongSwitch`, naming both) and nothing is written to it. The MAC is checked on every reply, the key exchange's included. A client without `Config.MAC` does the same with the MAC the switch reported on its first contact (so a device that takes the address over later is refused too); only that first contact is taken on trust, which is what `Config.MAC` removes.

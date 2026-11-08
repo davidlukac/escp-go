@@ -1,6 +1,6 @@
 # ESCP: the TP-Link Easy Smart UDP management protocol
 
-This is the wire protocol the `escp` package speaks. It was worked out from the vendor's configuration utility, from earlier open-source clients ([smrt](https://github.com/rgl/smrt) and its forks) and by observing a TL-SG108E hardware v6 (firmware 1.0.0 Build 20230218). The firmware released in 2023 added the RSA key exchange described below.
+This is the wire protocol the `escp` package speaks. It was worked out from the vendor's configuration utility, from earlier open-source clients ([smrt](https://github.com/rgl/smrt) and its forks) and by observing a TL-SG108E hardware v6 (firmware 1.0.0, builds 20230218 and 20250710). The firmware released in 2023 added the RSA key exchange described below.
 
 The notes are descriptive, written for people who maintain this library or want to build a compatible client. Layouts marked "verified" were exercised against a real switch; the others come from the vendor utility.
 
@@ -20,7 +20,7 @@ How to read the layout tables below: **Dir** is `GET` (a read), `SET` (a write) 
 1. **Static RC4 (256-byte state)**, used for discovery and the key-exchange packet. Its key is the one the vendor tooling ships with (public in several open-source clients); the state is re-initialized for every packet, the stream is not carried between packets.
 2. **Session RC4 with an 8-byte state**: the same algorithm with state size 8, keyed by a random 8-character alphanumeric string generated per client run. Fresh state per packet.
 
-Sending: discovery and the RSA key-exchange packet use static RC4; everything else uses the session RC4 once the exchange succeeded. Receiving: decrypt with static RC4; if the result looks like a header (`byte0 == 1 && byte1 < 5`) accept it, otherwise decrypt with the session RC4.
+Sending: discovery and the RSA key-exchange packet use static RC4; everything else uses the session RC4 once the exchange succeeded. Receiving: decrypt with static RC4; if the result looks like a header accept it, otherwise decrypt with the session RC4. A buffer looks like a header when it is at least 36 bytes (the 32-byte header and the end marker), byte 0 is 1, the op (byte 1) is below 5 and the length field equals the number of bytes received.
 
 ## Login handshake (new in fw ≥ 2023-02)
 
@@ -35,8 +35,8 @@ Sending: discovery and the RSA key-exchange packet use static RC4; everything el
 
 | Type | Name | Dir | Bytes | Status |
 |---|---|---|---|---|
-| 1, 2, 3, 4, 5, 6, 7, 8, 9, 13 | model, hostname, MAC, IP, mask, gateway, firmware, hardware, DHCP, v4 flag | GET (discovery) | | — |
-| 14 | unknown 1-byte flag, `00` or `01` depending on the unit | GET (discovery) | 1 | — |
+| 1, 2, 3, 4, 5, 6, 7, 8, 9 | model, hostname, MAC, IP, mask, gateway, firmware, hardware, DHCP | GET (discovery) | | — |
+| 14 | factory-default flag, `00` or `01` depending on the unit | GET (discovery) | 1 | — |
 | **12** | **LED** (1 = on) | GET with an empty TLV; SET `01` / `00` | 1 | — |
 | 10 | port count (login GET) | GET with an empty TLV | 1 | — |
 | 512 / 514 | username / password | SET | NUL string | — |
@@ -48,7 +48,7 @@ Notes:
 
 ## Settings TLVs
 
-All GETs below need the session-key exchange first; a GET of several types in one packet works. Multi-row settings come back as one TLV per row. Port numbers are 1-based; "mask" is a 32-bit big-endian bitmap, bit n-1 = port n.
+All GETs below need the session-key exchange first. Ask for one TLV type per GET: a GET that names several types at once is answered with error code 1 on this firmware (see the notes on IGMP and on features that are not active), so the client reads each setting separately. A few replies carry more than the type asked for (a GET of 4352 also returns 4354, a GET of 8448 returns 8448-8450). Multi-row settings come back as one TLV per row. Port numbers are 1-based; "mask" is a 32-bit big-endian bitmap, bit n-1 = port n.
 
 ### Port Setting (4096)
 

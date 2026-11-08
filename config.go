@@ -30,9 +30,11 @@ const defaultRetries = 2
 const MaxRetries = 10
 
 // MaxTimeout is the highest Config.Timeout that Config.Validate and Dial accept: the wait for a reply
-// per attempt. A switch answers in well under three seconds (it stalled for about ten under heavy
-// load); with MaxRetries the longest a request can hold a call is (MaxRetries+1) x MaxTimeout, 330
-// seconds, and a Timeout of an hour would hold it for hours.
+// per attempt. A switch normally answers in well under three seconds, so the limit leaves ample room
+// for a slow one; with MaxRetries one request holds a call for at most (MaxRetries+1) x
+// MaxTimeout, 330 seconds. That is per request: a call makes up to four requests
+// (plus a discovery on a client's first call, see Config.Retries), so at the limits a call can
+// hold up to five times that. A Timeout of an hour would hold a call for hours.
 const MaxTimeout = 30 * time.Second
 
 // Config configures a Client. Zero values select sensible defaults, except Host, which is
@@ -46,11 +48,11 @@ type Config struct {
 	Host string
 	// MAC, when set, pins the identity of the switch: a device that answers with another MAC
 	// address is never written to (the request fails with ErrWrongSwitch). With no Host the switch
-	// is looked up by MAC with a discovery probe on the first request and again when it stops
+	// is looked up by its MAC with a discovery probe on the first request and again when it stops
 	// answering (its address may have changed); with a Host the client keeps to that address
-	// unless RelocateByMAC is set. Nothing is sent by Dial. Without it the client pins itself to the MAC the switch reports on its first
-	// contact, so a device that takes the address over later is refused the same way; only the
-	// first contact is then taken on trust.
+	// unless RelocateByMAC is set. Without a MAC the client pins itself to the MAC the switch
+	// reports on its first contact, so a device that takes the address over later is refused the
+	// same way; only the first contact is then taken on trust. Dial itself sends nothing.
 	MAC model.MAC
 
 	// RelocateByMAC lets a client that has both Host and MAC look its switch up by the MAC when

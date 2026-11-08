@@ -62,8 +62,8 @@ func (c *Client) IGMP(ctx context.Context) (model.IGMP, error) {
 
 // SetIGMP writes IGMP snooping state and report suppression together, as the vendor
 // utility does, so a caller that changes one passes the other as read. With snooping off
-// the switch floods multicast traffic to every port. Toggling it was verified on a live
-// switch without interrupting traffic.
+// the switch floods multicast traffic to every port. Toggling it is covered by the live tests
+// (TestLiveIGMPToggle, build tag live), which passed on firmware 20250710.
 func (c *Client) SetIGMP(ctx context.Context, cfg model.IGMPConfig) error {
 	return c.setTLVs(ctx, model.MethodSetIGMP.Operation(),
 		wire.TLV{Type: wire.TLVIGMPEnabled, Value: []byte{boolByte(cfg.Enabled)}},

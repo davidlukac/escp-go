@@ -73,7 +73,7 @@ func bandwidthTLV(typ wire.TLVType, port model.PortID, kbps model.Kbps) wire.TLV
 }
 
 // SetBandwidth sets a port's ingress and egress limits in kbps (0 = unlimited,
-// otherwise a multiple of 64; the same type Bandwidth reads). An ingress limit is refused (ErrInvalid) on a port
+// otherwise a multiple of 64; the same model.PortBandwidth type Bandwidth reads). An ingress limit is refused (ErrInvalid) on a port
 // whose storm control is on: the switch would turn storm control off without saying so. Like the vendor utility it sends two requests,
 // ingress first, then egress. A limit on a port that carries traffic throttles
 // it; callers must guard against that. The two requests are not atomic: if the second
