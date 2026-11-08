@@ -129,6 +129,31 @@ func TestPollUntilReportsWhetherTheProbeSaidYesInTime(t *testing.T) {
 	})
 }
 
+// The key is drawn from the stream, one character per draw: a stream of 0, 1, 2, ... gives the
+// alphabet in order, so a key that ignores the stream (a constant) or maps it wrongly is caught.
+func TestTheSessionKeyFollowsTheEntropyItIsGiven(t *testing.T) {
+	stream := make([]byte, wire.SessionKeyLen)
+	for i := range stream {
+		stream[i] = byte(i)
+	}
+	key, err := newSessionKey(bytes.NewReader(stream))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := sessionKeyAlphabet[:wire.SessionKeyLen]; string(key) != want {
+		t.Fatalf("key %q, want %q", key, want)
+	}
+}
+
+// Two sessions of a program do not share a key: the entropy of the real source is used.
+func TestTwoSessionKeysFromTheRealSourceDiffer(t *testing.T) {
+	a, errA := newSessionKey(randReader)
+	b, errB := newSessionKey(randReader)
+	if errA != nil || errB != nil || bytes.Equal(a, b) {
+		t.Fatalf("keys %q and %q (%v, %v) must differ", a, b, errA, errB)
+	}
+}
+
 func TestNewSessionKey(t *testing.T) {
 	key, err := newSessionKey(bytes.NewReader(bytes.Repeat([]byte{7}, 1024)))
 	if err != nil || len(key) != wire.SessionKeyLen {

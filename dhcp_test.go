@@ -248,3 +248,78 @@ func TestEnableDHCPWithACanceledContextSendsNothing(t *testing.T) {
 		t.Fatalf("%d write(s) and %d lookup(s) after the caller gave up", f.WriteCount(), *lookups)
 	}
 }
+
+// A switch that answers at the wanted address but leases it has not taken a static one: the wait
+// after SetIPConfig ends only when DHCP is off.
+func TestAwaitingAStaticAddressIsNotDoneWhileTheSwitchLeases(t *testing.T) {
+	f := escptest.Start(t)
+	c, _ := dialLeasing(t, f, withMoveWait(300*time.Millisecond))
+	if err := c.EnableDHCP(context.Background()); err != nil { // the fake now reports DHCP on
+		t.Fatal(err)
+	}
+	err := c.awaitAddress(context.Background(), cfgOf("127.0.0.1", "255.255.255.0", "127.0.0.254"))
+	if !errors.Is(err, ErrMoveUnconfirmed) {
+		t.Fatalf("got %v, want ErrMoveUnconfirmed: the switch is at the address but leases it", err)
+	}
+}
+
+// After a write that moved the switch the client keys again: the session belonged to the old address.
+func TestAfterAMoveTheClientHasNoSession(t *testing.T) {
+	f := escptest.Start(t)
+	c := dialFast(t, f, "secret")
+	if _, err := c.LED(context.Background()); err != nil { // a session exists
+		t.Fatal(err)
+	}
+	if c.session == nil {
+		t.Fatal("the premise: a session was set up")
+	}
+	if err := c.SetIPConfig(context.Background(), lostReplyWanted); err != nil {
+		t.Fatal(err)
+	}
+	if c.session != nil {
+		t.Fatal("SetIPConfig kept the session of the old address")
+	}
+	c.session = []byte("another session")
+	if err := c.follow(Info{IP: netip.MustParseAddr("127.0.0.1")}); err != nil {
+		t.Fatal(err)
+	}
+	if c.session != nil {
+		t.Fatal("follow kept the session of the old address")
+	}
+}
+
+// What is said when no lease was reported depends on whether the switch answered, whether DHCP is
+// on, and how the write ended.
+func TestWhatIsSaidWhenNoLeaseWasReported(t *testing.T) {
+	static := Info{IP: netip.MustParseAddr("192.0.2.9"), DHCP: false}
+	leasing := Info{IP: netip.MustParseAddr("192.0.2.9"), DHCP: true}
+	lost := fmt.Errorf("send: %w", ErrNoReply)
+	for _, tt := range []struct {
+		name      string
+		last      Info
+		seen      bool
+		lost      error
+		moved     bool   // ErrMoveUnconfirmed
+		contains  string // in the message
+		notSwitch bool   // "so DHCP was not switched on"
+	}{
+		{"static and the write got no reply: DHCP was not switched on", static, true, lost, false, "DHCP was not switched on", true},
+		{"leasing although the write got no reply: not that verdict", leasing, true, lost, true, "DHCP on", false},
+		{"static and the write was answered: unconfirmed, DHCP off", static, true, nil, true, "DHCP off", false},
+		{"static and the write failed otherwise: unconfirmed", static, true, errors.New("refused"), true, "DHCP off", false},
+		{"nobody answers: unconfirmed", Info{}, false, lost, true, "nobody with the configured MAC", false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			err := leaseNotConfirmed(cfgOf("192.0.2.1", "255.255.255.0", "192.0.2.254"), tt.last, tt.seen, tt.lost)
+			if errors.Is(err, ErrMoveUnconfirmed) != tt.moved {
+				t.Fatalf("ErrMoveUnconfirmed = %v, want %v: %v", !tt.moved, tt.moved, err)
+			}
+			if got := strings.Contains(err.Error(), "DHCP was not switched on"); got != tt.notSwitch {
+				t.Fatalf("says DHCP was not switched on = %v, want %v: %v", got, tt.notSwitch, err)
+			}
+			if !strings.Contains(err.Error(), tt.contains) {
+				t.Fatalf("%q does not say %q", err, tt.contains)
+			}
+		})
+	}
+}
