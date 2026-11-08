@@ -366,3 +366,46 @@ func TestTheSearchForALoopbackPortGivesUpAndSaysSo(t *testing.T) {
 		t.Fatalf("got %v after %d tries, want %q after %d", err, tries, cause, maxLoopbackTries)
 	}
 }
+
+// A port is given back when the test that asked for it ends: the record and the marker go, so a long
+// run (thousands of tests in one process, or -count=n) does not use the range up.
+func TestAPortIsGivenBackWhenItsTestEnds(t *testing.T) {
+	var port int
+	t.Run("asks", func(t *testing.T) {
+		port = FreeUDPPort(t)
+		markersMu.Lock()
+		held := handed[port] && markers[port] != nil
+		markersMu.Unlock()
+		if !held {
+			t.Skip("the system forbids the marker for this port; the record alone is checked below")
+		}
+	})
+	markersMu.Lock()
+	defer markersMu.Unlock()
+	if handed[port] || markers[port] != nil {
+		t.Fatalf("port %d is still reserved after its test ended", port)
+	}
+}
+
+// Closing a fake switch gives its port back too.
+func TestClosingAFakeSwitchGivesItsPortBack(t *testing.T) {
+	f, err := Listen()
+	if err != nil {
+		t.Fatal(err)
+	}
+	port := f.UDPPort()
+	markersMu.Lock()
+	held := handed[port]
+	markersMu.Unlock()
+	if !held {
+		t.Fatalf("port %d of a running fake is not reserved", port)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+	markersMu.Lock()
+	defer markersMu.Unlock()
+	if handed[port] || markers[port] != nil {
+		t.Fatalf("port %d is still reserved after Close", port)
+	}
+}

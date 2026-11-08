@@ -21,14 +21,15 @@ func Loopback() netip.Addr { return netip.MustParseAddr("127.0.0.1") }
 
 // FreeUDPPort returns a currently unused UDP port (drawn from 20000-28999, below the ports the
 // system gives to sockets that bind port 0) so tests never bind the
-// protocol's real client port 29809. The port is reserved for the life of the process, and no
-// other process that uses this package is given it either: the kernel hands a port it has just
+// protocol's real client port 29809. The port is reserved until the test ends (its marker is then
+// closed and the number may be handed out again, so a run of thousands of tests does not use the
+// range up), and no other process that uses this package is given it either: the kernel hands a port it has just
 // released to the very next bind, in this process (measured: about 1 in 10,000 when several
 // goroutines bind at once) or in another one (the test binaries of one "go test ./..." run in
 // parallel), and that would let a fake switch take the port a test was told to use and fail the
 // client's bind with "address already in use". The reservation is a record in this process and a TCP
 // listener on the same port number (the two port spaces are separate, so the number is free to
-// mark), which the system releases when the process ends. On a system that forbids the TCP number
+// mark), which is closed when the test ends or, at the latest, when the process ends. On a system that forbids the TCP number
 // (some Windows runners do, for ports in an excluded range) the port is handed out with the record
 // alone: no other process of this kind can then see it. A program that binds the port without
 // asking this package can still collide, and a client that binds late cannot rule that out.
@@ -38,6 +39,7 @@ func FreeUDPPort(tb testing.TB) int {
 	if err != nil {
 		tb.Fatal(err)
 	}
+	tb.Cleanup(func() { release(port) }) // the test is over: its marker and its record go, so a long run does not use the range up
 	return port
 }
 
@@ -52,7 +54,7 @@ func FreePort() (int, error) {
 	return port, nil
 }
 
-// The ports this package has handed out are remembered for the life of the process (handed), and
+// The ports this package has handed out are remembered until the test that asked for one ends, or for the life of the process when FreePort gave it (handed), and
 // where the system allows it also marked with a TCP listener (markers) so that other processes see
 // them. A port whose TCP number cannot be bound because somebody holds it is in use by another
 // process of this kind (or by anything else that listens on TCP there), and is skipped. A port whose
@@ -61,7 +63,7 @@ func FreePort() (int, error) {
 // record of this process still keeps it from being handed out twice here.
 var (
 	markersMu sync.Mutex
-	markers   []net.Listener
+	markers   = map[int]net.Listener{}
 	handed    = map[int]bool{}
 )
 
@@ -158,9 +160,22 @@ func reserve(port int) error {
 	}
 	handed[port] = true
 	if l != nil {
-		markers = append(markers, l)
+		markers[port] = l
 	}
 	return nil
+}
+
+// release gives a port back: the marker is closed and the record dropped, so the number can be
+// handed out again. FreeUDPPort calls it when its test ends; a port from FreePort stays handed
+// out for the life of the process.
+func release(port int) {
+	markersMu.Lock()
+	defer markersMu.Unlock()
+	if l := markers[port]; l != nil {
+		_ = l.Close() // best effort: the process may be ending
+	}
+	delete(markers, port)
+	delete(handed, port)
 }
 
 // listenUDP binds a UDP socket; tests replace it.
