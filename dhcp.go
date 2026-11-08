@@ -141,8 +141,7 @@ func (c *Client) follow(found model.Info) error {
 		return fmt.Errorf("%w: %s answered without a usable address", ErrNotFound, c.cfg.MAC)
 	}
 	c.dest.IP = ip
-	c.reclaim()
 	c.hostMAC = localMAC(ip)
 	c.session = nil
-	return nil
+	return c.reclaim()
 }

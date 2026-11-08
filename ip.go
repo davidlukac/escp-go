@@ -117,8 +117,10 @@ func (c *Client) SetIPConfig(ctx context.Context, cfg model.IPConfig) error {
 		return err
 	}
 	c.dest = &net.UDPAddr{IP: net.IP(cfg.IP.AsSlice()), Port: c.dest.Port}
-	c.reclaim()
 	c.session = nil
+	if err := c.reclaim(); err != nil {
+		return fmt.Errorf("the switch has moved to %s: %w", cfg.IP, err)
+	}
 	return c.awaitAddress(ctx, cfg)
 }
 
