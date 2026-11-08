@@ -7,7 +7,8 @@
 # Procedure (RELEASING.md): the release PR is merged, `scripts/release.sh --tag X.Y.Z` tags the merge
 # commit, a maintainer pushes that tag (the push is what publishes). To re-run for a tag
 # that exists (a failed step, a version released before this workflow did all of it):
-#   gh workflow run release.yml -f tag=vX.Y.Z      (every step is safe to repeat)
+#   gh workflow run release.yml -f tag=vX.Y.Z      (every step is safe to repeat; a tag from before
+#                                                   examples/consumer existed is built with main's copy)
 name: Release
 
 on:
@@ -72,12 +73,19 @@ jobs:
           done
           exit 1
       # The program is examples/consumer of the tagged tree: the same file that every pull request
-      # compiles, so it cannot fall behind the API the way a copy inside this workflow did.
+      # compiles, so it cannot fall behind the API the way a copy inside this workflow did. A tag
+      # from before that program existed (up to v0.8.0) uses the copy on main, which is the program
+      # of the API those releases have; a tag whose API it no longer matches fails here, and the
+      # proxy step above is then the proof that the version installs.
       - name: A fresh module installs it and builds against every package
         run: |
-          src="$PWD/examples/consumer/main.go"
           dir="$(mktemp -d)"
-          cp "$src" "$dir/main.go"
+          if [ -f examples/consumer/main.go ]; then
+            cp examples/consumer/main.go "$dir/main.go"
+          else
+            echo "$TAG has no examples/consumer: using the copy on main"
+            git show origin/main:examples/consumer/main.go > "$dir/main.go"
+          fi
           cd "$dir"
           go mod init example.com/consumer
           GOWORK=off GOFLAGS=-mod=mod GOPROXY=https://proxy.golang.org go get "$MODULE@$TAG"
