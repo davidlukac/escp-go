@@ -2,8 +2,25 @@ package escp
 
 import (
 	"context"
+	"fmt"
 	"time"
 )
+
+// cutShort is the error of a call that Close ended while a management write may already have been
+// applied (a move or a lease wait, or the settle of a write): the client is closed, and what the
+// switch has now is unknown, which is what ErrMoveUnconfirmed says. It matches both.
+func cutShort() error {
+	return fmt.Errorf("%w: the call was cut short and the switch may have taken the change: %w", ErrClosed, ErrMoveUnconfirmed)
+}
+
+// cutShortBy returns err, or cutShort when Close has begun: whatever the wait reported (nothing
+// answered, nobody found) was caused by the stop, not by the switch.
+func (c *Client) cutShortBy(err error) error {
+	if err != nil && c.closing() {
+		return cutShort()
+	}
+	return err
+}
 
 // pollUntil asks probe, with a context that ends after wait, until it reports true, pausing poll
 // between the asks and calling again (to log, mostly) after each answer that was no. It reports

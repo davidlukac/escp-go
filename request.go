@@ -123,8 +123,9 @@ func (c *Client) setTLVs(ctx context.Context, op model.Operation, tlvs ...wire.T
 	return err
 }
 
-// setTLVsSent is setTLVs that also reports whether the gate let the write go, so that the
-// request may have reached the switch: false means nothing was sent for certain.
+// setTLVsSent is setTLVs that also reports whether the request may have reached the switch: false
+// means nothing was sent for certain (the gate refused, or the call was canceled or the client
+// closed before it got the lock), so there is nothing to settle.
 func (c *Client) setTLVsSent(ctx context.Context, op model.Operation, tlvs ...wire.TLV) (sent bool, err error) {
 	if gate := c.cfg.WriteGate; gate != nil {
 		if err := gate(ctx, c, op); err != nil {
@@ -133,7 +134,7 @@ func (c *Client) setTLVsSent(ctx context.Context, op model.Operation, tlvs ...wi
 		}
 	}
 	if err := c.lock(ctx); err != nil {
-		return true, err // the gate let it go: sent reports that, as it always has, and a caller that settles an unknown outcome stays on the safe side
+		return false, err // refused before anything was sent (canceled, or the client is closed): nothing to settle
 	}
 	defer c.mu.Unlock()
 	c.log.InfoContext(ctx, "write", "operation", op.Name.String(), "impact", op.Impact.String(), "ports", op.Ports.String())

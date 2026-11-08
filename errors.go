@@ -36,7 +36,7 @@ var (
 	// clients of it fail each other; close the first one, or share it. Returned by Dial, and by the
 	// call that finds out later: the first contact of a client made with an address only (the MAC the
 	// switch reports is what the other client holds), or a move of the switch onto an address another
-	// client holds. A client that got it keeps getting it until the other client is closed.
+	// client holds. A client that got it keeps getting it until the other client is closed, and sends nothing meanwhile. The refusal is mutual: the client that holds the switch by one name (its address) keeps that key, so a client that names it by the other (its MAC) is refused too, and each error names the other's key; use one client.
 	ErrSwitchInUse = errors.New("escp: another client of this process already talks to that switch")
 	// ErrClosed means the Client was closed: Close ends a client for good, and every later call
 	// returns this error without sending anything. Make a new client with Dial. A call that Close

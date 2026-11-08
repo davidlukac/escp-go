@@ -64,7 +64,12 @@ func (c *Client) EnableDHCP(ctx context.Context) error {
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.awaitLease(ctx, before, err)
+	if err != nil && (errors.Is(err, ErrClosed) || c.closing()) {
+		return cutShort() // Close ended the write: nothing is settled on a closed client
+	}
+	ctx, release := c.withStop(ctx) // the lease wait ends when Close begins
+	defer release()
+	return c.cutShortBy(c.awaitLease(ctx, before, err))
 }
 
 // awaitLease polls for the switch by MAC until it reports DHCP on with a usable address, then points
