@@ -8,7 +8,7 @@
         "20230218"
       ],
       "support": "verified",
-      "summary": "reads and writes checked on a real device, and the settings read back. The VLAN mode, 802.1Q VLAN and PVID writes were not tried on this build (they are verified on 20250710; same protocol generation)."
+      "summary": "reads; the writes on unused ports (port settings, bandwidth control, storm control for multicast and broadcast, QoS, ingress mirroring, LAG, port-based VLAN groups), the LED, IGMP snooping, loop prevention and the device description, each read back. Not tried on this build: the management address and DHCP, mirror egress, unknown-unicast storm control, IGMP report suppression, the VLAN mode, 802.1Q VLAN and PVID (all verified on 20250710; same protocol generation)."
     },
     {
       "model": "TL-SG108E",
