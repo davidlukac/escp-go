@@ -89,6 +89,8 @@ func (c *Client) discoverOnce(ctx context.Context) (model.Info, error) {
 // relocate finds the switch by Config.MAC and points the client at the address it answers from.
 // Callers hold c.mu. The destination is changed in place, because requests in flight hold it.
 func (c *Client) relocate(ctx context.Context) error {
+	ctx, release := c.withStop(ctx) // a lookup is cut short by Close: it is not "nobody answered"
+	defer release()
 	found, err := c.locator(ctx, c.cfg.MAC)
 	if errors.Is(err, ErrNotFound) && ctx.Err() == nil {
 		c.log.WarnContext(ctx, "lookup by MAC found nobody; asking once more")
@@ -98,7 +100,7 @@ func (c *Client) relocate(ctx context.Context) error {
 		found, err = c.locator(ctx, c.cfg.MAC)
 	}
 	if err != nil {
-		return err
+		return closedBy(ctx, err)
 	}
 	c.log.InfoContext(ctx, "switch located by MAC", "ip", found.IP.String())
 	return c.follow(found)

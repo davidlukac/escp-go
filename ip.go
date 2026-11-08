@@ -96,32 +96,61 @@ func (c *Client) SetIPConfig(ctx context.Context, cfg model.IPConfig) error {
 	c.alsoFrom = net.IP(cfg.IP.AsSlice())
 	c.mu.Unlock()
 	sent, err := c.writeSystem(ctx, model.MethodSetIPConfig.Operation(), info.Hostname, false, cfg)
+	return c.finishMove(ctx, moveOutcome{wrote: err, sent: sent, mac: info.MAC, before: before, want: cfg})
+}
+
+// moveOutcome is what SetIPConfig knows when its write has returned.
+type moveOutcome struct {
+	wrote  error // what the write returned
+	sent   bool  // the request may have reached the switch
+	mac    model.MAC
+	before model.IPConfig
+	want   model.IPConfig
+}
+
+// finishMove settles the outcome of the write of SetIPConfig, then waits for the switch at its new
+// address. It takes c.mu itself.
+func (c *Client) finishMove(ctx context.Context, m moveOutcome) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	var refused *RejectedError
-	if err != nil && sent && !errors.As(err, &refused) {
+	err := m.wrote
+	if err != nil && !m.sent { // refused before anything was sent (the gate, a canceled call, a closed client): nothing to settle
+		c.alsoFrom = nil
+		return err
+	}
+	if err != nil && (errors.Is(err, ErrClosed) || c.closing()) {
+		c.alsoFrom = nil
+		return cutShort() // Close ended the write: nothing is settled on a closed client
+	}
+	if err != nil && !errors.As(err, &refused) {
 		// The write may have been applied: no reply came, or the call was canceled, or the
 		// request could not be sent in full. Only a refusal by the switch (or by the gate, which
 		// sends nothing) says it was not. alsoFrom is still set, so a probe is answered from
 		// either address; and the probe must run even if ctx is done, because the answer is what
-		// the caller needs most.
+		// the caller needs most (then it gets a budget of its own).
 		if ctx.Err() != nil {
 			var cancel context.CancelFunc
 			ctx, cancel = context.WithTimeout(context.WithoutCancel(ctx), settleBudget)
 			defer cancel()
 		}
-		err = c.settleLostReply(ctx, info.MAC, before, cfg, err)
+		ctx, release := c.withStop(ctx) // the settle ends when Close begins, whatever budget it has
+		defer release()
+		err = c.settleLostReply(ctx, m.mac, m.before, m.want, err)
 	}
 	c.alsoFrom = nil
 	if err != nil {
-		return err
+		return c.cutShortBy(err)
 	}
-	c.dest = &net.UDPAddr{IP: net.IP(cfg.IP.AsSlice()), Port: c.dest.Port}
+	c.dest = &net.UDPAddr{IP: net.IP(m.want.IP.AsSlice()), Port: c.dest.Port}
+	c.hostMAC = localMAC(c.dest.IP) // the interface that reaches the new address may be another one
 	c.session = nil
 	if err := c.reclaim(); err != nil {
-		return fmt.Errorf("the switch has moved to %s: %w", cfg.IP, err)
+		return fmt.Errorf("the switch has moved to %s: %w", m.want.IP, err)
 	}
-	return c.awaitAddress(ctx, cfg)
+	ctx, release := c.withStop(ctx) // the wait for the new address ends when Close begins
+	defer release()
+	return c.cutShortBy(c.awaitAddress(ctx, m.want))
 }
 
 // lostReplyOutcome is what a probe shows after a write that got no reply.

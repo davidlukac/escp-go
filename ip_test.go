@@ -183,10 +183,11 @@ func TestSetIPConfigSettlesWhenTheCallIsCanceledAfterTheWrite(t *testing.T) {
 	}
 }
 
-// Canceled while the switch still shows the old settings: that proves nothing yet, and the error says so.
-func TestSetIPConfigDoesNotClaimTheWriteWasNotAppliedWhenCanceled(t *testing.T) {
+// Canceled after the gate and before the write got the lock: nothing was sent, so there is nothing
+// to settle, and the error is the cancellation, not a doubt about the switch.
+func TestSetIPConfigCanceledBeforeItsWriteIsNotUnconfirmed(t *testing.T) {
 	f := escptest.Start(t)
-	f.Configure(func(f *escptest.Faults) { f.DropSets = true })
+	f.Configure(func(f *escptest.Faults) { f.DropSets = true }) // a write that did go out would be counted as dropped
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 5 * time.Second,
@@ -194,14 +195,13 @@ func TestSetIPConfigDoesNotClaimTheWriteWasNotAppliedWhenCanceled(t *testing.T) 
 		// the gate lets the write go, then the caller gives up before it is sent
 		WriteGate: func(context.Context, Reader, Operation) error { cancel(); return nil }}, withLoopback())
 	t.Cleanup(func() { c.Close() })
+	start := time.Now()
 	err := c.SetIPConfig(ctx, lostReplyWanted)
-	// The probe sees the old settings, but the call ended before the switch had to answer, so
-	// nothing is proven: the error names the cancellation and says the write may yet take effect.
-	if !errors.Is(err, ErrMoveUnconfirmed) || !strings.Contains(err.Error(), "context canceled") || !strings.Contains(err.Error(), "may not have taken effect yet") {
-		t.Fatalf("want ErrMoveUnconfirmed naming the cancellation and the doubt, got %v", err)
+	if !errors.Is(err, context.Canceled) || errors.Is(err, ErrMoveUnconfirmed) || errors.Is(err, ErrWriteUnconfirmed) {
+		t.Fatalf("want the cancellation alone, got %v", err)
 	}
-	if errors.Is(err, ErrNoReply) {
-		t.Fatalf("this is not the 'all attempts unanswered' case: %v", err)
+	if f.DroppedSets() != 0 || f.WriteCount() != 0 || time.Since(start) > time.Second {
+		t.Fatalf("a call canceled before its write sent %d write(s) (%d applied) and took %v: it settled something that was never sent", f.DroppedSets(), f.WriteCount(), time.Since(start))
 	}
 }
 

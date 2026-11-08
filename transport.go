@@ -231,9 +231,23 @@ func (c *Client) send(op byte, tlvs []wire.TLV, static bool, to []*net.UDPAddr) 
 	return nil
 }
 
+// mayExchange is the check before anything is sent: a closed or closing client sends nothing and
+// does not open its socket again, and a client whose claim on the switch is refused (another client
+// of this process holds it) sends nothing either, because its key exchange would replace the session
+// of the client that owns the switch. Callers hold c.mu.
+func (c *Client) mayExchange() error {
+	if c.closed || c.closing() {
+		return ErrClosed
+	}
+	return c.reclaim()
+}
+
 // exchange sends one packet and waits for the reply with the same sequence
 // number from the switch, retrying on silence. Callers hold c.mu.
 func (c *Client) exchange(ctx context.Context, op byte, tlvs []wire.TLV, static bool, to []*net.UDPAddr) (rep reply, err error) {
+	if err := c.mayExchange(); err != nil {
+		return reply{}, err
+	}
 	ctx, release := c.withStop(ctx)
 	defer release()
 	defer func() { err = closedBy(ctx, err) }()
@@ -275,6 +289,9 @@ func (c *Client) exchange(ctx context.Context, op byte, tlvs []wire.TLV, static 
 // packets follow (the header carries no index, no total and no checksum), so nothing here can
 // tell that an earlier packet was lost: the caller checks what it gets (see assembleConfig).
 func (c *Client) exchangeFragments(ctx context.Context, op byte, tlvs []wire.TLV, typ wire.TLVType) (parts [][]byte, err error) {
+	if err := c.mayExchange(); err != nil {
+		return nil, err
+	}
 	ctx, release := c.withStop(ctx)
 	defer release()
 	defer func() { err = closedBy(ctx, err) }()
