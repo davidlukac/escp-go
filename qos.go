@@ -61,8 +61,11 @@ func (c *Client) SetQoSMode(ctx context.Context, mode model.QoSMode) error {
 // or nothing is sent, and the first fault is reported in the order given. As in the vendor utility the
 // request carries the priority of every port, so the current values are read first (a QoS read, which
 // the write gate does not see) and the ports not mentioned are re-sent unchanged. The priorities only
-// take effect in QoSPortBased mode.
+// take effect in QoSPortBased mode. An empty list is refused: it would send a write that changes nothing.
 func (c *Client) SetPortPriorities(ctx context.Context, changes []model.PortPriority) error {
+	if len(changes) == 0 {
+		return invalidf("escp: no priorities to set")
+	}
 	var named model.PortSet
 	for _, ch := range changes {
 		if err := ch.Validate(); err != nil {
