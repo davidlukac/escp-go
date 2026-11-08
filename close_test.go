@@ -40,6 +40,12 @@ func TestCloseEndsTheCallInFlightAndTheCallsWaitingBehindIt(t *testing.T) {
 	go func() { _, err := c.Ports(context.Background()); queued <- err }()
 	time.Sleep(20 * time.Millisecond) // the second call is queued on the lock
 	closeWithin(t, c, 5*time.Second)
+	atClose := f.Received()
+	defer func() {
+		if got := f.Received(); got != atClose {
+			t.Errorf("%d datagram(s) were sent after Close returned: a queued call that gets the lock after Close began must send nothing", got-atClose)
+		}
+	}()
 	for name, ch := range map[string]chan error{"the call in flight": inFlight, "the queued call": queued} { // subtests: two results of one scenario, not cases
 		select {
 		case err := <-ch:
