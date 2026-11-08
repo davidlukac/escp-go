@@ -5,6 +5,35 @@ version; a breaking change is called out as such. The history before 0.1.0 is th
 `internal/escp` of [terraform-provider-tplinkeasysmart](https://github.com/davidlukac/terraform-provider-tplinkeasysmart),
 whose commits this repository keeps.
 
+## 0.9.0
+
+- **Breaking changes and behavior changes**, from the audit round of November 2026 (a full review of the library by independent readers, then a second review of the fixes together). `make apidiff` suggests this version. Each row is one change; the number is the issue.
+
+  | 0.8.0 | 0.9.0 |
+  |---|---|
+  | `Close` ended the client until its next call, which opened it again (a closed client reopened its socket and claim, and `ConfigBackup` on one panicked) (#135, #139) | `Close` ends a client **for good**: every later call returns `ErrClosed` and sends nothing; make a new client with `Dial`. The zero `Client` is closed too (`ErrClosed`, no panic; a nil pointer still panics) (#161) |
+  | `Close` waited for the call in flight (seconds to minutes at the defaults) and for the calls queued behind it, which then reopened the client (#161) | `Close` ends the call in flight and the waits that hold the client's lock (the lease wait of `EnableDHCP`, the move wait of `SetIPConfig`, the settle after a lost reply, the lookup by MAC) at once; the cut-short call returns `ErrClosed` (joined with `ErrMoveUnconfirmed` when a management write may have been applied); queued calls give up with `ErrClosed` (#161, #181) |
+  | A write that got no reply was reported as `ErrNoReply`, as if it had not been applied, and a management write was sent again after a new session key (up to twice `Retries+1` sends) (#149) | It returns `*UnconfirmedWriteError` (matches `ErrWriteUnconfirmed` and, as before, `ErrNoReply`): the write may have been applied. A write of impact management is not repeated after a new session key; it first proves that the switch still knows the session with one authenticated read, so a management write costs one extra read (#149, #183). `docs/writing-safely.md` says what to do with the outcome |
+  | A client made with `Host` and `Config.MAC` looked the switch up by its MAC when the address stopped answering and followed it to whatever address it answered from (#144) | It keeps to the address unless `Config.RelocateByMAC` is set (a client with only a MAC still finds its switch by it; `SetIPConfig` and `EnableDHCP` follow their own switch whatever this says). The address a lookup returns is checked before the client follows it (a unicast IPv4 address that names one device) |
+  | A client made with an address only never claimed the MAC its switch reported, and a client made with a MAC only had no address key: two clients of one switch both worked (#151) | The claim is renewed after every reply (the MAC of the first contact, the address after a move); a key another client holds gives `ErrSwitchInUse` to that call and every later one, and a refused client sends nothing (it used to send its key exchange, which replaced the owner's session). The refusal is mutual (#151, #181). Use one client per switch |
+  | `SetIPConfig` canceled after the gate and before its write got the lock was probed and reported as `ErrMoveUnconfirmed`; a probe that proved "not applied" still matched `ErrWriteUnconfirmed` (#181, #183) | Nothing was sent, so the call returns the cancellation; a settled outcome matches `ErrNoReply` only, `ErrWriteUnconfirmed` and `ErrMoveUnconfirmed` stay for outcomes that are unknown |
+  | `SetPortPriorities` with an empty list sent a full rewrite of every priority that changed nothing (#169) | It returns `ErrInvalid`: the call is a patch ("change these ports"), and an empty one names nothing to change. (An empty collection that the caller owns, a port set of a group, still clears it) |
+  | `IPConfig.Validate` (and so `SetIPConfig`) accepted addresses in 0.0.0.0/8, 240.0.0.0/4 and 169.254.0.0/16, which no host that follows the usual rules can reach (#163) | They are refused (`ErrInvalid`) |
+  | `model.Firmware` had an exported `Build` field next to the unexported string it is read from (#167) | `fw.Build` becomes the method `fw.BuildDate()` |
+  | `SetVLANMode` told a write gate that it names the MTU uplink port, or no port, so `safety.PortGate` waved through a change that isolates every port (#165) | `model.Operation.AllPorts` is set for every VLAN mode change and `PortGate` treats it as naming every port: it refuses while any port has a link or is in a LAG, which on any switch you can reach is always. A front end that offers the write uses `MaxImpact` and its own confirmation |
+
+- **Added:** `ErrClosed` (#139), `ErrWriteUnconfirmed` and `*UnconfirmedWriteError` (#149), `Config.RelocateByMAC` (#144), `model.Operation.AllPorts` (#165), `model.Firmware.BuildDate` (#167). **Removed:** `model.Firmware.Build` (see the table).
+- **Fixed:**
+  - Read-modify-write calls undid each other when they ran at once (`SetHostname` could revert a `SetIPConfig`, two `SetPortPriorities` lost one change): they are one step now (`SetHostname`, `SetIPConfig`, `EnableDHCP`, `SetPortPriorities`, and the checks of `SetBandwidth` and `SetStormControl` against each other) (#141, #183).
+  - A `FirmwareGate` shared by clients of several switches held its lock while it read a firmware version, so a silent switch stalled the writes to the others (#153).
+  - A first reply without a MAC address became the identity of the switch, after which any device that answered was accepted (#155).
+  - A fragmented reply had one timeout per packet and no packet cap: `ConfigBackup` is bounded by one deadline per attempt and 64 packets (#157).
+  - The lookup of a client by MAC probed the real network on the default ports even for a client pointed at a fake: it follows the client's `SwitchPort`, `HostPort` and `BroadcastAddr` (#159).
+  - After a `SetIPConfig` move the host MAC of the request header is refreshed, as it is after a lease (#181).
+  - `escptest` gives its ports back when the test or the fake ends, so `-count=n` and long soaks no longer run out of them (#171).
+- **Documentation:** the guides match the model split, the one-client rule and the code; the Go blocks of the README and `docs/` are compiled by a test; the 20230218 compatibility row says exactly what was verified on that build and what was not (#175, #179).
+- **Tests and tooling:** the nine mutants that timed out are killed (#133); the default claim of `Dial` is tested (#146); the session key, the settle conditions and the session reset after a move are tested (#173); a flaky registry test waits for nothing it does not need (#137); `release.yml` can be re-run for a tag from before `examples/consumer` (#176).
+
 ## 0.8.0
 
 - **Breaking changes**, made together before 1.0: the values and their rules move out of the client into package `model`, and four behaviors that were accepted before are refused now. `make apidiff` suggests this version.
