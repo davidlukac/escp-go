@@ -5,6 +5,10 @@ version; a breaking change is called out as such. The history before 0.1.0 is th
 `internal/escp` of [terraform-provider-tplinkeasysmart](https://github.com/davidlukac/terraform-provider-tplinkeasysmart),
 whose commits this repository keeps.
 
+## 0.9.0
+
+- the audit round: typed unconfirmed writes, a client per switch by address and MAC, a final Close, atomic read-modify-write and a set of seam fixes
+
 ## 0.8.0
 
 - **Breaking changes**, made together before 1.0: the values and their rules move out of the client into package `model`, and four behaviors that were accepted before are refused now. `make apidiff` suggests this version.
