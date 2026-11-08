@@ -83,6 +83,11 @@ func (c *Client) SetBandwidth(ctx context.Context, limit model.PortBandwidth) er
 		return err
 	}
 	in, eg := bandwidthTLV(wire.TLVBandwidthIngress, limit.Port, limit.Ingress), bandwidthTLV(wire.TLVBandwidthEgress, limit.Port, limit.Egress)
+	end, err := c.beginModify(ctx) // the check against storm control and the write are one step
+	if err != nil {
+		return err
+	}
+	defer end()
 	if err := c.requirePorts(ctx, limit.Port.AsSet()); err != nil {
 		return err
 	}

@@ -58,6 +58,11 @@ func (c *Client) SetStormControl(ctx context.Context, cfg model.StormConfig) err
 		return err
 	}
 	limited := cfg.Limited()
+	end, err := c.beginModify(ctx) // the check against the ingress limit and the write are one step
+	if err != nil {
+		return err
+	}
+	defer end()
 	if err := c.requirePorts(ctx, cfg.Port.AsSet()); err != nil {
 		return err
 	}

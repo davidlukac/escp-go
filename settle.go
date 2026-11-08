@@ -2,9 +2,20 @@ package escp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 )
+
+// plainNoReply is the error of a write that got no reply without its "may have been applied"
+// wrapper: a probe settles the outcome (applied, not applied, or ErrMoveUnconfirmed), so what it
+// reports must not match ErrWriteUnconfirmed when the state is known.
+func plainNoReply(err error) error {
+	if ue := (*UnconfirmedWriteError)(nil); errors.As(err, &ue) {
+		return ue.Err
+	}
+	return err
+}
 
 // cutShort is the error of a call that Close ended while a management write may already have been
 // applied (a move or a lease wait, or the settle of a write): the client is closed, and what the
