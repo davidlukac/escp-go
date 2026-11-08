@@ -62,7 +62,9 @@ func (c *Client) ensureSession(ctx context.Context) error {
 }
 
 // withSession runs fn with an established session, re-establishing it once if
-// the switch stops answering (session expired or switch rebooted).
+// the switch stops answering (session expired or switch rebooted). The one exception is a write
+// that fn reports as unconfirmed and that is not repeatable (see repeatable): fn has resent it
+// already, so the session is dropped for the next call and the outcome is returned as it is.
 func (c *Client) withSession(ctx context.Context, fn func() error) error {
 	for retried := false; ; retried = true {
 		if err := c.ensureSession(ctx); err != nil {
@@ -71,6 +73,9 @@ func (c *Client) withSession(ctx context.Context, fn func() error) error {
 		err := fn()
 		if errors.Is(err, ErrNoReply) && !retried {
 			c.session = nil
+			if unconfirmed := (*UnconfirmedWriteError)(nil); errors.As(err, &unconfirmed) && !repeatable(unconfirmed.Method) {
+				return err
+			}
 			c.log.WarnContext(ctx, "no reply; opening a new session", "lookup_by_mac", c.mayRelocate())
 			if c.mayRelocate() {
 				_ = c.relocate(ctx) // best effort: the address may have changed; the retry says if not

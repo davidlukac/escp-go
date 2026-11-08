@@ -72,6 +72,7 @@ type Config struct {
 	// that needs a session makes up to four such requests (the key exchange and the request,
 	// then both again if the switch stops answering mid-call), plus the discovery that learns
 	// the switch's MAC on a client's first call: with the defaults 36 seconds, 45 on the first.
+	// A write of impact management is not run again after the new key, so it takes half that.
 	Retries int
 
 	// SwitchPort and HostPort are the UDP ports of the switch (29808) and of this host

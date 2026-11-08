@@ -10,8 +10,13 @@ import (
 )
 
 var (
-	// ErrNoReply means the switch did not answer within the timeout.
+	// ErrNoReply means the switch did not answer within the timeout. For a write this means it
+	// may have been applied: see ErrWriteUnconfirmed.
 	ErrNoReply = errors.New("escp: no reply from switch")
+	// ErrWriteUnconfirmed means a write was sent and the switch never answered, so it may or may
+	// not have been applied. It is returned as an *UnconfirmedWriteError, which also matches
+	// ErrNoReply; a read that gets no reply matches only ErrNoReply.
+	ErrWriteUnconfirmed = errors.New("escp: the write may have been applied, the switch never answered")
 	// ErrReplyTooLarge means a fragmented reply grew past the sane limit.
 	ErrReplyTooLarge = errors.New("escp: fragmented reply is larger than any switch sends")
 	// ErrRejected means the switch answered a request with a non-zero code: it rejected a write,
@@ -60,6 +65,27 @@ func (e *WrongSwitchError) Error() string {
 
 // Is makes errors.Is(err, ErrWrongSwitch) true.
 func (e *WrongSwitchError) Is(target error) bool { return target == ErrWrongSwitch }
+
+// UnconfirmedWriteError is a write that was sent (Config.Retries+1 times, and again after a new
+// session key unless it is a management write) without any reply: the switch may have applied it
+// once or several times, or never received it. It matches ErrWriteUnconfirmed and ErrNoReply. Read
+// the setting back before deciding what to do; writing again is safe for an absolute value, and
+// the methods that move the management address settle the outcome themselves.
+type UnconfirmedWriteError struct {
+	Method model.Method // the write that was not confirmed
+	Err    error        // the transport error, which matches ErrNoReply
+}
+
+// Error names the write and carries the transport error.
+func (e *UnconfirmedWriteError) Error() string {
+	return fmt.Sprintf("%s: %s: %v", ErrWriteUnconfirmed.Error(), e.Method, e.Err)
+}
+
+// Unwrap returns the transport error, so that errors.Is(err, ErrNoReply) is true.
+func (e *UnconfirmedWriteError) Unwrap() error { return e.Err }
+
+// Is makes errors.Is(err, ErrWriteUnconfirmed) true.
+func (e *UnconfirmedWriteError) Is(target error) bool { return target == ErrWriteUnconfirmed }
 
 // invalidf builds an error that matches ErrInvalid and reads as the formatted message.
 func invalidf(format string, args ...any) error {
