@@ -166,11 +166,11 @@ func dial(ctx context.Context, r ipLookuper, cfg Config, opts ...dialOption) (*C
 		cfg.HostPort = defaultHostPort
 	}
 	if !cfg.BroadcastAddr.IsValid() {
-		cfg.BroadcastAddr = netip.AddrFrom4([net.IPv4len]byte{255, 255, 255, 255})
+		cfg.BroadcastAddr = limitedBroadcast
 	}
 	base := clientLogger(cfg)
 	c := &Client{cfg: cfg, log: identified(base), ident: identity{pin: cfg.MAC}, seams: seams{shared: !claimsByDefault}}
-	c.locator = hostLocator(base) // Locate identifies itself
+	c.locator = hostLocator(base, cfg) // Locate identifies itself
 	if cfg.Host == "" && !cfg.MAC.IsZero() {
 		// no address yet: the first request finds the switch by its MAC address
 		c.dest = &net.UDPAddr{Port: cfg.SwitchPort}
@@ -285,11 +285,20 @@ func macHolding(addr net.IP, ifs []net.Interface, addrs func(net.Interface) ([]n
 	return model.MAC{}
 }
 
-// hostLocator is the lookup a client uses: Locate on the interfaces of this host, logging to the
-// client's logger (before it is identified: Locate does that).
-func hostLocator(log *slog.Logger) func(ctx context.Context, mac model.MAC) (model.Info, error) {
+// hostLocator is the lookup a client uses: Locate with the client's own ports, logging to the
+// client's logger (before it is identified: Locate does that). It probes the interfaces of this
+// host, except for a client whose Config.BroadcastAddr is not the limited broadcast: that client was
+// pointed at one address (a fake switch on loopback, or one subnet), and its lookup goes there only,
+// never to the real network on the default ports.
+func hostLocator(log *slog.Logger, cfg Config) func(ctx context.Context, mac model.MAC) (model.Info, error) {
+	env := discoverEnv{interfaces: hostInterfaces, switchPort: cfg.SwitchPort, hostPort: cfg.HostPort}
+	if b := cfg.BroadcastAddr; b.IsValid() && b != limitedBroadcast {
+		env.interfaces = func() ([]netInterface, error) {
+			return []netInterface{{Name: "configured", MAC: localMAC(net.IP(b.AsSlice())), Broadcasts: []netip.Addr{b}}}, nil
+		}
+	}
 	return func(ctx context.Context, mac model.MAC) (model.Info, error) {
-		return Locate(ctx, mac, DiscoverOptions{Logger: log})
+		return locateWith(ctx, mac, DiscoverOptions{Logger: log}, env)
 	}
 }
 
