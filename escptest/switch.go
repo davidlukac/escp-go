@@ -91,8 +91,13 @@ func Listen() (*Switch, error) {
 	return f, nil
 }
 
-// Close stops the switch. Requests that arrive afterwards get no answer.
-func (f *Switch) Close() error { return f.conn.Close() }
+// Close stops the switch and gives its port back (see FreeUDPPort). Requests that arrive afterwards
+// get no answer.
+func (f *Switch) Close() error {
+	err := f.conn.Close()
+	release(f.port)
+	return err
+}
 
 // UDPPort is the UDP port the switch listens on; give it to the client as its switch port.
 func (f *Switch) UDPPort() int { return f.port }
