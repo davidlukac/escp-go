@@ -112,6 +112,8 @@ func TestEveryRefusedArgumentIsErrInvalid(t *testing.T) {
 		}, "both tagged and untagged"},
 		{"SetDot1QVLAN empty", func(c *Client) error { return c.SetDot1QVLAN(ctx, Dot1QVLAN{ID: 20}) }, "has no member ports"},
 		{"SetPortBasedVLAN id", func(c *Client) error { return c.SetPortBasedVLAN(ctx, PortVLAN{ID: 0, Ports: MustPortSet(2, 3)}) }, "invalid port-based VLAN id 0"},
+		{"SetPortPriorities empty", func(c *Client) error { return c.SetPortPriorities(ctx, nil) }, "no priorities to set"},
+		{"SetPortPriorities empty list", func(c *Client) error { return c.SetPortPriorities(ctx, []PortPriority{}) }, "no priorities to set"},
 		{"SetPVIDs empty", func(c *Client) error { return c.SetPVIDs(ctx, nil) }, "no PVIDs to set"},
 	}
 	for _, tc := range cases {
