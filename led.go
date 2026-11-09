@@ -11,6 +11,7 @@ import (
 
 // LED reports whether the switch LEDs are on.
 func (c *Client) LED(ctx context.Context) (bool, error) {
+	// lockwait: the lock is held across the whole exchange on purpose (the switch answers one request at a time); the wait ends with ctx, or with Close (every exchange runs under withStop), or when the retries are spent
 	if err := c.lock(ctx); err != nil {
 		return false, err
 	}

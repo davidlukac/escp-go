@@ -77,6 +77,7 @@ func (c *Client) SetIPConfig(ctx context.Context, cfg model.IPConfig) error {
 	if err := c.validateIPConfig(cfg); err != nil {
 		return err
 	}
+	// lockwait: c.modify is held from the read to the write on purpose (that is what makes the pair one step, see beginModify); every wait inside takes ctx and ends with it or with Close, and only another modify call waits for c.modify, which gives up with its own ctx
 	end, err := c.beginModify(ctx)
 	if err != nil {
 		return err
@@ -111,6 +112,7 @@ type moveOutcome struct {
 // finishMove settles the outcome of the write of SetIPConfig, then waits for the switch at its new
 // address. It takes c.mu itself.
 func (c *Client) finishMove(ctx context.Context, m moveOutcome) error {
+	// lockwait: the lock is held across the settle and the wait for the new address on purpose (the outcome of a write that may have been applied is settled before another call uses the client); both end after their own budget (settleBudget, ipMoveWait), or with Close (withStop)
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	var refused *RejectedError

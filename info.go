@@ -17,6 +17,7 @@ import (
 // switch's address and to Config.BroadcastAddr, and repeated up to Config.Retries times; if
 // nothing answers the error is ErrNoReply.
 func (c *Client) Info(ctx context.Context) (model.Info, error) {
+	// lockwait: the lock is held across the discovery on purpose (the switch answers one request at a time), and across the lookup by MAC when the address is stale; both end with ctx, or with Close (withStop), or when the retries and the lookup window are spent
 	if err := c.lock(ctx); err != nil {
 		return model.Info{}, err
 	}

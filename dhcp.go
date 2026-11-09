@@ -35,6 +35,7 @@ func (c *Client) EnableDHCP(ctx context.Context) error {
 	if c.cfg.MAC.IsZero() {
 		return invalidf("escp: EnableDHCP needs Config.MAC: the leased address is not known in advance, and the switch can only be found again by its MAC")
 	}
+	// lockwait: c.modify is held from the read to the write on purpose (that is what makes the pair one step, see beginModify); every wait inside takes ctx and ends with it or with Close, and only another modify call waits for c.modify, which gives up with its own ctx
 	end, err := c.beginModify(ctx)
 	if err != nil {
 		return err
@@ -62,6 +63,7 @@ func (c *Client) EnableDHCP(ctx context.Context) error {
 		ctx, cancel = context.WithTimeout(context.WithoutCancel(ctx), settleBudget)
 		defer cancel()
 	}
+	// lockwait: the lock is held across the wait for the lease on purpose (the outcome of a write that may have been applied is settled before another call uses the client); the wait ends after leaseWait, or with Close (withStop)
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if err != nil && (errors.Is(err, ErrClosed) || c.closing()) {
