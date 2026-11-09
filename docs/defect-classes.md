@@ -31,7 +31,7 @@ How to use this page:
 
 Each entry has the same fields, in this order: the rule in one sentence; why (what happened); the DESIGN question; the TEST requirement; AUTOMATION; the ADVERSARIAL probe.
 
-AUTOMATION names each check by kind and name, so that a test can verify that the name exists. The kinds are `test:` (a test function), `fuzz:` (a fuzz target), `make:` (a Makefile target), `lint:` (a linter enabled in `.golangci.yml`), `analyzer:` (a directory of `devtools/`), `script:` (a path), `workflow:` (a file in `.github/workflows/`), `reading:` (it cannot be scripted; the reason follows) and `proposed:` (not built yet; the name is followed by the issue that tracks it in parentheses, and a few have no issue yet and are written without a number until one is filed). A claim that a check exists without a name is not accepted; `proposed:catalogcheck(#191)` is the check that every name in this page resolves.
+AUTOMATION names each check by kind and name, so that a test can verify that the name exists. The kinds are `test:` (a test function), `fuzz:` (a fuzz target), `make:` (a Makefile target), `lint:` (a linter enabled in `.golangci.yml`), `analyzer:` (a directory of `devtools/`), `script:` (a path), `workflow:` (a file in `.github/workflows/`), `reading:` (it cannot be scripted; the reason follows) and `proposed:` (not built yet; the name is followed by the issue that tracks it in parentheses; #195 tracks the ones that have no issue of their own). A claim that a check exists without a name is not accepted; `proposed:catalogcheck(#191)` is the check that every name in this page resolves.
 
 ---
 
@@ -63,7 +63,7 @@ AUTOMATION names each check by kind and name, so that a test can verify that the
 
 **Test requirement.** A test that fails when a copy drifts: a generated table compared with the file, snippets compiled, a list compared with the code in both directions (nothing missing, nothing extra).
 
-**Automation.** `test:TestTheGeneratedTablesAreCurrent` and `make:settings-docs` (settings table, impact classes, validators); `test:TestReadmeCompatibilityTable` and `make:compat-table`; `test:TestEveryGoBlockOfTheDocumentationCompiles`; `lint:misspell`; `proposed:stalenames` (a script that lists, for every exported identifier removed or renamed since the last tag, each place in the documentation that still uses it).
+**Automation.** `test:TestTheGeneratedTablesAreCurrent` and `make:settings-docs` (settings table, impact classes, validators); `test:TestReadmeCompatibilityTable` and `make:compat-table`; `test:TestEveryGoBlockOfTheDocumentationCompiles`; `lint:misspell`; `proposed:stalenames(#195)` (a script that lists, for every exported identifier removed or renamed since the last tag, each place in the documentation that still uses it).
 
 **Adversarial probe.** Rename an identifier or change a limit and search every place that states it; each place that stays green is the finding.
 
@@ -78,7 +78,7 @@ AUTOMATION names each check by kind and name, so that a test can verify that the
 
 **Test requirement.** A test in each consumer that fails on the old assumption; the migration row in the changelog names the issue and what a user does.
 
-**Automation.** `make:apidiff` (signatures only); `proposed:consumers` (a script that searches the known consumer repositories, examples and docs for each identifier an API diff removes or changes); `proposed:canary` (a CI job in the provider that builds and tests it against this library's `main`); `proposed:defaultssnapshot(#190)` (a test that renders every default and limit of `Config` to `testdata/defaults.txt`, so a flipped default shows in the diff).
+**Automation.** `make:apidiff` (signatures only); `proposed:consumers(#195)` (a script that searches the known consumer repositories, examples and docs for each identifier an API diff removes or changes); `proposed:canary(#195)` (a CI job in the provider that builds and tests it against this library's `main`); `proposed:defaultssnapshot(#190)` (a test that renders every default and limit of `Config` to `testdata/defaults.txt`, so a flipped default shows in the diff).
 
 **Adversarial probe.** For each changed exported identifier or default, search all repositories and the docs for its use; flip the default and run every other suite.
 
@@ -93,7 +93,7 @@ AUTOMATION names each check by kind and name, so that a test can verify that the
 
 **Test requirement.** A test per property of the combination, written against the merged tree, not the branch.
 
-**Automation.** `make:apidiff`; `proposed:seams` (a script that lists functions changed by more than one pull request in a release range, with the pull requests); `reading:` the combined diff of the release, read as one change.
+**Automation.** `make:apidiff`; `proposed:seams(#195)` (a script that lists functions changed by more than one pull request in a release range, with the pull requests); `reading:` the combined diff of the release, read as one change.
 
 **Adversarial probe.** Take the classes the release fixed; run each class's probe against every function the release added.
 
@@ -108,7 +108,7 @@ AUTOMATION names each check by kind and name, so that a test can verify that the
 
 **Test requirement.** A test that fails for each such variant, shown by running it against the variant. A seam is an option of the test, never a global flipped in `TestMain`. A rule in the fake carries its source (a captured vector, a measurement, or "assumed") and one test that does not share the fake's assumption.
 
-**Automation.** `make:mutation-diff`, `make:mutation`, `make:cover`; `analyzer:subtests`; `proposed:gremlins-operators` (enable `invert-logical`, `invert-assignments`, `invert-loopctrl` in a `.gremlins.yaml`); `proposed:handmutants` (a script that applies a committed list of hand mutants and requires each to fail a test); `proposed:testseam` (an analyzer that flags a `TestMain` or `init` that assigns a package variable of production code).
+**Automation.** `make:mutation-diff`, `make:mutation`, `make:cover`; `analyzer:subtests`; `proposed:gremlins-operators(#195)` (enable `invert-logical`, `invert-assignments`, `invert-loopctrl` in a `.gremlins.yaml`); `proposed:handmutants(#195)` (a script that applies a committed list of hand mutants and requires each to fail a test); `proposed:testseam(#195)` (an analyzer that flags a `TestMain` or `init` that assigns a package variable of production code).
 
 **Adversarial probe.** Mutate by hand: drop each call, flip each constant, swap each pair of arguments, delete each `if`; run only the package's tests.
 
@@ -123,7 +123,7 @@ AUTOMATION names each check by kind and name, so that a test can verify that the
 
 **Test requirement.** Synchronize with channels and contexts, never with a sleep; release with `t.Cleanup`; ports from an allocator that gives them back; a deterministic clock or a bounded wait for anything timed.
 
-**Automation.** `make:soak` (weekly: shuffled, repeated, with the race detector, on three operating systems); `workflow:weekly.yml`; `proposed:nosleep` (a `forbidigo` pattern for `time.Sleep` in tests, with a reason-comment escape).
+**Automation.** `make:soak` (weekly: shuffled, repeated, with the race detector, on three operating systems); `workflow:weekly.yml`; `proposed:nosleep(#195)` (a `forbidigo` pattern for `time.Sleep` in tests, with a reason-comment escape).
 
 **Adversarial probe.** Run `go test -race -shuffle=on -count=5`, with `GOMAXPROCS=1`, with a CPU hog beside it, and with two copies of the binary at once.
 
@@ -153,7 +153,7 @@ AUTOMATION names each check by kind and name, so that a test can verify that the
 
 **Test requirement.** Documentation values only (`192.0.2.0/24`, `00:00:5e:00:53:xx`); a secret-absence test over the log output of a call that carries a credential; a type that holds a secret prints redacted under every verb, JSON and `slog`.
 
-**Automation.** `lint:misspell`, `make:spell`, `test:TestTheTextIsAmericanEnglish`, `test:TestNothingPrivateToAWorkspaceIsPublished`, `lint:gosec`; `proposed:secretformat` (an analyzer that requires `String`, `GoString`, `Format` and `LogValue` on a type with a field named like a credential).
+**Automation.** `lint:misspell`, `make:spell`, `test:TestTheTextIsAmericanEnglish`, `test:TestNothingPrivateToAWorkspaceIsPublished`, `lint:gosec`; `proposed:secretformat(#195)` (an analyzer that requires `String`, `GoString`, `Format` and `LogValue` on a type with a field named like a credential).
 
 **Adversarial probe.** Print every type that can hold a credential with every formatting verb and logging handler; search the diff and the generated documentation for addresses, MACs and host names.
 
@@ -168,7 +168,7 @@ AUTOMATION names each check by kind and name, so that a test can verify that the
 
 **Test requirement.** A dry run in CI for every publishing step (a snapshot build, an install check); every workflow linted.
 
-**Automation.** `make:actionlint`, `workflow:test.yml`, `workflow:release.yml`, `workflow:weekly.yml`, `workflow:codeql.yml`; `proposed:ci-hygiene(#192)` (a module tidy and verify check, `make actionlint` in CI, no persisted checkout credentials, job-level permissions); `proposed:settingscheck` (a script that reads the repository's rulesets and required checks through the API and compares them with a committed expectation).
+**Automation.** `make:actionlint`, `workflow:test.yml`, `workflow:release.yml`, `workflow:weekly.yml`, `workflow:codeql.yml`; `proposed:ci-hygiene(#192)` (a module tidy and verify check, `make actionlint` in CI, no persisted checkout credentials, job-level permissions); `proposed:settingscheck(#195)` (a script that reads the repository's rulesets and required checks through the API and compares them with a committed expectation).
 
 **Adversarial probe.** A pull request from a fork that edits a workflow; a tag pushed by someone with write access; a compromised dependency (TM-10 of the [adversarial checklist](adversarial-review.md)).
 
@@ -187,7 +187,7 @@ AUTOMATION names each check by kind and name, so that a test can verify that the
 
 **Test requirement.** For each blocking call, a cancel test and a `Close` test against a fake that never answers: it returns within a bound, `errors.Is(err, ErrClosed)` (or the context's error) holds, and the fake received no datagram after `Close` began.
 
-**Automation.** `test:TestCloseEndsTheCallInFlightAndTheCallsWaitingBehindIt`, `test:TestAWriteCutShortByCloseReturnsErrClosed`, `test:TestUsedAndClosedClientsLeaveNoGoroutinesBehind`, `lint:contextcheck`, `lint:noctx`; `proposed:TestEveryMethodEndsWithItsContextAndClose(#190)` (reflect over every exported method of `Client` that takes a context and require a row for it in a table of cancel and `Close` cases, against a muted fake); `proposed:lockwait(#188)` (an analyzer that flags a blocking operation while a mutex is held; an intended wait carries `// lockwait: <reason>`); `proposed:waitcheck` (an analyzer that flags a blocking call in a function that takes a context and never selects on it); `reading:` whether holding a lock across I/O is intended.
+**Automation.** `test:TestCloseEndsTheCallInFlightAndTheCallsWaitingBehindIt`, `test:TestAWriteCutShortByCloseReturnsErrClosed`, `test:TestUsedAndClosedClientsLeaveNoGoroutinesBehind`, `lint:contextcheck`, `lint:noctx`; `proposed:TestEveryMethodEndsWithItsContextAndClose(#190)` (reflect over every exported method of `Client` that takes a context and require a row for it in a table of cancel and `Close` cases, against a muted fake); `proposed:lockwait(#188)` (an analyzer that flags a blocking operation while a mutex is held; an intended wait carries `// lockwait: <reason>`); `proposed:waitcheck(#195)` (an analyzer that flags a blocking call in a function that takes a context and never selects on it); `reading:` whether holding a lock across I/O is intended.
 
 **Adversarial probe.** Call every method against a muted switch and cancel or `Close` at a random moment; after `Close`, assert no goroutine, no socket and no datagram. Call every method on the zero value, with a nil context, after `Close` and during `Close`.
 
@@ -202,7 +202,7 @@ AUTOMATION names each check by kind and name, so that a test can verify that the
 
 **Test requirement.** A table of fault and exit against (sent or not, the error identity through `errors.Is` and `errors.As`, writes the fake applied), using the fake's `DropSets`, `RSADrop` and cancellation.
 
-**Automation.** `test:TestAWriteTheSwitchNeverAnswersIsUnconfirmedAndSentAsOftenAsItsImpactAllows`, `test:TestEveryWriteMethodDeclaresItsOperation`, `test:TestOnlyKnownPlacesSendASET`; `proposed:outcometable` (a generated table test over the fake's fault list and every exit); `reading:` whether a `sent` flag is set on every return needs a person.
+**Automation.** `test:TestAWriteTheSwitchNeverAnswersIsUnconfirmedAndSentAsOftenAsItsImpactAllows`, `test:TestEveryWriteMethodDeclaresItsOperation`, `test:TestOnlyKnownPlacesSendASET`; `proposed:outcometable(#195)` (a generated table test over the fake's fault list and every exit); `reading:` whether a `sent` flag is set on every return needs a person.
 
 **Adversarial probe.** Cut a write at every step (before the gate, before the lock, after the send, in the middle of a re-key, in the middle of a settle) and compare the reported outcome with the fake's write count.
 
@@ -217,7 +217,7 @@ AUTOMATION names each check by kind and name, so that a test can verify that the
 
 **Test requirement.** A test that parks the first call between its read and its write (a gate or a hook), completes a second call, releases the first and asserts the final state; it must fail against the code without the lock.
 
-**Automation.** `test:TestReadModifyWriteCallsDoNotUndoEachOther`, `test:TestReadModifyWriteCallsGiveUpWhenTheirContextEnds`, `make:soak` (race detector); `proposed:readwrite(#188)` (an analyzer that flags a read method of the client followed by a write method outside the modify guard); `proposed:readsfirst` (a column in the settings table naming the methods that read before they write, and a test that each appears in the atomicity test); `reading:` finding a read hidden in a helper.
+**Automation.** `test:TestReadModifyWriteCallsDoNotUndoEachOther`, `test:TestReadModifyWriteCallsGiveUpWhenTheirContextEnds`, `make:soak` (race detector); `proposed:readwrite(#188)` (an analyzer that flags a read method of the client followed by a write method outside the modify guard); `proposed:readsfirst(#195)` (a column in the settings table naming the methods that read before they write, and a test that each appears in the atomicity test); `reading:` finding a read hidden in a helper.
 
 **Adversarial probe.** Run each pair of write methods at once against a gate that reads and a hook that pauses between read and write; the final state must equal one of the two serial results.
 
@@ -232,7 +232,7 @@ AUTOMATION names each check by kind and name, so that a test can verify that the
 
 **Test requirement.** Two clients through every pair of naming ways are refused; a refused client's second call sends nothing; first-contact variations (no MAC, zero MAC, another MAC, the right MAC from another address) each have a test.
 
-**Automation.** `test:TestAClientByAddressAndAClientByMACOfOneSwitchAreRefused`, `test:TestASecondClientOfTheSameSwitchIsRefused`, `test:TestARefusedClientHoldsNothing`, `test:TestAFirstReplyWithoutAMACDoesNotBecomeTheIdentity`, `test:TestAReplyWithoutAMACIsRefusedWhenThereIsAnIdentity`; `proposed:claimmatrix` (one table test over every pair of naming ways and every state of the first contact).
+**Automation.** `test:TestAClientByAddressAndAClientByMACOfOneSwitchAreRefused`, `test:TestASecondClientOfTheSameSwitchIsRefused`, `test:TestARefusedClientHoldsNothing`, `test:TestAFirstReplyWithoutAMACDoesNotBecomeTheIdentity`, `test:TestAReplyWithoutAMACIsRefusedWhenThereIsAnIdentity`; `proposed:claimmatrix(#195)` (one table test over every pair of naming ways and every state of the first contact).
 
 **Adversarial probe.** Dial the same switch by every spelling and in every order; answer with another device, with no MAC, with a zero MAC, with the right MAC from another address; record which bytes go to whom.
 
@@ -247,7 +247,7 @@ AUTOMATION names each check by kind and name, so that a test can verify that the
 
 **Test requirement.** For each type, a table of valid and invalid values at the boundaries, a round trip (`Marshal`, `Unmarshal`, `Validate`), "decode accepts only what `Validate` accepts", nothing sent when refused, and hostile strings (a NUL, 4 MB, a leading "+", full-width digits, bidirectional controls, zero).
 
-**Automation.** `test:TestEveryRefusedArgumentIsErrInvalid`, `test:TestEveryNamedValueReadsBackFromItsText`, `fuzz:FuzzParseMAC`, `fuzz:FuzzSettingParsers`; `proposed:TestDecodersAgreeWithValidate` (reflect over every exported type with `Validate` and `UnmarshalText`: any input the decoder accepts must satisfy `Validate`); `proposed:validatecall` (an analyzer that requires an exported function taking a type with `Validate` to call it before use).
+**Automation.** `test:TestEveryRefusedArgumentIsErrInvalid`, `test:TestEveryNamedValueReadsBackFromItsText`, `fuzz:FuzzParseMAC`, `fuzz:FuzzSettingParsers`; `proposed:TestDecodersAgreeWithValidate(#195)` (reflect over every exported type with `Validate` and `UnmarshalText`: any input the decoder accepts must satisfy `Validate`); `proposed:validatecall(#195)` (an analyzer that requires an exported function taking a type with `Validate` to call it before use).
 
 **Adversarial probe.** Feed every entry the same hostile list (signs, leading zeros, huge, negative, NUL, Unicode digits, spellings the resolver accepts) and compare what each entry does with the same value.
 
@@ -262,7 +262,7 @@ AUTOMATION names each check by kind and name, so that a test can verify that the
 
 **Test requirement.** A fuzz target for each parser with its corpus committed; a hostile-peer test (a fake that never stops sending, sends oversized replies, wrong source or wrong sequence); a test that a call's time stays within its budget against such a peer.
 
-**Automation.** `fuzz:FuzzAcceptDatagram`, `fuzz:FuzzSettingParsers`, `make:fuzz`, `lint:forcetypeassert`, `lint:gosec`; `proposed:TestEveryParserHasAFuzzTarget(#193)` (list the parsers by name and require a target for each); `proposed:g115` (replace the blanket gosec G115 exclusion with checked conversions or a reason per site).
+**Automation.** `fuzz:FuzzAcceptDatagram`, `fuzz:FuzzSettingParsers`, `make:fuzz`, `lint:forcetypeassert`, `lint:gosec`; `proposed:TestEveryParserHasAFuzzTarget(#193)` (list the parsers by name and require a target for each); `proposed:g115(#195)` (replace the blanket gosec G115 exclusion with checked conversions or a reason per site).
 
 **Adversarial probe.** A peer that answers first, answers forever, answers with every field at its extreme, or replays an old reply: measure time, memory and descriptors, and what the client does next.
 
@@ -277,7 +277,7 @@ AUTOMATION names each check by kind and name, so that a test can verify that the
 
 **Test requirement.** A table over all writers: operation name, ports, impact, scope; a gate refuses and a gate allows, each with the fake's write count; nothing sent on a refusal.
 
-**Automation.** `test:TestEveryWriteMethodIsInTheGateTable`, `test:TestEveryWriteMethodDeclaresItsOperation`, `test:TestOnlyKnownPlacesSendASET`; `proposed:TestWritersSendOnlyWhatTheirRowSays` (record the TLV types each writer sends and compare them with its settings row); `proposed:writerdiscovery` (find writers by their use of the single send function, not by a name prefix); `proposed:layering(#189)` (`depguard` and `forbidigo` rules: the value and gate packages do not import the client package, and a socket is written only in `transport.go` and `discover.go`).
+**Automation.** `test:TestEveryWriteMethodIsInTheGateTable`, `test:TestEveryWriteMethodDeclaresItsOperation`, `test:TestOnlyKnownPlacesSendASET`; `proposed:TestWritersSendOnlyWhatTheirRowSays(#195)` (record the TLV types each writer sends and compare them with its settings row); `proposed:writerdiscovery(#195)` (find writers by their use of the single send function, not by a name prefix); `proposed:layering(#189)` (`depguard` and `forbidigo` rules: the value and gate packages do not import the client package, and a socket is written only in `transport.go` and `discover.go`).
 
 **Adversarial probe.** For each writer, send the most dangerous valid argument through every gate combination and compare the bytes the fake received with the declared impact.
 
@@ -292,6 +292,6 @@ AUTOMATION names each check by kind and name, so that a test can verify that the
 
 **Test requirement.** `make apidiff` is clean or the break is listed with a migration row; tests with hand-built values (zero value, an unkeyed literal, a round trip through JSON and text); a runnable example for each new entry point.
 
-**Automation.** `make:apidiff`, `lint:exhaustive`, `lint:revive` (argument limit), `lint:recvcheck`, `test:TestEveryRefusedArgumentIsErrInvalid`; `proposed:apishape` (an analyzer over the exported API: an exported field and an unexported field of the same name, a function with more than three parameters of one type, an exported interface above a size, a closed-set type without `Validate` or `String`).
+**Automation.** `make:apidiff`, `lint:exhaustive`, `lint:revive` (argument limit), `lint:recvcheck`, `test:TestEveryRefusedArgumentIsErrInvalid`; `proposed:apishape(#195)` (an analyzer over the exported API: an exported field and an unexported field of the same name, a function with more than three parameters of one type, an exported interface above a size, a closed-set type without `Validate` or `String`).
 
 **Adversarial probe.** Write the ten-line consumer in five hostile styles: an unkeyed literal, a copy compared with `==`, a `switch` over every enum value without a default, an implementation of every exported interface, a JSON round trip of every type.
