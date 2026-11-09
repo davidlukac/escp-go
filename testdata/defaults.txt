@@ -1,0 +1,54 @@
+# What a zero Config resolves to in Dial, and the package limits and budgets a caller can run into.
+# A change here is a change of behavior for every caller that left the field out: the pull request names its consumers
+# (defect class DC-C03 of docs/defect-classes.md). Update with: UPDATE_DEFAULTS=1 go test -run TestTheConfigDefaultsAreTheSnapshot
+
+[Config with a Host]
+RelocateByMAC false
+Username ""
+Timeout 3s
+Retries 2
+SwitchPort 29808
+HostPort 29809
+BroadcastAddr 255.255.255.255
+WriteGate nil=true
+Logger nil=true
+first-contact-budget 1.5s
+claims-its-switch true
+
+[Config with a Host and NoRetries]
+RelocateByMAC false
+Username ""
+Timeout 3s
+Retries 0
+SwitchPort 29808
+HostPort 29809
+BroadcastAddr 255.255.255.255
+WriteGate nil=true
+Logger nil=true
+first-contact-budget 1.5s
+claims-its-switch true
+
+[Config with a MAC and no Host]
+RelocateByMAC false
+Username ""
+Timeout 3s
+Retries 2
+SwitchPort 29808
+HostPort 29809
+BroadcastAddr 255.255.255.255
+WriteGate nil=true
+Logger nil=true
+first-contact-budget 1.5s
+claims-its-switch true
+
+[package limits and budgets]
+NoRetries -1
+MaxRetries 10
+MaxTimeout 30s
+defaultDiscoverWindow 2s
+defaultFirstContactBudget 1.5s
+leaseWait 1m0s
+ipMoveWait 20s
+ipMovePoll 500ms
+settleBudget 15s
+drainWait 1ms
