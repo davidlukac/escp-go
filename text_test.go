@@ -3,6 +3,7 @@ package escp
 import (
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -13,31 +14,54 @@ import (
 // textFiles returns the repository's text files that carry prose or comments: Go, Markdown, YAML,
 // JSON, shell and the Makefile. History that quotes the past (the changelog, the Contributor Covenant
 // text) is not checked, and neither are the checks themselves, which name what they look for.
+// What is checked is what is published: the files git tracks. A file a developer keeps beside them and
+// git ignores (a local editor or assistant setting) is not, so it cannot fail the test on one machine only.
 func textFiles(t *testing.T) []string {
 	t.Helper()
 	skipDirs := map[string]bool{".git": true, "build": true, "devtools": true}
 	skipFiles := map[string]bool{"CHANGELOG.md": true, "CODE_OF_CONDUCT.md": true, "text_test.go": true, "go.sum": true}
 	var files []string
-	err := filepath.WalkDir(".", func(path string, d fs.DirEntry, err error) error {
-		switch {
-		case err != nil:
-			return err
-		case d.IsDir() && skipDirs[d.Name()]:
-			return filepath.SkipDir
-		case d.IsDir() || skipFiles[d.Name()]:
-			return nil
+	for _, path := range publishedFiles(t) {
+		inSkipped := false
+		for _, dir := range strings.Split(filepath.Dir(path), string(filepath.Separator)) {
+			inSkipped = inSkipped || skipDirs[dir]
+		}
+		if inSkipped || skipFiles[filepath.Base(path)] {
+			continue
 		}
 		switch ext := filepath.Ext(path); {
-		case ext == ".go" || ext == ".md" || ext == ".yml" || ext == ".json" || ext == ".sh", d.Name() == "Makefile":
+		case ext == ".go" || ext == ".md" || ext == ".yml" || ext == ".json" || ext == ".sh", filepath.Base(path) == "Makefile":
 			files = append(files, path)
 		}
-		return nil
+	}
+	if len(files) < 50 {
+		t.Fatalf("found only %d text files: the list of files is broken", len(files))
+	}
+	return files
+}
+
+// publishedFiles lists the files git tracks. Without git (the module's sources unpacked from an archive)
+// it walks the tree, where nothing is ignored.
+func publishedFiles(t *testing.T) []string {
+	t.Helper()
+	if out, err := exec.Command("git", "ls-files", "-z").Output(); err == nil {
+		var files []string
+		for _, path := range strings.Split(string(out), "\x00") {
+			if path != "" {
+				files = append(files, filepath.FromSlash(path))
+			}
+		}
+		return files
+	}
+	var files []string
+	err := filepath.WalkDir(".", func(path string, d fs.DirEntry, err error) error {
+		if err == nil && !d.IsDir() {
+			files = append(files, path)
+		}
+		return err
 	})
 	if err != nil {
 		t.Fatal(err)
-	}
-	if len(files) < 50 {
-		t.Fatalf("found only %d text files: the walk is broken", len(files))
 	}
 	return files
 }
