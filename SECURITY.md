@@ -19,6 +19,8 @@ The library speaks the switch's own management protocol (ESCP), which has **no r
 - The client shares its UDP reply port (`SO_REUSEPORT`) so several switches can be managed at once. Other processes on the same host that bind the port the same way can see replies, and the switches address their replies to the broadcast address, so every host of the segment sees them too; do not run it on a shared multi-user host or on a segment you do not control.
 - The write gates (`safety`) protect against self-inflicted lockouts, not against an attacker on the segment.
 
+The checklists a review runs against this design (the threat model in full, and what is and is not defended) are in [docs/adversarial-review.md](docs/adversarial-review.md). What is reported, and how, is unchanged: privately, as above.
+
 ## In scope
 
 Bugs in this library that leak credentials (logs, error messages), bypass a write gate, panic or hang on malformed replies, or let a reply from the wrong device be accepted. Weaknesses of the vendor protocol itself are documented above and are out of scope.

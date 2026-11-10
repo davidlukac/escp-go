@@ -10,5 +10,7 @@ The API reference is on [pkg.go.dev](https://pkg.go.dev/github.com/davidlukac/es
 | [Logging](logging.md) | route the library's log lines into your own logging, and what they contain |
 | [Testing against the fake switch](testing.md) | test code that uses the client without hardware (`escptest`) |
 | [Architecture](architecture.md) | find your way in the code, and the naming conventions (contributors) |
+| [Defect classes](defect-classes.md) | find which questions to ask and which tests to write for your change, from the classes of defect that reached a release (contributors) |
+| [Adversarial review](adversarial-review.md) | the architecture and security checklists, the threat model, and how findings are reported (contributors and reviewers) |
 | [PROTOCOL.md](../PROTOCOL.md) | the wire protocol and what was measured on hardware |
 | [CONTRIBUTING.md](../CONTRIBUTING.md) | add or change a setting |

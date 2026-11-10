@@ -51,4 +51,4 @@ A test that checks "nothing was written" should assert `sw.WriteCount() == 0`, a
 
 ## What it is not
 
-It keeps no state until you enable it, models only the TL-SG108E, and answers faster and more reliably than a real management CPU. A rule that is only assumed is marked as such in a comment in the source. Verify a change on a real switch (the `live` tests in the repository) before you trust it.
+It keeps no state until you enable it, models only the TL-SG108E, and answers faster and more reliably than a real management CPU. A rule that is only assumed is marked as such in a comment in the source. Verify a change on a real switch (the `live` tests in the repository) before you trust it. The same holds for the library's own tests: the fake is checked against more than the code under test ([DC-C05](defect-classes.md#dc-c05)).
