@@ -5,7 +5,7 @@
 # Dependabot bumps them there. `go tool` builds the pinned version on first use (cached afterwards).
 DEVTOOL := go tool -modfile=devtools/go.mod
 
-.PHONY: test lint spell actionlint vuln cover cover-html apidiff fuzz mutation mutation-diff pkgdoc pkgdoc-serve compat-table settings-docs soak hooks pre-commit
+.PHONY: test lint spell actionlint modcheck vuln cover cover-html apidiff fuzz mutation mutation-diff pkgdoc pkgdoc-serve compat-table settings-docs soak hooks pre-commit
 
 # Unit tests against the fake switch. No hardware is touched.
 test:
@@ -33,9 +33,18 @@ lint: spell
 	$(DEVTOOL) golangci-lint run --build-tags live ./...
 	@bin="$$($(DEVTOOL) -n golangci-lint)"; for os in $(LINT_GOOS); do echo "golangci-lint run (GOOS=$$os)"; GOOS=$$os "$$bin" run ./... || exit 1; done
 
-# The workflow files, with the pinned actionlint (it runs shellcheck on the scripts when that is installed).
+# The workflow files, with the pinned actionlint (it runs shellcheck on the scripts when that is installed);
+# the pre-commit hook runs it for a staged workflow, CI for every pull request.
 actionlint:
 	$(DEVTOOL) actionlint
+
+# The module files: tidy would change nothing (this module and devtools), and every downloaded
+# dependency matches go.sum.
+modcheck:
+	go mod tidy -diff
+	go -C devtools mod tidy -diff
+	go mod verify
+	go -C devtools mod verify
 
 # Known vulnerabilities in the code and its dependencies.
 vuln:

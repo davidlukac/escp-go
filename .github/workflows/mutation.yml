@@ -41,6 +41,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0
       - uses: ./.github/actions/setup
         with:
@@ -61,6 +62,7 @@ jobs:
     permissions:
       contents: write # the badge goes to the `badges` branch, as the coverage badge does
     steps:
+      # The one checkout that keeps its credentials: the badges branch is pushed below.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
         with:
