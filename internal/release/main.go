@@ -25,6 +25,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -91,12 +92,7 @@ func insertEntry(changelog, ver, line string) (string, error) {
 
 // hasEntry reports whether the changelog has a heading "## ver" of its own.
 func hasEntry(changelog, ver string) bool {
-	for _, l := range strings.Split(changelog, "\n") {
-		if l == "## "+ver {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(strings.Split(changelog, "\n"), "## "+ver)
 }
 
 // tools is what the command needs from the machine: git and make in the repository, and its files.
@@ -247,7 +243,7 @@ func (t tools) newerThanLatest(v version) error {
 	if err != nil {
 		return fmt.Errorf("git tag: %w: %s", err, out)
 	}
-	for _, name := range strings.Split(out, "\n") {
+	for name := range strings.SplitSeq(out, "\n") {
 		latest, err := parseVersion(strings.TrimPrefix(name, "v"))
 		if err != nil {
 			continue // a tag that is no release version

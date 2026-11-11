@@ -1,5 +1,7 @@
 package model
 
+import "slices"
+
 // Method is the name of a Client method: the identity of a read or a write in the settings table,
 // in the Operation a WriteGate is handed, and in the log. It is the text of the method's own name,
 // so it reads the same in a log line, a JSON file and a dry-run report. The constants below are the
@@ -56,10 +58,8 @@ func (m Method) String() string { return string(m) }
 // matches ErrInvalid.
 func (m Method) Validate() error {
 	for _, s := range settings {
-		for _, r := range s.Reads {
-			if r == m {
-				return nil
-			}
+		if slices.Contains(s.Reads, m) {
+			return nil
 		}
 		for _, w := range s.Writes {
 			if w.Name == m {

@@ -15,11 +15,11 @@ import (
 // properties each function promises hold. `go test` runs the seed corpus; run
 // `go test -fuzz=<Name> -fuzztime=30s .` to explore further.
 
-func mustHex(t testing.TB, s string) []byte {
-	t.Helper()
+func mustHex(tb testing.TB, s string) []byte {
+	tb.Helper()
 	b, err := hex.DecodeString(s)
 	if err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
 	return b
 }

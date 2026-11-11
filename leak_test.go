@@ -22,7 +22,7 @@ func libraryGoroutines(t *testing.T) []string {
 		t.Fatal(err)
 	}
 	var left []string
-	for _, stack := range strings.Split(profile.String(), "\n\n") {
+	for stack := range strings.SplitSeq(profile.String(), "\n\n") {
 		switch {
 		case !strings.Contains(stack, "github.com/davidlukac/escp-go"):
 		case strings.Contains(stack, "testing.tRunner"), strings.Contains(stack, "testing.(*T).Run"), strings.Contains(stack, "testing.runTests"):

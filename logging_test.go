@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"net/netip"
 	"slices"
 	"strings"
@@ -41,9 +42,7 @@ func (r *logRecorder) Enabled(context.Context, slog.Level) bool { return true }
 func (r *logRecorder) Handle(_ context.Context, rec slog.Record) error {
 	attrs := map[string]any{}
 	var dupes []string
-	for k, v := range r.with {
-		attrs[k] = v
-	}
+	maps.Copy(attrs, r.with)
 	rec.Attrs(func(a slog.Attr) bool {
 		if _, again := attrs[a.Key]; again {
 			dupes = append(dupes, a.Key)
@@ -58,9 +57,7 @@ func (r *logRecorder) Handle(_ context.Context, rec slog.Record) error {
 }
 func (r *logRecorder) WithAttrs(as []slog.Attr) slog.Handler {
 	with := map[string]any{}
-	for k, v := range r.with {
-		with[k] = v
-	}
+	maps.Copy(with, r.with)
 	dupes := append([]string(nil), r.dupes...)
 	for _, a := range as {
 		if _, again := with[a.Key]; again {

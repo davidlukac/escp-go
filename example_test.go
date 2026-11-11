@@ -152,8 +152,7 @@ func ExampleRejectedError() {
 	err := fmt.Errorf("creating the group: %w", &escp.RejectedError{Code: 4})
 
 	fmt.Println(errors.Is(err, escp.ErrRejected))
-	var rejected *escp.RejectedError
-	if errors.As(err, &rejected) {
+	if rejected, ok := errors.AsType[*escp.RejectedError](err); ok {
 		fmt.Println("code", rejected.Code)
 	}
 	// Output:

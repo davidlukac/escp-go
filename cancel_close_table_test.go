@@ -69,8 +69,7 @@ func closeRows() []closeRow {
 func contextMethods(typ reflect.Type) []string {
 	ctxType := reflect.TypeFor[context.Context]()
 	var names []string
-	for i := range typ.NumMethod() {
-		m := typ.Method(i)
+	for m := range typ.Methods() {
 		for j := 1; j < m.Type.NumIn(); j++ { // 0 is the receiver
 			if m.Type.In(j) == ctxType {
 				names = append(names, m.Name)
@@ -166,6 +165,7 @@ func reachedOnly(t *testing.T, f *escptest.Switch, before int, probe *Client) {
 
 // A call whose context is already canceled returns the context's error and sends nothing.
 func canceledCallSendsNothing(t *testing.T, call func(context.Context, *Client) error) {
+	t.Helper()
 	f := escptest.Start(t)
 	f.EnableModel(nil)
 	c, probe := usedClient(t, f, 300*time.Millisecond), usedClient(t, f, 300*time.Millisecond)
@@ -181,6 +181,7 @@ func canceledCallSendsNothing(t *testing.T, call func(context.Context, *Client) 
 // A call cut off by Close while the switch stays silent returns ErrClosed, and sends nothing more:
 // not a retry, and not on a socket the client opened again.
 func closeEndsACallWaitingForASilentSwitch(t *testing.T, call func(context.Context, *Client) error) {
+	t.Helper()
 	f := escptest.Start(t)
 	f.EnableModel(nil)
 	c := usedClient(t, f, 30*time.Second) // what the call would wait for without Close: minutes
@@ -219,6 +220,7 @@ func closeEndsACallWaitingForASilentSwitch(t *testing.T, call func(context.Conte
 
 // A call after Close returns ErrClosed and sends nothing.
 func callAfterCloseSendsNothing(t *testing.T, call func(context.Context, *Client) error) {
+	t.Helper()
 	f := escptest.Start(t)
 	f.EnableModel(nil)
 	c, probe := usedClient(t, f, 300*time.Millisecond), usedClient(t, f, 300*time.Millisecond)

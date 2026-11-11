@@ -45,10 +45,12 @@ func pollUntil(ctx context.Context, wait, poll time.Duration, probe func(context
 			return true
 		}
 		again(ctx)
+		pause := time.NewTimer(poll)
 		select {
 		case <-ctx.Done():
+			pause.Stop()
 			return false
-		case <-time.After(poll):
+		case <-pause.C:
 		}
 	}
 }

@@ -146,8 +146,8 @@ func skipRawText(s, name string) string {
 
 // afterFirst returns what follows the first sep in s, or nothing when there is none.
 func afterFirst(s, sep string) string {
-	if i := strings.Index(s, sep); i >= 0 {
-		return s[i+len(sep):]
+	if _, after, ok := strings.Cut(s, sep); ok {
+		return after
 	}
 	return ""
 }

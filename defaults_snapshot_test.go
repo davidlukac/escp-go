@@ -157,7 +157,7 @@ func timeSelectors(fset *token.FileSet, file *ast.File) (decls, funcs map[string
 // shownNames is the first word of every line of the snapshot: the names it shows a value for.
 func shownNames(snapshot string) map[string]bool {
 	shown := map[string]bool{}
-	for _, line := range strings.Split(snapshot, "\n") {
+	for line := range strings.SplitSeq(snapshot, "\n") {
 		if name, _, found := strings.Cut(line, " "); found {
 			shown[name] = true
 		}
@@ -214,7 +214,7 @@ func unlistedDefaults(t *testing.T, snapshot string) []string {
 func sectionLines(text string) []string {
 	var out []string
 	section := ""
-	for _, l := range strings.Split(text, "\n") {
+	for l := range strings.SplitSeq(text, "\n") {
 		switch {
 		case l == "" || strings.HasPrefix(l, "#"):
 		case strings.HasPrefix(l, "["):

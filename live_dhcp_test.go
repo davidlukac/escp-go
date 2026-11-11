@@ -30,7 +30,7 @@ func TestLiveDHCPProbe(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ESCP_MAC must name the switch: %v", err)
 	}
-	for _, ro := range strings.Split(os.Getenv("ESCP_LIVE_READONLY_MACS"), ",") {
+	for ro := range strings.SplitSeq(os.Getenv("ESCP_LIVE_READONLY_MACS"), ",") {
 		if strings.EqualFold(strings.TrimSpace(ro), mac.String()) {
 			t.Fatalf("refusing: %s is listed in ESCP_LIVE_READONLY_MACS", mac)
 		}

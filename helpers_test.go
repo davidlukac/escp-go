@@ -18,14 +18,14 @@ const testMovePoll = 20 * time.Millisecond
 // immediately, retrying with another port if something grabbed the first one
 // in the meantime. Once it returns, the port is held by the client, so two
 // tests can never end up on the same port.
-func newBoundClient(t testing.TB, cfg Config, opts ...dialOption) *Client {
-	t.Helper()
+func newBoundClient(tb testing.TB, cfg Config, opts ...dialOption) *Client {
+	tb.Helper()
 	var lastErr error
 	for range 20 {
-		cfg.HostPort = escptest.FreeUDPPort(t)
+		cfg.HostPort = escptest.FreeUDPPort(tb)
 		c, err := dial(context.Background(), net.DefaultResolver, cfg, append([]dialOption{withMovePoll(testMovePoll)}, opts...)...)
 		if err != nil {
-			t.Fatal(err)
+			tb.Fatal(err)
 		}
 		c.mu.Lock()
 		lastErr = c.open(context.Background())
@@ -34,7 +34,7 @@ func newBoundClient(t testing.TB, cfg Config, opts ...dialOption) *Client {
 			return c
 		}
 	}
-	t.Fatalf("no free UDP port after 20 attempts: %v", lastErr)
+	tb.Fatalf("no free UDP port after 20 attempts: %v", lastErr)
 	return nil
 }
 
@@ -57,11 +57,11 @@ func dialFast(t *testing.T, f *escptest.Switch, pass Password, opts ...dialOptio
 }
 
 // localPort is the UDP port a socket is bound to.
-func localPort(t testing.TB, c interface{ LocalAddr() net.Addr }) int {
-	t.Helper()
+func localPort(tb testing.TB, c interface{ LocalAddr() net.Addr }) int {
+	tb.Helper()
 	ap, err := udp.AddrPort(c.LocalAddr())
 	if err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
 	return int(ap.Port())
 }

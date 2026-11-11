@@ -277,7 +277,7 @@ AUTOMATION names each check by kind and name, so that a test can verify that the
 
 **Test requirement.** A table over all writers: operation name, ports, impact, scope; a gate refuses and a gate allows, each with the fake's write count; nothing sent on a refusal.
 
-**Automation.** `test:TestEveryWriteMethodIsInTheGateTable`, `test:TestEveryWriteMethodDeclaresItsOperation`, `test:TestOnlyKnownPlacesSendASET`; `proposed:TestWritersSendOnlyWhatTheirRowSays(#195)` (record the TLV types each writer sends and compare them with its settings row); `proposed:writerdiscovery(#195)` (find writers by their use of the single send function, not by a name prefix); `proposed:layering(#189)` (`depguard` and `forbidigo` rules: the value and gate packages do not import the client package, and a socket is written only in `transport.go` and `discover.go`).
+**Automation.** `test:TestEveryWriteMethodIsInTheGateTable`, `test:TestEveryWriteMethodDeclaresItsOperation`, `test:TestOnlyKnownPlacesSendASET`; `proposed:TestWritersSendOnlyWhatTheirRowSays(#195)` (record the TLV types each writer sends and compare them with its settings row); `proposed:writerdiscovery(#195)` (find writers by their use of the single send function, not by a name prefix); `lint:depguard` (rules `model-layer`, `safety-layer` and `no-fake-in-production`: the value and gate packages import only what the architecture guide lists, so never the client package, and production code never imports the fake), `lint:forbidigo` (a socket is written only in `transport.go` and `discover.go`, and `time.After` is banned).
 
 **Adversarial probe.** For each writer, send the most dangerous valid argument through every gate combination and compare the bytes the fake received with the declared impact.
 

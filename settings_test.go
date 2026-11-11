@@ -27,7 +27,7 @@ func registeredImpact(method Method) Impact {
 // The table is the one list of what the client reads and writes: a method of the client that is not
 // in it (or a row for a method that does not exist) is a mistake the tests name.
 func TestTheSettingsTableListsEveryReaderAndWriter(t *testing.T) {
-	typ := reflect.TypeOf(&Client{})
+	typ := reflect.TypeFor[*Client]()
 	var rows, written []string
 	for _, s := range Settings() {
 		for _, r := range s.Reads {
@@ -55,8 +55,8 @@ func TestTheSettingsTableListsEveryReaderAndWriter(t *testing.T) {
 		}
 	}
 	// the readers of the Reader interface and the others the guides name are all in the table
-	for i := range reflect.TypeOf((*Reader)(nil)).Elem().NumMethod() {
-		name := reflect.TypeOf((*Reader)(nil)).Elem().Method(i).Name
+	for method := range reflect.TypeFor[Reader]().Methods() {
+		name := method.Name
 		if name == "SwitchMAC" {
 			continue // the identity of the switch, an accessor and no page of the web UI
 		}

@@ -25,7 +25,7 @@ For people who work on the library. Users want the [guides](README.md); the chec
 
 The module path is the repository's, `github.com/davidlukac/escp-go`, so the import paths are that, `.../escp-go/model`, `.../escp-go/safety` and `.../escp-go/escptest`; the packages themselves are named `escp`, `model`, `safety` and `escptest`, and the documentation calls them that.
 
-Dependencies point one way: `escp` (the client) depends on `model`; `safety` and `escptest` depend on `model`; `model` depends on nothing of the module but `internal/wire` (lengths) and `internal/invalid`. `model` never imports the client, and a test (`model/layers_test.go`) says so.
+Dependencies point one way: `escp` (the client) depends on `model`; `safety` and `escptest` depend on `model`; `model` depends on nothing of the module but `internal/wire` (lengths) and `internal/invalid`. `model` never imports the client, and a test (`model/layers_test.go`) says so. `make lint` enforces the same arrows with `depguard` (`.golangci.yml`: a production file of `model` or `safety` may import only the packages named there, and none may import the fake), and with `forbidigo` it keeps a write to a socket in `transport.go` and `discover.go`.
 
 ## Layout of the root package and of the model
 
