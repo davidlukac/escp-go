@@ -31,7 +31,7 @@ How to use this page:
 
 Each entry has the same fields, in this order: the rule in one sentence; why (what happened); the DESIGN question; the TEST requirement; AUTOMATION; the ADVERSARIAL probe.
 
-AUTOMATION names each check by kind and name, so that a test can verify that the name exists. The kinds are `test:` (a test function), `fuzz:` (a fuzz target), `make:` (a Makefile target), `lint:` (a linter enabled in `.golangci.yml`), `analyzer:` (a directory of `devtools/`), `script:` (a path), `workflow:` (a file in `.github/workflows/`), `reading:` (it cannot be scripted; the reason follows) and `proposed:` (not built yet; the name is followed by the issue that tracks it in parentheses; #195 tracks the ones that have no issue of their own). A claim that a check exists without a name is not accepted; `proposed:catalogcheck(#191)` is the check that every name in this page resolves.
+AUTOMATION names each check by kind and name, so that a test can verify that the name exists. The kinds are `test:` (a test function), `fuzz:` (a fuzz target), `make:` (a Makefile target), `lint:` (a linter enabled in `.golangci.yml`), `analyzer:` (a directory of `devtools/`, or the name an analyzer declared there carries), `script:` (a path), `workflow:` (a file in `.github/workflows/`), `reading:` (it cannot be scripted; the reason follows) and `proposed:` (not built yet; the name is followed by the issue that tracks it in parentheses; #195 tracks the ones that have no issue of their own). A claim that a check exists without a name is not accepted. `make lint` runs `devtools/catalogcheck` (`make catalogcheck`), which fails with one line per problem when a name in this page does not resolve (a renamed test, a removed target), when a `reading:` has no reason or a `proposed:` no issue, when a `proposed:` names something that exists already (write it with its kind), when a field of an entry is missing or out of order, when an entry is not in the routing table, and when an id or a link to this page written anywhere else in the repository resolves to nothing.
 
 ---
 
@@ -48,7 +48,7 @@ AUTOMATION names each check by kind and name, so that a test can verify that the
 
 **Test requirement.** One test per promise, observing it from outside: datagrams the fake received (not what the code intended to send), elapsed time against a bound with a deliberately blocked dependency, `errors.Is` and `errors.As` on the result. "Sends nothing" asserts the fake's count; "returns in moments" asserts a bounded wait; "never" has a test that tries to make it happen.
 
-**Automation.** `test:TestEveryGoBlockOfTheDocumentationCompiles`, `test:TestEveryErrorIsInTheErrorsGuide`, `test:TestEveryLoggedAttributeIsInTheLoggingGuide` (three kinds of claim that are checked today); `proposed:guarantee(#191)` (a `// guarantee: <Name>` marker in a test of the package, matched by an analyzer, in report mode first, with each exported identifier whose doc comment states a guarantee); `reading:` deciding which sentence is a guarantee needs a person.
+**Automation.** `test:TestEveryGoBlockOfTheDocumentationCompiles`, `test:TestEveryErrorIsInTheErrorsGuide`, `test:TestEveryLoggedAttributeIsInTheLoggingGuide` (three kinds of claim that are checked today); `analyzer:guarantee` (`make guarantee`, part of `make lint`: each exported identifier whose doc comment states a guarantee, matched with a `// guarantee: <Name>` marker in a test of its package; in report mode, it lists the identifiers without a marker and the count and does not fail the build, until the existing tests carry their markers and `-strict` is turned on); `reading:` deciding which sentence is a guarantee needs a person.
 
 **Adversarial probe.** Read each doc comment of the identifiers you touched and write the call that makes it false: cancel in the middle, `Close` in the middle, two callers at once, a lost reply, the zero value, a nil context.
 
@@ -63,7 +63,7 @@ AUTOMATION names each check by kind and name, so that a test can verify that the
 
 **Test requirement.** A test that fails when a copy drifts: a generated table compared with the file, snippets compiled, a list compared with the code in both directions (nothing missing, nothing extra).
 
-**Automation.** `test:TestTheGeneratedTablesAreCurrent` and `make:settings-docs` (settings table, impact classes, validators); `test:TestReadmeCompatibilityTable` and `make:compat-table`; `test:TestEveryGoBlockOfTheDocumentationCompiles`; `lint:misspell`; `proposed:stalenames(#195)` (a script that lists, for every exported identifier removed or renamed since the last tag, each place in the documentation that still uses it).
+**Automation.** `test:TestTheGeneratedTablesAreCurrent` and `make:settings-docs` (settings table, impact classes, validators); `test:TestReadmeCompatibilityTable` and `make:compat-table`; `test:TestEveryGoBlockOfTheDocumentationCompiles`; `lint:misspell`; `analyzer:catalogcheck` (every name this page gives to a check, and every id of it and link to it written elsewhere in the repository, resolves); `proposed:stalenames(#195)` (a script that lists, for every exported identifier removed or renamed since the last tag, each place in the documentation that still uses it).
 
 **Adversarial probe.** Rename an identifier or change a limit and search every place that states it; each place that stays green is the finding.
 
@@ -78,7 +78,7 @@ AUTOMATION names each check by kind and name, so that a test can verify that the
 
 **Test requirement.** A test in each consumer that fails on the old assumption; the migration row in the changelog names the issue and what a user does.
 
-**Automation.** `make:apidiff` (signatures only); `proposed:consumers(#195)` (a script that searches the known consumer repositories, examples and docs for each identifier an API diff removes or changes); `proposed:canary(#195)` (a CI job in the provider that builds and tests it against this library's `main`); `proposed:defaultssnapshot(#190)` (a test that renders every default and limit of `Config` to `testdata/defaults.txt`, so a flipped default shows in the diff).
+**Automation.** `make:apidiff` (signatures only); `proposed:consumers(#195)` (a script that searches the known consumer repositories, examples and docs for each identifier an API diff removes or changes); `proposed:canary(#195)` (a CI job in the provider that builds and tests it against this library's `main`); `test:TestTheConfigDefaultsAreTheSnapshot` (renders every default and limit of `Config`, and every duration of the package, to `testdata/defaults.txt`, so a flipped default shows in the diff of its pull request).
 
 **Adversarial probe.** For each changed exported identifier or default, search all repositories and the docs for its use; flip the default and run every other suite.
 
@@ -121,7 +121,7 @@ AUTOMATION names each check by kind and name, so that a test can verify that the
 
 **Design question.** What does this test wait for? What resource does it hold, and who releases it?
 
-**Test requirement.** Synchronize with channels and contexts, never with a sleep; release with `t.Cleanup`; ports from an allocator that gives them back; a deterministic clock or a bounded wait for anything timed.
+**Test requirement.** Synchronize with channels and contexts, never with a sleep; release with `t.Cleanup`; ports from an allocator that gives them back; a deterministic clock or a bounded wait for anything timed. Where the fake is muted so that a call parks in its wait, a wrapper around the client's own socket (the package's `datagramConn` seam; `signalingConn` in `cancel_close_table_test.go` is one) that signals when the call has reached the read is an acceptable way to know that the call is waiting, and replaces a sleep.
 
 **Automation.** `make:soak` (weekly: shuffled, repeated, with the race detector, on three operating systems); `workflow:weekly.yml`; `proposed:nosleep(#195)` (a `forbidigo` pattern for `time.Sleep` in tests, with a reason-comment escape).
 
@@ -168,7 +168,7 @@ AUTOMATION names each check by kind and name, so that a test can verify that the
 
 **Test requirement.** A dry run in CI for every publishing step (a snapshot build, an install check); every workflow linted.
 
-**Automation.** `make:actionlint`, `workflow:test.yml`, `workflow:release.yml`, `workflow:weekly.yml`, `workflow:codeql.yml`; `proposed:ci-hygiene(#192)` (a module tidy and verify check, `make actionlint` in CI, no persisted checkout credentials, job-level permissions); `proposed:settingscheck(#195)` (a script that reads the repository's rulesets and required checks through the API and compares them with a committed expectation).
+**Automation.** `make:actionlint`, `workflow:test.yml`, `workflow:release.yml`, `workflow:weekly.yml`, `workflow:codeql.yml`; `make:modcheck` (`go mod tidy -diff` and `go mod verify`, for the module and for `devtools`) and `make:actionlint`, both run by `workflow:test.yml` on every pull request; `reading:` that every checkout sets `persist-credentials: false` and that a workflow's permissions are read-only unless a job writes is checked by a person at review, no check fails when a new workflow omits them; `proposed:settingscheck(#195)` (a script that reads the repository's rulesets and required checks through the API and compares them with a committed expectation).
 
 **Adversarial probe.** A pull request from a fork that edits a workflow; a tag pushed by someone with write access; a compromised dependency (TM-10 of the [adversarial checklist](adversarial-review.md)).
 
@@ -187,7 +187,7 @@ AUTOMATION names each check by kind and name, so that a test can verify that the
 
 **Test requirement.** For each blocking call, a cancel test and a `Close` test against a fake that never answers: it returns within a bound, `errors.Is(err, ErrClosed)` (or the context's error) holds, and the fake received no datagram after `Close` began.
 
-**Automation.** `test:TestCloseEndsTheCallInFlightAndTheCallsWaitingBehindIt`, `test:TestAWriteCutShortByCloseReturnsErrClosed`, `test:TestUsedAndClosedClientsLeaveNoGoroutinesBehind`, `lint:contextcheck`, `lint:noctx`; `proposed:TestEveryMethodEndsWithItsContextAndClose(#190)` (reflect over every exported method of `Client` that takes a context and require a row for it in a table of cancel and `Close` cases, against a muted fake); `proposed:lockwait(#188)` (an analyzer that flags a blocking operation while a mutex is held; an intended wait carries `// lockwait: <reason>`); `proposed:waitcheck(#195)` (an analyzer that flags a blocking call in a function that takes a context and never selects on it); `reading:` whether holding a lock across I/O is intended.
+**Automation.** `test:TestCloseEndsTheCallInFlightAndTheCallsWaitingBehindIt`, `test:TestAWriteCutShortByCloseReturnsErrClosed`, `test:TestUsedAndClosedClientsLeaveNoGoroutinesBehind`, `lint:contextcheck`, `lint:noctx`; `test:TestEveryMethodEndsWithItsContextAndClose` (reflects over every exported method of `Client` that takes a context and requires a row for it in a table of cancel and `Close` cases, against a muted fake; a method without a row, and a row without a method, fail); `proposed:lockwait(#188)` (an analyzer that flags a blocking operation while a mutex is held; an intended wait carries `// lockwait: <reason>`); `proposed:waitcheck(#195)` (an analyzer that flags a blocking call in a function that takes a context and never selects on it); `reading:` whether holding a lock across I/O is intended.
 
 **Adversarial probe.** Call every method against a muted switch and cancel or `Close` at a random moment; after `Close`, assert no goroutine, no socket and no datagram. Call every method on the zero value, with a nil context, after `Close` and during `Close`.
 
@@ -213,7 +213,7 @@ AUTOMATION names each check by kind and name, so that a test can verify that the
 
 **Why.** `SetHostname` read the management settings, released the lock and wrote them back, which undid a concurrent `SetIPConfig` in about one run in six when a gate read first (#141). Two limit guards had the same shape and were found only when the fixes were read together (#183).
 
-**Design question.** What does this call read before it writes? What can another caller change in between? Does the critical section cover the whole read and write, including the gate?
+**Design question.** What does this call read before it writes? What can another caller change in between? Does the critical section cover the whole read and write, including the gate? A discovery read counts as the read: `SetHostname` reads the address settings with `Info` (a discovery probe) and writes them back, so it is a read-modify-write like one that reads a setting page.
 
 **Test requirement.** A test that parks the first call between its read and its write (a gate or a hook), completes a second call, releases the first and asserts the final state; it must fail against the code without the lock.
 
@@ -245,7 +245,7 @@ AUTOMATION names each check by kind and name, so that a test can verify that the
 
 **Design question.** Which inputs does this change add? For each: its type, its `Validate`, every place it enters (argument, JSON, text, configuration, wire), and its zero and empty meaning.
 
-**Test requirement.** For each type, a table of valid and invalid values at the boundaries, a round trip (`Marshal`, `Unmarshal`, `Validate`), "decode accepts only what `Validate` accepts", nothing sent when refused, and hostile strings (a NUL, 4 MB, a leading "+", full-width digits, bidirectional controls, zero).
+**Test requirement.** For each type, a table of valid and invalid values at the boundaries, including the reserved and special ranges of a value that names an address (unspecified, "this network" 0.0.0.0/8, loopback, multicast, link-local, 240.0.0.0/4 with the limited broadcast, and the network and broadcast address of the subnet: a validator that accepts one as a management address is the defect, as in #163), a round trip (`Marshal`, `Unmarshal`, `Validate`), "decode accepts only what `Validate` accepts", nothing sent when refused, and hostile strings (a NUL, 4 MB, a leading "+", full-width digits, bidirectional controls, zero).
 
 **Automation.** `test:TestEveryRefusedArgumentIsErrInvalid`, `test:TestEveryNamedValueReadsBackFromItsText`, `fuzz:FuzzParseMAC`, `fuzz:FuzzSettingParsers`; `proposed:TestDecodersAgreeWithValidate(#195)` (reflect over every exported type with `Validate` and `UnmarshalText`: any input the decoder accepts must satisfy `Validate`); `proposed:validatecall(#195)` (an analyzer that requires an exported function taking a type with `Validate` to call it before use).
 
@@ -262,7 +262,7 @@ AUTOMATION names each check by kind and name, so that a test can verify that the
 
 **Test requirement.** A fuzz target for each parser with its corpus committed; a hostile-peer test (a fake that never stops sending, sends oversized replies, wrong source or wrong sequence); a test that a call's time stays within its budget against such a peer.
 
-**Automation.** `fuzz:FuzzAcceptDatagram`, `fuzz:FuzzSettingParsers`, `make:fuzz`, `lint:forcetypeassert`, `lint:gosec`; `proposed:TestEveryParserHasAFuzzTarget(#193)` (list the parsers by name and require a target for each); `proposed:g115(#195)` (replace the blanket gosec G115 exclusion with checked conversions or a reason per site).
+**Automation.** `fuzz:FuzzAcceptDatagram`, `fuzz:FuzzSettingParsers`, `make:fuzz`, `lint:forcetypeassert`, `lint:gosec`; `test:TestEveryParserHasAFuzzTarget` (finds every function or method that is named `parse*`, `decode*` or `unmarshal*` (or is on a short list of others) and takes bytes, a string or a TLV list, and requires a `Fuzz` function that reaches it, or an entry with the reason why not that a person reads at review); `proposed:g115(#195)` (replace the blanket gosec G115 exclusion with checked conversions or a reason per site).
 
 **Adversarial probe.** A peer that answers first, answers forever, answers with every field at its extreme, or replays an old reply: measure time, memory and descriptors, and what the client does next.
 
@@ -288,7 +288,7 @@ AUTOMATION names each check by kind and name, so that a test can verify that the
 
 **Why.** `Firmware.Build` was exported beside an unexported string it had to agree with, so a hand-built value passed a check yet printed empty (#167). `Operation.Name` was a string, so a misspelling was a different operation (#111). Adding a method to `Reader` forced every implementer to change (0.8.0). A validation helper that exists for tests was public. Renames were needed in 0.2.0, 0.3.0, 0.4.0 and 0.8.0, each of which a look at the surface with this question would have avoided.
 
-**Design question.** Could I add a field, value, method or argument next year without a break? What if a user builds the value by hand, compares it, switches over it, implements it or embeds it? What is its zero value, and what does a changed default do to an existing caller?
+**Design question.** Could I add a field, value, method or argument next year without a break? What if a user builds the value by hand, compares it, switches over it, implements it or embeds it? What is its zero value, and what does a changed default do to an existing caller? `model.Reader` is the one wide interface on purpose, and it agrees with the rule against an interface that implementers must grow: the rule that a run-time type assertion that decides behavior means the interface lacks a method says to hand a gate the wide `Reader` (it must look at several settings) and not one method plus an assertion for the rest. `Reader` has one real implementer, `*Client`; callers take it (a gate) and a test double embeds it, so a method added to it breaks nobody who embeds, but it does break a type that implements all of it by hand (0.8.0 added `SwitchMAC`). So a method added to `Reader` is an exported change like any other: route it here, ask whether a gate needs it, and give it a migration row that says to embed `Reader`.
 
 **Test requirement.** `make apidiff` is clean or the break is listed with a migration row; tests with hand-built values (zero value, an unkeyed literal, a round trip through JSON and text); a runnable example for each new entry point.
 

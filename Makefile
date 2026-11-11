@@ -53,6 +53,24 @@ modcheck:
 	go mod verify
 	go -C devtools mod verify
 
+# Two checks of the project's own, run by `make lint` (they are prerequisites of it, so a change to the
+# lint recipe does not touch them):
+#   catalogcheck  every name the defect catalog gives to a check resolves: a renamed test or a removed
+#                 target fails here (devtools/catalogcheck; it exits 1 with one line per problem);
+#   guarantee     the exported identifiers whose doc comment states a guarantee and that no test names
+#                 with a `// guarantee: <Name>` marker (devtools/guarantee; report mode, never fails
+#                 the build: it lists them and prints the count; `build/guarantee -strict` fails).
+.PHONY: catalogcheck guarantee
+lint: catalogcheck guarantee
+
+catalogcheck:
+	go -C devtools build -o $(CURDIR)/build/catalogcheck ./catalogcheck
+	build/catalogcheck -root .
+
+guarantee:
+	go -C devtools build -o $(CURDIR)/build/guarantee ./guarantee
+	build/guarantee -root .
+
 # Known vulnerabilities in the code and its dependencies.
 vuln:
 	$(DEVTOOL) govulncheck ./...
