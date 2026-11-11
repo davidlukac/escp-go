@@ -59,6 +59,7 @@ func view() *switchView {
 	}
 }
 
+// guarantee: PortGate
 func TestPortGate(t *testing.T) {
 	cases := []struct {
 		name  string

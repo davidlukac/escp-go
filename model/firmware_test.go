@@ -6,6 +6,7 @@ import (
 	"testing"
 )
 
+// guarantee: ParseFirmware
 func TestParseFirmware(t *testing.T) {
 	tests := []struct {
 		version string

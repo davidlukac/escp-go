@@ -52,6 +52,8 @@ func TestMissingPortIsNotLinkUp(t *testing.T) {
 }
 
 // A port listed twice counts as used if any entry says so: the guard fails closed.
+//
+// guarantee: UseOf
 func TestUseOfFailsClosedOnDuplicateEntries(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -82,6 +84,7 @@ func checkedPorts() []model.Port {
 	}
 }
 
+// guarantee: PortRule.TolerateLAG
 func TestCheckPorts(t *testing.T) {
 	cases := []struct {
 		name  string
