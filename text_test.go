@@ -23,7 +23,7 @@ func textFiles(t *testing.T) []string {
 	var files []string
 	for _, path := range publishedFiles(t) {
 		inSkipped := false
-		for _, dir := range strings.Split(filepath.Dir(path), string(filepath.Separator)) {
+		for dir := range strings.SplitSeq(filepath.Dir(path), string(filepath.Separator)) {
 			inSkipped = inSkipped || skipDirs[dir]
 		}
 		if inSkipped || skipFiles[filepath.Base(path)] {
@@ -46,7 +46,7 @@ func publishedFiles(t *testing.T) []string {
 	t.Helper()
 	if out, err := exec.Command("git", "ls-files", "-z").Output(); err == nil {
 		var files []string
-		for _, path := range strings.Split(string(out), "\x00") {
+		for path := range strings.SplitSeq(string(out), "\x00") {
 			if path != "" {
 				files = append(files, filepath.FromSlash(path))
 			}

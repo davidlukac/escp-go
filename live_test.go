@@ -300,6 +300,7 @@ func TestLiveBandwidth(t *testing.T) {
 }
 
 func mustBandwidth(t *testing.T, c *Client) []PortBandwidth {
+	t.Helper()
 	rows, err := c.Bandwidth(context.Background())
 	if err != nil {
 		t.Fatal(err)

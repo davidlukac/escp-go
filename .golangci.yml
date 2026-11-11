@@ -16,6 +16,7 @@ linters:
     - unused
     - gosec
     - forbidigo
+    - depguard
     # Stricter set (added after the second review): readability, naming and misuse of the language.
     - gocritic
     - predeclared
@@ -43,7 +44,55 @@ linters:
     - forcetypeassert
     - dupword
     - errchkjson
+    # Added after the audit of the linter catalog (#189): each was clean on main when enabled (or its
+    # findings were fixed in the same change), and now keeps it so. The reason for each:
+    - gochecknoinits  # no init functions: the library has no import-time side effect
+    - usetesting  # t.TempDir, t.Setenv, t.Context instead of the os and context equivalents in tests
+    - makezero  # append to a slice made with a non-zero length
+    - gosmopolitan  # no hard-coded script or locale-dependent time in library text
+    - maintidx  # maintainability index: bounds what the complexity linters do not
+    - containedctx  # a context.Context is never a struct field of a production type
+    - fatcontext  # a context rebuilt in a loop nests deeper on every pass
+    - sloglint  # the library logs only through slog: one style of attribute per call
+    - exptostd  # golang.org/x/exp helpers that have a standard library home
+    - godot  # a comment ends with a period
+    - godox  # no TODO, FIXME or BUG left in committed code: an open item is an issue
+    - nilnesserr  # an error that is nil being returned as if it were set
+    - durationcheck  # a duration multiplied by a duration
+    - asasalint  # a slice passed to a variadic ...any as one element
+    - reassign  # a package variable of another package replaced from outside
+    - modernize  # the newer standard library idiom for slices, maps, strings and errors
+    - godoclint  # the form of doc comments
+    - dupl  # a block of code written twice
+    - mirror  # the bytes or strings variant that avoids a conversion
+    - gocheckcompilerdirectives  # a //go: directive that the compiler would ignore
+    - dogsled  # too many blank identifiers on the left of an assignment
+    - inamedparam  # the methods of an interface name their parameters
+    - nosprintfhostport  # a host and port are joined with net.JoinHostPort
+    - gomoddirectives  # no replace or retract directive in go.mod by accident
+    - thelper  # test helpers call t.Helper and name the testing value consistently
+    - nilnil  # no return of a nil value together with a nil error
+    - iface  # two interfaces with the same method set, an interface that only wraps another
+    - testableexamples  # an example that prints has an Output comment, so it is run and checked
   settings:
+    # What these catalog linters were measured as and left off, and why (the catalog audit of #189):
+    #   wrapcheck          a bare Validate() error and ctx.Err() are the documented contract
+    #   paralleltest, tparallel   the tests share process-wide seams and UDP ports on purpose
+    #   exhaustruct        "setting nothing is a setting": a zero value is valid by design
+    #   gochecknoglobals   the read-only tables are fine and the few mutable test seams are known
+    #   err113             wrapping model.ErrInvalid is the error policy
+    #   mnd                the protocol is made of numbers; they are named where they carry meaning
+    #   nonamedreturns     (sent bool, err error) and the deferred err are named on purpose
+    #   shadow, fieldalignment   a shadowed err in a nested if is no bug; memory layout is no goal
+    #   cyclop, funlen, interfacebloat   gocyclo, gocognit and maintidx already bound size; the
+    #                      wide interfaces (model.Reader) are wide on purpose
+    #   ireturn, funcorder, noinlineerr, lll, varnamelen, embeddedstructfieldcheck, goconst
+    #                      style, with more noise than defects
+    govet:
+      enable:
+        - nilness
+        - unusedwrite
+        - useany
     misspell:
       # American spelling, as the Go standard library and godoc use it.
       locale: US
@@ -60,10 +109,49 @@ linters:
     nolintlint:
       require-explanation: true
       require-specific: true
+    depguard:
+      # The layering of docs/architecture.md, as rules (the dependency arrows point one way). A rule
+      # applies to production files only (a test may reach further, for a fake); `strict` allows
+      # exactly the listed packages and the standard library, so a new import is a decision made here.
+      rules:
+        model-layer:
+          list-mode: strict
+          files:
+            - "**/model/**"
+            - "!$test"
+          allow:
+            - $gostd
+            - github.com/davidlukac/escp-go/model
+            - github.com/davidlukac/escp-go/internal/invalid
+            - github.com/davidlukac/escp-go/internal/wire
+        safety-layer:
+          list-mode: strict
+          files:
+            - "**/safety/**"
+            - "!$test"
+          allow:
+            - $gostd
+            - github.com/davidlukac/escp-go/safety
+            - github.com/davidlukac/escp-go/model
+        no-fake-in-production:
+          files:
+            - "!$test"
+            - "!**/escptest/**"
+            - "!**/examples/**"
+          deny:
+            - pkg: github.com/davidlukac/escp-go/escptest
+              desc: the fake switch is for tests; production code never depends on it
     forbidigo:
       # The library writes nowhere on its own: every message goes through the
       # *slog.Logger the caller passes in (Config.Logger, DiscoverOptions.Logger).
+      # With type analysis the patterns match the method of the value's type, so a socket write is
+      # found through the interface the client holds as well as through *net.UDPConn.
+      analyze-types: true
       forbid:
+        - pattern: ^time\.After$
+          msg: time.After keeps its timer until it fires; use a time.Timer and Stop it
+        - pattern: ^.*\.(WriteTo|WriteToUDP|WriteToUDPAddrPort|WriteMsgUDP|WriteMsgUDPAddrPort)$
+          msg: only transport.go and discover.go write to a socket (the write gate is in request.go)
         - pattern: ^(fmt\.Print(f|ln)?|print|println)$
           msg: the library logs through its slog.Logger (Config.Logger), never to stdout
         - pattern: ^log\.(Print|Fatal|Panic)(f|ln)?$
@@ -101,6 +189,13 @@ linters:
       - path: ^(internal/coverpolicy|examples)/
         linters:
           - forbidigo
+      # The one place that writes a datagram is the transport, and discovery, which sends a broadcast
+      # no write gate guards (it reads, and it has no session); the fake switch answers with its own
+      # socket. Anywhere else a write to a socket goes around request.go and the write gate.
+      - path: ^(transport|discover)\.go$|^escptest/
+        text: only transport\.go and discover\.go write to a socket
+        linters:
+          - forbidigo
       # G115 (integer conversion overflow): the protocol is a fixed-width binary
       # format. Conversions are either bit-level masking/shifting by design or
       # operate on values range-checked beforehand (ports 1-32, rates up to
@@ -108,8 +203,15 @@ linters:
       - text: "G115"
         linters:
           - gosec
+      # The examples that talk to a switch are compiled and never run: running them would send
+      # packets to a real network (the comment at the top of example_test.go says so).
+      - path: ^example_test\.go$
+        linters:
+          - testableexamples
       - path: _test\.go
         linters:
+          # A table row or a test double may carry the context it stands for.
+          - containedctx
           - gosec
           - errcheck
           - revive
@@ -117,6 +219,7 @@ linters:
           # Tests are long on purpose (tables, scripted switches) and read top to bottom.
           - gocyclo
           - gocognit
+          - maintidx
           - nestif
           - unparam
           - prealloc

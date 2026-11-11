@@ -90,7 +90,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, tool goTo
 // fuzzTargets picks the fuzz targets out of the output of `go test -list`.
 func fuzzTargets(listing string) []string {
 	var out []string
-	for _, line := range strings.Split(listing, "\n") {
+	for line := range strings.SplitSeq(listing, "\n") {
 		if name := strings.TrimSpace(line); strings.HasPrefix(name, fuzzPrefix) {
 			out = append(out, name)
 		}

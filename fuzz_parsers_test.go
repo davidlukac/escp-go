@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/davidlukac/escp-go/internal/wire"
@@ -169,7 +170,7 @@ func checkInfo(t *testing.T, tlvs []wire.TLV) {
 	t.Helper()
 	info := infoFromTLVs(tlvs)
 	for _, s := range []string{info.Model, info.Hardware, string(info.Hostname), info.Firmware.String()} {
-		if bytes.ContainsRune([]byte(s), 0) {
+		if strings.ContainsRune(s, 0) {
 			t.Fatalf("a text field of the reply holds a NUL: %q", s)
 		}
 	}

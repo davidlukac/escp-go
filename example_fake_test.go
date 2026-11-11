@@ -112,8 +112,7 @@ func ExampleConfig_writeGate() {
 
 	ctx := context.Background()
 	err = c.SetBandwidth(ctx, model.PortBandwidth{Port: 1, Ingress: 64})
-	var inUse *safety.PortUseError
-	if errors.As(err, &inUse) {
+	if _, ok := errors.AsType[*safety.PortUseError](err); ok {
 		fmt.Println("refused:", err)
 	}
 	fmt.Println("writes reaching the switch:", sw.WriteCount())

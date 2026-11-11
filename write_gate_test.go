@@ -71,9 +71,9 @@ var writeCalls = map[Method]func(context.Context, *Client) error{
 
 func writeMethodNames() []Method {
 	var names []Method
-	typ := reflect.TypeOf(&Client{})
-	for i := range typ.NumMethod() {
-		if n := typ.Method(i).Name; strings.HasPrefix(n, "Set") || strings.HasPrefix(n, "Delete") || strings.HasPrefix(n, "Enable") {
+	typ := reflect.TypeFor[*Client]()
+	for method := range typ.Methods() {
+		if n := method.Name; strings.HasPrefix(n, "Set") || strings.HasPrefix(n, "Delete") || strings.HasPrefix(n, "Enable") {
 			names = append(names, Method(n))
 		}
 	}
@@ -334,7 +334,7 @@ func TestGateChangingItsOperationChangesNothingThatIsSent(t *testing.T) {
 	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 300 * time.Millisecond,
 		SwitchPort: f.UDPPort(), BroadcastAddr: escptest.Loopback(),
 		WriteGate: func(_ context.Context, _ Reader, op Operation) error {
-			op.Ports = MustPortSet(8)
+			op.Ports = MustPortSet(8) //nolint:govet // unusedwrite: the write is the test; it changes the gate's own copy and the sender must never see it
 			return nil
 		}})
 	t.Cleanup(func() { c.Close() })

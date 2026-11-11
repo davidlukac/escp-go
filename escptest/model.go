@@ -2,6 +2,7 @@ package escptest
 
 import (
 	"encoding/binary"
+	"slices"
 
 	"github.com/davidlukac/escp-go/internal/wire"
 	"github.com/davidlukac/escp-go/model"
@@ -229,12 +230,7 @@ func (f *Switch) lagConflict(p int, mirror []byte) int32 {
 }
 
 func contains(s []int, v int) bool {
-	for _, x := range s {
-		if x == v {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(s, v)
 }
 
 // applied updates what a stored table row implies for the other tables.

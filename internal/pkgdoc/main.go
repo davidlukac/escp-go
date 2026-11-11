@@ -192,10 +192,12 @@ func waitUntilServing(ctx context.Context, s settings, url string, site *running
 		if _, err := fetch(ctx, s.client, url); err == nil {
 			return nil
 		}
+		pause := time.NewTimer(s.startupPoll)
 		select {
 		case <-site.done:
+			pause.Stop()
 			return fmt.Errorf("pkgsite exited: %w\n%s", cmp.Or(site.err, errExitedCleanly), log.String())
-		case <-time.After(s.startupPoll):
+		case <-pause.C:
 		}
 		if time.Now().After(deadline) {
 			return fmt.Errorf("pkgsite did not start:\n%s", log.String())

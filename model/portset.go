@@ -141,7 +141,7 @@ func (s *PortSet) UnmarshalText(text []byte) error {
 		return nil
 	}
 	var ports []PortID
-	for _, part := range strings.Split(str, ",") {
+	for part := range strings.SplitSeq(str, ",") {
 		n, err := strconv.Atoi(strings.TrimSpace(part))
 		if err != nil {
 			return invalidf("escp: %q is not a list of port numbers (write 2,3,5 or none)", str)

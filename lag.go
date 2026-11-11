@@ -99,8 +99,7 @@ func (c *Client) SetLAG(ctx context.Context, lag model.LAG) error {
 // nameRefusal adds the reason to a *RejectedError whose code is in reasons; any other
 // error, and a refusal with an unknown code, is returned as it is.
 func nameRefusal(err error, reasons map[ReplyCode]string) error {
-	var rejected *RejectedError
-	if errors.As(err, &rejected) {
+	if rejected, ok := errors.AsType[*RejectedError](err); ok {
 		if reason, ok := reasons[rejected.Code]; ok {
 			return &RejectedError{Code: rejected.Code, Reason: reason}
 		}

@@ -63,8 +63,7 @@ func ExampleSwitch_EnableModel() {
 	ctx := context.Background()
 	fmt.Println("mirror:", c.SetPortMirror(ctx, model.Mirror{Enabled: true, Destination: 4, IngressPorts: model.MustPortSet(2)}))
 	err = c.SetLAG(ctx, model.LAG{ID: 1, Ports: model.MustPortSet(2, 3)})
-	var refused *escp.RejectedError
-	if errors.As(err, &refused) {
+	if refused, ok := errors.AsType[*escp.RejectedError](err); ok {
 		fmt.Println("LAG refused with code", refused.Code)
 	}
 	// Output:
