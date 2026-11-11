@@ -22,6 +22,7 @@ type drainConn struct {
 	queue    [][]byte
 	hurry    func(call int) time.Duration
 	failWith error  // returned by every read instead of the above
+	failOnce error  // returned by the first read only
 	onRead   func() // runs at the start of every read
 
 	sets  int
@@ -43,6 +44,11 @@ func (d *drainConn) ReadFromUDP(b []byte) (int, *net.UDPAddr, error) {
 	d.reads++
 	if d.onRead != nil {
 		d.onRead()
+	}
+	if d.failOnce != nil {
+		err := d.failOnce
+		d.failOnce = nil
+		return 0, nil, err
 	}
 	if d.failWith != nil {
 		return 0, nil, d.failWith
@@ -95,6 +101,7 @@ func TestADrainTimeoutThatDidNotWaitDoesNotProveTheSocketEmpty(t *testing.T) {
 		queue     int
 		hurry     func(int) time.Duration
 		failWith  error
+		failOnce  error
 		cancel    string // "before" or "during" the first read; empty for never
 		wantReads int
 		wantLeft  int
@@ -106,8 +113,14 @@ func TestADrainTimeoutThatDidNotWaitDoesNotProveTheSocketEmpty(t *testing.T) {
 		{name: "timeouts that never waited end at the bound too", queue: 1, hurry: ever, wantReads: maxDiscarded, wantLeft: 1},
 		{name: "a wait of the minimum is a wait", hurry: waitOf(drainMinWait), wantReads: 1},
 		{name: "a wait just below the minimum is not", hurry: waitOf(drainMinWait - 1), wantReads: 2},
+		// the same boundary in literal values, so that changing drainMinWait fails a case
+		{name: "a wait of 500 microseconds is a wait", hurry: waitOf(500 * time.Microsecond), wantReads: 1},
+		{name: "a wait of 499 microseconds is not", hurry: waitOf(499 * time.Microsecond), wantReads: 2},
+		{name: "a genuine empty wait ends the drain after one read", hurry: waitOf(drainWait - time.Microsecond), wantReads: 1},
 		{name: "a closed socket ends the drain at once", queue: 1, failWith: net.ErrClosed, wantReads: 1, wantLeft: 1},
-		{name: "any other read error ends it", queue: 1, failWith: syscall.ECONNREFUSED, wantReads: 1, wantLeft: 1},
+		{name: "any other read error ends it", queue: 1, failWith: syscall.EIO, wantReads: 1, wantLeft: 1},
+		{name: "a read error that is only ICMP noise does not end it", queue: 2, failOnce: &net.OpError{Op: "read", Net: "udp", Err: errWSAConnReset}, wantReads: 4},
+		{name: "ICMP noise that never stops ends at the bound", queue: 1, failWith: syscall.ECONNREFUSED, wantReads: maxDiscarded, wantLeft: 1},
 		{name: "a context canceled before the drain reads nothing", queue: 1, cancel: "before", wantReads: 0, wantLeft: 1},
 		{name: "a context canceled during a read ends it", queue: 1, hurry: ever, cancel: "during", wantReads: 1, wantLeft: 1},
 	}
@@ -115,7 +128,7 @@ func TestADrainTimeoutThatDidNotWaitDoesNotProveTheSocketEmpty(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			conn := &drainConn{now: time.Unix(1000, 0), queue: queued(tt.queue), hurry: tt.hurry, failWith: tt.failWith}
+			conn := &drainConn{now: time.Unix(1000, 0), queue: queued(tt.queue), hurry: tt.hurry, failWith: tt.failWith, failOnce: tt.failOnce}
 			switch tt.cancel {
 			case "before":
 				cancel()

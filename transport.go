@@ -204,8 +204,11 @@ const drainWait = time.Millisecond
 // drain. Go's poller looks at the deadline before it looks at the socket, so a read that starts
 // after its deadline (the goroutine was not scheduled for longer than drainWait) times out at once
 // even though a datagram is queued. Such a timeout waited for nothing; a timeout that proves the
-// socket empty is one the read sat through, which takes about drainWait. A hold-up in the few
-// instructions between the clock read and the poller's check is not seen by this rule.
+// socket empty is one the read sat through, which takes about drainWait. The rule narrows the
+// window and does not close it: a hold-up after the clock read and before the poller's check
+// (the entry into ReadFromUDP, the read lock, the check itself) is not seen. Closing it takes a
+// read that never consults a deadline (a non-blocking recvfrom through RawConn) or a second,
+// confirming read, which doubles the cost of an empty drain.
 const drainMinWait = drainWait / 2
 
 // maxDiscarded bounds discard, so a sender that never stops cannot hold a request back. A read
@@ -217,9 +220,11 @@ const maxDiscarded = 64
 // discovery, or a reply meant for another client, which share the port (see PROTOCOL.md). Left in
 // the buffer, one that carries the number the request is about to use would be taken for its reply.
 //
-// The drain ends at the first read that waited out its timeout, at any other read error (a closed
-// socket among them), when ctx ends (the exchange's context, so Close and a cancellation end it
-// too) and after maxDiscarded reads.
+// The drain ends at the first read that waited out its timeout, at a read error that is more than
+// ICMP noise (a closed socket among them; noise is skipped, as recv does, and counts toward the
+// bound), when ctx ends (the exchange's context, so Close and a cancellation end it too) and after
+// maxDiscarded reads. When ctx ended, send still writes its request: the drain only stops early,
+// and the reply of that request is not read, because recv refuses to read for a context that is done.
 func (c *Client) discard(ctx context.Context) {
 	buf := make([]byte, maxDatagram)
 	for range maxDiscarded {
@@ -229,7 +234,9 @@ func (c *Client) discard(ctx context.Context) {
 		_ = c.conn.SetReadDeadline(c.now().Add(drainWait))
 		began := c.now() // after the deadline is set, so a goroutine held up in between shows as a short wait
 		_, _, err := c.conn.ReadFromUDP(buf)
-		if err != nil && (!errors.Is(err, os.ErrDeadlineExceeded) || c.now().Sub(began) >= drainMinWait) {
+		switch {
+		case err == nil, icmpNoise(err):
+		case !errors.Is(err, os.ErrDeadlineExceeded) || c.now().Sub(began) >= drainMinWait:
 			return
 		}
 	}
@@ -275,7 +282,7 @@ func (c *Client) exchange(ctx context.Context, op byte, tlvs []wire.TLV, static 
 	defer c.interruptOnDone(ctx)()
 	c.ident.forget()
 	for attempt := 0; attempt <= c.cfg.Retries; attempt++ {
-		if err := expired(ctx); err != nil { // a canceled call sends nothing, not even a retry
+		if err := expired(ctx); err != nil { // a call canceled before an attempt sends nothing, not even a retry; one canceled during the drain still sends this attempt (see discard)
 			return reply{}, err
 		}
 		if err := c.send(ctx, op, tlvs, static, to); err != nil {

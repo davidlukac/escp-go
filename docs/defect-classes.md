@@ -300,13 +300,13 @@ AUTOMATION names each check by kind and name, so that a test can verify that the
 <a id="dc-l09"></a>
 ### DC-L09 An emptiness check that is itself a timed read
 
-**Rule.** A timeout counts as proof that nothing is there only if the read was seen to wait for it; a read that returns a timeout without having waited (its deadline passed before it started) proves nothing, and the check reads again, within the bound the loop already has.
+**Rule.** A timeout counts as proof that nothing is there only if the read was seen to wait for it; a read that returns a timeout without having waited (its deadline passed before it started) proves nothing, and the check reads again, within the bound the loop already has. The rule narrows the window (a hold-up after the check's own clock read and before the poller's check is still not seen); closing it takes a read that never consults a deadline or a second confirming read.
 
 **Why.** `Client.discard` emptied the socket before each request by reading with a deadline of `drainWait` (1 ms) and taking a timeout for "empty". Go's poller checks the deadline before it tries the socket, so a goroutine that was not scheduled for longer than 1 ms between setting the deadline and reading got a timeout with a datagram queued; the datagram was then read as the answer to the request just sent. It showed as a flaky stale-datagram test on a loaded macOS machine (#206), and as a window for any consumer on a loaded host (#207).
 
 **Design question.** What does this check conclude from a timeout, and can the timeout come without the wait (the deadline already passed when the read began, a canceled or closed socket, a clock step)? What does the check do then, and what ends the loop (a bound, the context, `Close`)?
 
-**Test requirement.** A test over the `datagramConn` seam with a clock the test controls (no sleeping): a timeout that did not wait, with data queued, does not end the check; a timeout that waited does; the exact minimum is a wait; a flood and a socket that only ever times out end at the bound; a closed socket and a canceled context end the check.
+**Test requirement.** A test over the `datagramConn` seam with a clock the test controls (no sleeping): a timeout that did not wait, with data queued, does not end the check; a timeout that waited does; the exact minimum is a wait; a flood and a socket that only ever times out end at the bound; a closed socket and a canceled context end the check; a read error that is only ICMP noise does not end it, and ends at the bound when it never stops.
 
 **Automation.** `test:TestADrainTimeoutThatDidNotWaitDoesNotProveTheSocketEmpty`, `test:TestAStaleReplyInTheSocketIsNotTheAnswerToTheNextRequest`, `test:TestAFloodOfStaleDatagramsDoesNotHoldARequestBack`; `reading:` a check that draws a conclusion from a timeout cannot be found by a script, and a deadline that is short compared with the scheduler's pauses is the signal.
 
