@@ -18,6 +18,7 @@ For people who work on the library. Users want the [guides](README.md); the chec
 | `internal/release` | cutting a version: the CHANGELOG entry, the checks, the tag (a build tool, `scripts/release.sh`) |
 | `internal/fuzzrun` | every fuzz target of the module for a number of seconds each (a build tool, `scripts/fuzz.sh`) |
 | `devtools/subtests` | the check `make lint` runs for what golangci-lint cannot see: a table of cases in a test must run each case with `t.Run` (a `go/analysis` command in the devtools module; its one source is here, and the provider repository gets a verbatim copy) |
+| `devtools/analyzers` | the other checks `make lint` runs, one `multichecker`: `readwrite` (a read followed by a write outside the modify guard) and `lockwait` (a blocking operation under a lock needs a `// lockwait: <reason>`); one directory, copied verbatim into the provider repository like `devtools/subtests` |
 | `internal/pkgdoc` | the package documentation rendered the way pkg.go.dev does, as HTML and text (a build tool, `scripts/pkgdoc.sh`) |
 | `examples/discover` | a read-only example program |
 | `examples/consumer` | a small program that uses `escp`, `model`, `safety` and `escptest` the way an outside module does; the release workflow builds it in a fresh module against the tagged version |

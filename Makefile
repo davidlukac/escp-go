@@ -25,10 +25,17 @@ spell:
 	@git ls-files -z -- '*.go' '*.md' '*.yml' '*.yaml' '*.json' '*.sh' Makefile ':!:CHANGELOG.md' ':!:CODE_OF_CONDUCT.md' ':!:text_test.go' ':!:testdata' \
 		| xargs -0 $(DEVTOOL) misspell -locale US -error
 
+# What `lint` runs, in order: the spelling check; the project's own checks, which golangci-lint has no
+# rule for (devtools/subtests: a table of cases runs each case with t.Run; devtools/analyzers: `readwrite`,
+# a read followed by a write outside the modify guard, and `lockwait`, a blocking operation under a lock
+# without a `// lockwait: <reason>`), after the tests of the checks themselves; then golangci-lint, for
+# every build tag and operating system.
 lint: spell
 	go -C devtools build -o $(CURDIR)/build/subtests ./subtests
+	go -C devtools build -o $(CURDIR)/build/analyzers ./analyzers
 	go -C devtools test -count=1 ./...
 	build/subtests ./...
+	build/analyzers ./...
 	$(DEVTOOL) golangci-lint run ./...
 	$(DEVTOOL) golangci-lint run --build-tags live ./...
 	@bin="$$($(DEVTOOL) -n golangci-lint)"; for os in $(LINT_GOOS); do echo "golangci-lint run (GOOS=$$os)"; GOOS=$$os "$$bin" run ./... || exit 1; done

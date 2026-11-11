@@ -58,6 +58,7 @@ func (c *Client) SetStormControl(ctx context.Context, cfg model.StormConfig) err
 		return err
 	}
 	limited := cfg.Limited()
+	// lockwait: c.modify is held from the read to the write on purpose (that is what makes the pair one step, see beginModify); every wait inside takes ctx and ends with it or with Close, and only another modify call waits for c.modify, which gives up with its own ctx
 	end, err := c.beginModify(ctx) // the check against the ingress limit and the write are one step
 	if err != nil {
 		return err

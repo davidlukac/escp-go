@@ -76,6 +76,7 @@ func (c *Client) SetPortPriorities(ctx context.Context, changes []model.PortPrio
 		}
 		named = named.Union(ch.Port.AsSet())
 	}
+	// lockwait: c.modify is held from the read to the write on purpose (that is what makes the pair one step, see beginModify); every wait inside takes ctx and ends with it or with Close, and only another modify call waits for c.modify, which gives up with its own ctx
 	end, err := c.beginModify(ctx)
 	if err != nil {
 		return err

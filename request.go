@@ -134,6 +134,7 @@ func (c *Client) setTLVsSent(ctx context.Context, op model.Operation, tlvs ...wi
 			return false, err
 		}
 	}
+	// lockwait: the lock is held across the whole exchange on purpose (the switch answers one request at a time); the wait ends with ctx, or with Close (every exchange runs under withStop), or when the retries are spent
 	if err := c.lock(ctx); err != nil {
 		return false, err // refused before anything was sent (canceled, or the client is closed): nothing to settle
 	}
@@ -183,6 +184,7 @@ func repeatable(m model.Method) bool {
 // getTLVs reads one or more setting types with an authenticated session and
 // returns every TLV of the reply. It never writes.
 func (c *Client) getTLVs(ctx context.Context, types ...wire.TLVType) ([]wire.TLV, error) {
+	// lockwait: the lock is held across the whole exchange on purpose (the switch answers one request at a time); the wait ends with ctx, or with Close (every exchange runs under withStop), or when the retries are spent
 	if err := c.lock(ctx); err != nil {
 		return nil, err
 	}

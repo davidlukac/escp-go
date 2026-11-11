@@ -31,6 +31,7 @@ var ErrInvalidConfigFile = errors.New("escp: reply is not a switch configuration
 // configuration that changes while it is read fails the same way. A rejection, a missing reply
 // and a canceled context end the call at once.
 func (c *Client) ConfigBackup(ctx context.Context) (model.ConfigFile, error) {
+	// lockwait: the lock is held across the whole download (every request of it) on purpose (the switch answers one request at a time); the wait ends with ctx, or with Close (every exchange runs under withStop), or when the retries are spent
 	if err := c.lock(ctx); err != nil {
 		return nil, err
 	}
