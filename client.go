@@ -82,6 +82,17 @@ type seams struct {
 	shared bool
 	// locator finds a switch by MAC address; the default is Locate on the interfaces of this host.
 	locator func(ctx context.Context, mac model.MAC) (model.Info, error)
+	// clock replaces time.Now where a test must decide how much time has passed (the drain);
+	// nil means time.Now.
+	clock func() time.Time
+}
+
+// now is the current time, from the clock seam when a test set one.
+func (s seams) now() time.Time {
+	if s.clock != nil {
+		return s.clock()
+	}
+	return time.Now()
 }
 
 // dialOption changes how dial builds a client; only tests use it.
