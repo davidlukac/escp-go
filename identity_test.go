@@ -127,6 +127,7 @@ func TestAnUnpinnedClientNeverWritesToAnotherDeviceThanTheOneItMet(t *testing.T)
 	}
 }
 
+// guarantee: Config.MAC
 func TestADeviceWithAnotherMACIsNeverWrittenTo(t *testing.T) {
 	f := escptest.Start(t)
 	f.SetMAC(otherMAC)
@@ -406,6 +407,9 @@ func TestSwitchMACIsThePinOrTheMACOfTheFirstContact(t *testing.T) {
 }
 
 // Reading it does not wait for the call that holds the client's lock.
+//
+// guarantee: Client.SwitchMAC
+// guarantee: model.Reader.SwitchMAC
 func TestSwitchMACDoesNotWaitForTheLock(t *testing.T) {
 	f := escptest.Start(t)
 	c := dialFast(t, f, "secret")

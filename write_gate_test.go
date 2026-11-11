@@ -97,6 +97,8 @@ func TestEveryWriteMethodIsInTheGateTable(t *testing.T) {
 
 // A gate that refuses must stop every write before a single SET is sent, and the
 // method returns the gate's error unchanged.
+//
+// guarantee: model.WriteGate
 func TestWriteGateRefusalSendsNothingForAnyWriteMethod(t *testing.T) {
 	for _, name := range writeMethodNames() {
 		call := writeCalls[name]
@@ -150,6 +152,9 @@ func TestWriteGateThatAllowsLetsEveryWriteMethodThrough(t *testing.T) {
 }
 
 // Reads are never gated: a gate that refuses everything must not stop a read.
+//
+// guarantee: Client.ConfigBackup
+// guarantee: model.WriteGate
 func TestWriteGateDoesNotAffectReads(t *testing.T) {
 	f := escptest.Start(t)
 	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 300 * time.Millisecond,
@@ -260,6 +265,7 @@ func operationsOf(t *testing.T, call func(context.Context, *Client) error) []Ope
 	return seen
 }
 
+// guarantee: model.WriteGate
 func TestEveryWriteMethodDeclaresItsOperation(t *testing.T) {
 	names := writeMethodNames()
 	if len(writeOperations) != len(names) {

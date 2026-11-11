@@ -17,6 +17,8 @@ import (
 // The gates of the safety package, composed as a front end would, against the real client and the
 // fake switch: the firmware gate, a ceiling on the impact, and a dry run that records what would
 // have been written.
+//
+// guarantee: safety.DryRun
 func TestDryRunThroughTheRealClient(t *testing.T) {
 	f := escptest.Start(t)
 	f.EnableModel(nil) // the pre-write read of the other limiter needs a switch that answers

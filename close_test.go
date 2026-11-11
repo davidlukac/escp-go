@@ -59,6 +59,8 @@ func TestCloseEndsTheCallInFlightAndTheCallsWaitingBehindIt(t *testing.T) {
 }
 
 // A write that Close cut short says that it was closed; the caller may not assume it was applied.
+//
+// guarantee: ErrClosed
 func TestAWriteCutShortByCloseReturnsErrClosed(t *testing.T) {
 	f := escptest.Start(t)
 	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 30 * time.Second,
@@ -82,6 +84,8 @@ func TestAWriteCutShortByCloseReturnsErrClosed(t *testing.T) {
 // A Client that Dial did not make (the zero value) is a closed client: it returns ErrClosed
 // instead of panicking. (A nil *Client is a nil pointer, which panics as every nil pointer does;
 // only its Close is a no-op.)
+//
+// guarantee: ErrClosed
 func TestAClientNotMadeByDialIsClosed(t *testing.T) {
 	ctx := context.Background()
 	c := &Client{}

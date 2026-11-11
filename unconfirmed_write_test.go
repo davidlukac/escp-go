@@ -12,6 +12,9 @@ import (
 // A write the switch never answers may have been applied, and how often it was sent is part of
 // what the caller is told: Retries+1 sends per run (dialFast: 2), twice that when the run is
 // repeated after a new session key, which only a write that sets an absolute value is.
+//
+// guarantee: ErrWriteUnconfirmed
+// guarantee: UnconfirmedWriteError
 func TestAWriteTheSwitchNeverAnswersIsUnconfirmedAndSentAsOftenAsItsImpactAllows(t *testing.T) {
 	const sendsPerRun = 2 // dialFast: one retry
 	tests := []struct {

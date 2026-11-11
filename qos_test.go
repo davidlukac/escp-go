@@ -14,6 +14,8 @@ import (
 
 // A request with several faults names the first one in the order given, a port twice is a fault, and
 // a request that is wrong in itself is refused before the switch is asked anything.
+//
+// guarantee: Client.SetPortPriorities
 func TestSetPortPrioritiesNamesTheFirstFaultInTheOrderGiven(t *testing.T) {
 	f := escptest.Start(t)
 	f.EnableModel(nil)

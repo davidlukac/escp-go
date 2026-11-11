@@ -106,6 +106,7 @@ func TestSetDot1QVLANWire(t *testing.T) {
 	}
 }
 
+// guarantee: Client.SetPVIDs
 func TestSetPVIDsWire(t *testing.T) {
 	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
@@ -140,6 +141,8 @@ func TestSetPVIDsWire(t *testing.T) {
 }
 
 // A request with several faults names the first one in the order given, and a port twice is a fault.
+//
+// guarantee: Client.SetPVIDs
 func TestSetPVIDsNamesTheFirstFaultInTheOrderGiven(t *testing.T) {
 	f := escptest.Start(t)
 	c := dialFake(t, f, "secret")
