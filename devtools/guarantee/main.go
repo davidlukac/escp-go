@@ -15,12 +15,13 @@
 // a test of the other one: that test puts the directory of the identifier's package in front of the
 // name (`// guarantee: model.WriteGate`).
 //
-// The command is in report mode: it prints one line per unmatched identifier (`file:line: Name:
-// sentence`), the names a marker uses that no exported identifier has, and the count, and exits 0.
-// With -strict it exits 1 when there is anything to report; that is for when the existing tests carry
-// their markers. It decides from the text of the comments only, with patterns for the usual wording of
-// a promise, so it misses a promise worded differently and flags a sentence that is not one; deciding
-// what is a guarantee needs a person, the check only keeps the list from growing silently.
+// By default the command only reports: it prints one line per unmatched identifier (`file:line: Name:
+// sentence`), the names a marker uses that no exported identifier has, and the count, and exits 0. With
+// -strict it exits 1 when there is anything to report, which is how `make lint` runs it (every
+// documented guarantee has its marked test, or its sentence is reworded). It decides from the text of the
+// comments only, with patterns for the usual wording of a promise, so it misses a promise worded
+// differently and flags a sentence that is not one; deciding what is a guarantee needs a person, the
+// check only keeps the list from growing silently.
 //
 // It reads Go source with go/parser and has no dependency outside the standard library.
 package main
@@ -42,7 +43,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("guarantee", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	root := fs.String("root", ".", "the repository root")
-	strict := fs.Bool("strict", false, "exit 1 when an identifier lacks its marker or a marker names nothing")
+	strict := fs.Bool("strict", false, "exit 1 when an identifier lacks its marker or a marker names nothing (make lint does)")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}

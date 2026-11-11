@@ -191,7 +191,7 @@ func TestTheReportListsEachFindingAndTheCount(t *testing.T) {
 	want := []string{
 		"p/p.go:4: A: A never panics. (no test carries `// guarantee: A`)",
 		"p/p_test.go:3: `// guarantee: Gone` names no exported identifier of its package",
-		"guarantee (report mode): 2 exported identifiers state a guarantee; 1 have a test marker, 1 do not; 1 stale marker(s)",
+		"guarantee: 2 exported identifiers state a guarantee; 1 have a test marker, 1 do not; 1 stale marker(s)",
 	}
 	if strings.Join(lines, "\n") != strings.Join(want, "\n") {
 		t.Errorf("report:\n%s\nwant:\n%s", strings.Join(lines, "\n"), strings.Join(want, "\n"))
