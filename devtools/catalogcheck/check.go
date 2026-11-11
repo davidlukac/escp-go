@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -12,16 +13,18 @@ import (
 )
 
 var (
-	idUse      = regexp.MustCompile(`\bDC-[CL][0-9]{2}\b`)
-	catalogRef = regexp.MustCompile(`defect-classes\.md#([A-Za-z0-9_-]+)`)
 	// textFile is what is searched for ids and links: documentation, code, workflows and scripts.
 	textFile = regexp.MustCompile(`(\.(md|go|yml|yaml|sh|txt)|(^|/)Makefile)$`)
 )
 
 // Check reads the catalog of the repository at root and everything it names, and returns the
 // problems, sorted by file and line. An error means the repository could not be read at all.
-func Check(root string) ([]Problem, error) {
-	text, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(catalogPath)))
+func Check(root string, opts Options) ([]Problem, error) {
+	rl, err := newRules(opts)
+	if err != nil {
+		return nil, err
+	}
+	text, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rl.path)))
 	if err != nil {
 		return nil, fmt.Errorf("reading the catalog: %w", err)
 	}
@@ -29,13 +32,13 @@ func Check(root string) ([]Problem, error) {
 	if err != nil {
 		return nil, err
 	}
-	cat := parseCatalog(string(text))
+	cat := parseCatalog(string(text), rl)
 	problems := append([]Problem{}, r.problems...)
 	problems = append(problems, cat.problems...)
 	problems = append(problems, cat.shapeProblems()...)
 	problems = append(problems, cat.routingProblems()...)
 	problems = append(problems, r.automationProblems(cat)...)
-	idProblems, err := r.idProblems(cat)
+	idProblems, err := r.idProblems(cat, rl)
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +52,8 @@ func Check(root string) ([]Problem, error) {
 	return problems, nil
 }
 
-// automationProblems resolves the tokens of the Automation field of every entry.
+// automationProblems resolves the tokens of the Automation field of every entry, and those of the
+// rows of the other tables of the page.
 func (r *repo) automationProblems(cat catalog) []Problem {
 	var out []Problem
 	for _, e := range cat.entries {
@@ -59,16 +63,35 @@ func (r *repo) automationProblems(cat catalog) []Problem {
 			}
 			tokens, bad := parseTokens(f.text)
 			for _, b := range bad {
-				out = append(out, Problem{catalogPath, f.line, e.id + ": " + b})
+				out = append(out, Problem{cat.path, f.line, e.id + ": " + b})
 			}
 			if len(tokens) == 0 {
-				out = append(out, Problem{catalogPath, f.line, e.id + ": Automation names no check (a claim without a name is not accepted: use `reading:` with a reason or `proposed:` with an issue)"})
+				out = append(out, Problem{cat.path, f.line, e.id + ": Automation names no check (a claim without a name is not accepted: use `reading:` with a reason or `proposed:` with an issue)"})
 			}
-			for _, t := range tokens {
-				for _, msg := range r.tokenProblems(t) {
-					out = append(out, Problem{catalogPath, f.line, e.id + ": " + msg})
-				}
+			out = append(out, r.tokensProblems(cat.path, f.line, e.id+": ", tokens)...)
+		}
+	}
+	for _, row := range cat.rows {
+		// Outside an Automation field a span that only looks like a token (an unknown kind, a kind
+		// without a name, as in the page's own description of the kinds) is prose, not a claim.
+		tokens, _ := parseTokens(row.text)
+		var claims []automationToken
+		for _, t := range tokens {
+			if t.kind == kindReading || t.name != "" {
+				claims = append(claims, t)
 			}
+		}
+		out = append(out, r.tokensProblems(cat.path, row.line, "", claims)...)
+	}
+	return out
+}
+
+// tokensProblems resolves tokens found at a line of the page; prefix starts each message.
+func (r *repo) tokensProblems(file string, line int, prefix string, tokens []automationToken) []Problem {
+	var out []Problem
+	for _, t := range tokens {
+		for _, msg := range r.tokenProblems(t) {
+			out = append(out, Problem{file, line, prefix + msg})
 		}
 	}
 	return out
@@ -141,11 +164,13 @@ func (r *repo) proposedProblems(t automationToken) []string {
 }
 
 // idProblems checks every `DC-xnn` id and every link `defect-classes.md#anchor` written in a text
-// file of the repository: it must be an entry, or an anchor of the catalog.
-func (r *repo) idProblems(cat catalog) ([]Problem, error) {
-	ids := map[string]bool{}
+// file of the repository. An id of a letter the page defines must be an entry, a link to the page
+// itself must go to an anchor of it. An id of another letter, and a link by an absolute URL (the page
+// of another repository, which is not read), are checked for their shape only.
+func (r *repo) idProblems(cat catalog, rl rules) ([]Problem, error) {
+	sc := idScope{rules: rl, ids: map[string]bool{}, anchors: cat.anchors}
 	for _, e := range cat.entries {
-		ids[e.id] = true
+		sc.ids[e.id] = true
 	}
 	var out []Problem
 	for _, rel := range r.files {
@@ -159,23 +184,43 @@ func (r *repo) idProblems(cat catalog) ([]Problem, error) {
 		if err != nil {
 			return nil, fmt.Errorf("reading %s: %w", rel, err)
 		}
-		out = append(out, usedIDProblems(rel, string(data), ids, cat.anchors)...)
+		out = append(out, sc.problems(rel, string(data))...)
 	}
 	return out, nil
 }
 
-// usedIDProblems finds the ids and the catalog links of one file that resolve to nothing.
-func usedIDProblems(rel, text string, ids, anchors map[string]bool) []Problem {
+// idScope is what the ids and links of a file are resolved against.
+type idScope struct {
+	rules   rules
+	ids     map[string]bool // the entries of the page
+	anchors map[string]bool // the anchors of the page
+}
+
+// foreignAnchor is the shape of an anchor of a page that is not read: lower case, as GitHub makes it,
+// and an id-like start (`dc-` and a letter and a digit) must be a whole id.
+var (
+	foreignAnchor = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
+	idLikeAnchor  = regexp.MustCompile(`^dc-[a-z][0-9]`)
+	idAnchor      = regexp.MustCompile(`^dc-[a-z][0-9]{2}(-[a-z0-9_-]*)?$`)
+)
+
+// problems finds the ids and the catalog links of one file that are wrong.
+func (sc idScope) problems(rel, text string) []Problem {
 	var out []Problem
+	base := path.Base(sc.rules.path)
 	for i, line := range strings.Split(text, "\n") {
-		for _, id := range idUse.FindAllString(line, -1) {
-			if !ids[id] {
-				out = append(out, Problem{rel, i + 1, fmt.Sprintf("%s is not an entry of %s", id, catalogPath)})
+		for _, m := range idUse.FindAllStringSubmatch(line, -1) {
+			if sc.rules.owns(m[1]) && !sc.ids[m[0]] {
+				out = append(out, Problem{rel, i + 1, fmt.Sprintf("%s is not an entry of %s", m[0], sc.rules.path)})
 			}
 		}
-		for _, m := range catalogRef.FindAllStringSubmatch(line, -1) {
-			if !anchors[m[1]] {
-				out = append(out, Problem{rel, i + 1, fmt.Sprintf("the link defect-classes.md#%s goes to no anchor of %s", m[1], catalogPath)})
+		for _, m := range sc.rules.pageLink.FindAllStringSubmatch(line, -1) {
+			if strings.Contains(m[1], "://") {
+				if !foreignAnchor.MatchString(m[2]) || (idLikeAnchor.MatchString(m[2]) && !idAnchor.MatchString(m[2])) {
+					out = append(out, Problem{rel, i + 1, fmt.Sprintf("the link %s%s#%s has an anchor of the wrong shape (lower case letters, digits and hyphens; an id is dc-<letter><two digits>)", m[1], base, m[2])})
+				}
+			} else if !sc.anchors[m[2]] {
+				out = append(out, Problem{rel, i + 1, fmt.Sprintf("the link %s#%s goes to no anchor of %s", base, m[2], sc.rules.path)})
 			}
 		}
 	}

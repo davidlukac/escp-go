@@ -235,7 +235,7 @@ func TestTheCatalogCheck(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			files := baseRepo()
 			tc.mutate(files)
-			problems, err := Check(writeRepo(t, files))
+			problems, err := Check(writeRepo(t, files), DefaultOptions())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -267,7 +267,7 @@ func TestProblemsAreSortedAndNameTheirLine(t *testing.T) {
 	files := baseRepo()
 	files["README.md"] = "DC-L90\nDC-L91\n"
 	replaceIn(files, ".golangci.yml", "    - gocritic # a comment\n", "")
-	problems, err := Check(writeRepo(t, files))
+	problems, err := Check(writeRepo(t, files), DefaultOptions())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -276,16 +276,16 @@ func TestProblemsAreSortedAndNameTheirLine(t *testing.T) {
 		got = append(got, p.File+":"+strconv.Itoa(p.Line))
 	}
 	want := []string{"README.md:1", "README.md:2"}
-	if len(problems) != 3 || strings.Join(got[:2], ",") != strings.Join(want, ",") || problems[2].File != catalogPath {
+	if len(problems) != 3 || strings.Join(got[:2], ",") != strings.Join(want, ",") || problems[2].File != defaultCatalog {
 		t.Fatalf("problems = %v", problems)
 	}
-	if !strings.HasPrefix(problems[2].String(), catalogPath+":") {
+	if !strings.HasPrefix(problems[2].String(), defaultCatalog+":") {
 		t.Errorf("String() = %q", problems[2])
 	}
 }
 
 func TestMissingCatalogIsAnError(t *testing.T) {
-	if _, err := Check(t.TempDir()); err == nil || !strings.Contains(err.Error(), "reading the catalog") {
+	if _, err := Check(t.TempDir(), DefaultOptions()); err == nil || !strings.Contains(err.Error(), "reading the catalog") {
 		t.Fatalf("err = %v", err)
 	}
 }
