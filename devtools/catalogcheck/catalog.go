@@ -6,9 +6,6 @@ import (
 	"strings"
 )
 
-// catalogPath is the catalog, relative to the repository root.
-const catalogPath = "docs/defect-classes.md"
-
 // routingHeading starts the section whose table routes a change to the entries it touches.
 const routingHeading = "## Routing"
 
@@ -19,12 +16,10 @@ var fieldOrder = []string{"Rule", "Why", "Design question", "Test requirement", 
 const automationField = "Automation"
 
 var (
-	anchorLine   = regexp.MustCompile(`^<a id="([^"]+)"></a>\s*$`)
-	entryHeading = regexp.MustCompile(`^### (DC-[CL][0-9]{2})( .+)?$`)
-	badHeading   = regexp.MustCompile(`^### DC-`)
-	fieldStart   = regexp.MustCompile(`^\*\*([^*]+)\.\*\*(.*)$`)
-	routingLink  = regexp.MustCompile(`\[(DC-[CL][0-9]{2})\]\(#([a-z0-9-]*)\)`)
-	selfLink     = regexp.MustCompile(`\]\(#([a-z0-9-]+)\)`)
+	anchorLine = regexp.MustCompile(`^<a id="([^"]+)"></a>\s*$`)
+	badHeading = regexp.MustCompile(`^### DC-`)
+	fieldStart = regexp.MustCompile(`^\*\*([^*]+)\.\*\*(.*)$`)
+	selfLink   = regexp.MustCompile(`\]\(#([a-z0-9-]+)\)`)
 )
 
 // Problem is one thing wrong with the catalog or with a name it uses.
@@ -51,6 +46,12 @@ type entry struct {
 	fields []field
 }
 
+// row is a row of a table of the page that is not part of an entry.
+type row struct {
+	line int
+	text string
+}
+
 // link is a link of the routing table to an entry.
 type link struct {
 	id     string
@@ -60,7 +61,12 @@ type link struct {
 
 // catalog is what the parser makes of the page.
 type catalog struct {
+	// path is the page's path, for the problems it reports.
+	path    string
 	entries []entry
+	// rows are the rows of the tables outside the entries and outside the routing table: a sentence
+	// there may name a check as well ("how the common classes apply here").
+	rows    []row
 	routing []link
 	// anchors holds every anchor a link into the page may use: the entries' and the headings'.
 	anchors  map[string]bool
@@ -69,6 +75,7 @@ type catalog struct {
 
 // catalogParser holds the state of one pass over the page.
 type catalogParser struct {
+	rules   rules
 	cat     catalog
 	cur     *entry
 	open    *field // the field a following line may continue, nil after a blank line
@@ -79,8 +86,8 @@ type catalogParser struct {
 
 // parseCatalog reads the page. It reports the problems of the page's own shape (a malformed heading,
 // an anchor that is not its heading's id); the checks of the fields and the names come after.
-func parseCatalog(text string) catalog {
-	p := &catalogParser{cat: catalog{anchors: map[string]bool{}}}
+func parseCatalog(text string, rl rules) catalog {
+	p := &catalogParser{rules: rl, cat: catalog{path: rl.path, anchors: map[string]bool{}}}
 	for i, line := range strings.Split(text, "\n") {
 		p.line(i+1, line)
 	}
@@ -90,7 +97,7 @@ func parseCatalog(text string) catalog {
 }
 
 func (p *catalogParser) problem(line int, format string, args ...any) {
-	p.cat.problems = append(p.cat.problems, Problem{File: catalogPath, Line: line, Msg: fmt.Sprintf(format, args...)})
+	p.cat.problems = append(p.cat.problems, Problem{File: p.rules.path, Line: line, Msg: fmt.Sprintf(format, args...)})
 }
 
 // line takes one line of the page.
@@ -109,10 +116,10 @@ func (p *catalogParser) line(n int, line string) {
 		p.dropPending()
 		p.pending, p.pendAt = anchorLine.FindStringSubmatch(line)[1], n
 		p.cat.anchors[p.pending] = true
-	case entryHeading.MatchString(line):
-		p.startEntry(n, entryHeading.FindStringSubmatch(line)[1])
+	case p.rules.entryHeading.MatchString(line):
+		p.startEntry(n, p.rules.entryHeading.FindStringSubmatch(line)[1])
 	case badHeading.MatchString(line):
-		p.problem(n, "entry heading must be `### DC-<C|L><two digits> <title>`: %q", line)
+		p.problem(n, "entry heading must be `%s`: %q", p.rules.headingForm(), line)
 	case strings.HasPrefix(line, "## "), strings.TrimSpace(line) == "---":
 		p.finishEntry()
 		p.dropPending()
@@ -157,11 +164,14 @@ func (p *catalogParser) finishEntry() {
 // the field of an entry.
 func (p *catalogParser) body(n int, line string) {
 	if p.routing {
-		for _, m := range routingLink.FindAllStringSubmatch(line, -1) {
+		for _, m := range p.rules.routingLink.FindAllStringSubmatch(line, -1) {
 			p.cat.routing = append(p.cat.routing, link{id: m[1], anchor: m[2], line: n})
 		}
 	}
 	if p.cur == nil {
+		if !p.routing && strings.HasPrefix(strings.TrimSpace(line), "|") {
+			p.cat.rows = append(p.cat.rows, row{line: n, text: line})
+		}
 		return
 	}
 	if strings.TrimSpace(line) == "" {
@@ -196,15 +206,15 @@ func slug(heading string) string {
 func (c catalog) shapeProblems() []Problem {
 	var out []Problem
 	for _, e := range c.entries {
-		out = append(out, entryShape(e)...)
+		out = append(out, entryShape(c.path, e)...)
 	}
 	return out
 }
 
-func entryShape(e entry) []Problem {
+func entryShape(file string, e entry) []Problem {
 	var out []Problem
 	add := func(line int, format string, args ...any) {
-		out = append(out, Problem{File: catalogPath, Line: line, Msg: e.id + ": " + fmt.Sprintf(format, args...)})
+		out = append(out, Problem{File: file, Line: line, Msg: e.id + ": " + fmt.Sprintf(format, args...)})
 	}
 	next := 0 // index into fieldOrder of the field expected next
 	seen := map[string]bool{}
@@ -252,18 +262,18 @@ func (c catalog) routingProblems() []Problem {
 	for _, l := range c.routing {
 		if l.id == "" { // a link inside the page, not a row of the table
 			if !c.anchors[l.anchor] {
-				out = append(out, Problem{catalogPath, l.line, fmt.Sprintf("the link #%s goes to no anchor of this page", l.anchor)})
+				out = append(out, Problem{c.path, l.line, fmt.Sprintf("the link #%s goes to no anchor of this page", l.anchor)})
 			}
 			continue
 		}
 		routed[l.id] = true
 		if l.anchor != strings.ToLower(l.id) {
-			out = append(out, Problem{catalogPath, l.line, fmt.Sprintf("the routing link of %s goes to #%s, not #%s", l.id, l.anchor, strings.ToLower(l.id))})
+			out = append(out, Problem{c.path, l.line, fmt.Sprintf("the routing link of %s goes to #%s, not #%s", l.id, l.anchor, strings.ToLower(l.id))})
 		}
 	}
 	for _, e := range c.entries {
 		if !routed[e.id] {
-			out = append(out, Problem{catalogPath, e.line, fmt.Sprintf("%s is in no row of the routing table", e.id)})
+			out = append(out, Problem{c.path, e.line, fmt.Sprintf("%s is in no row of the routing table", e.id)})
 		}
 	}
 	return out
