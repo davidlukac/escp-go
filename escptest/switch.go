@@ -176,8 +176,25 @@ func (r request) has(t wire.TLVType) bool {
 }
 
 // reply answers the request with the given operation, code and TLVs; useSession says whether the
-// reply travels under the session key (the replies to discovery do not).
+// reply travels under the session key (the replies to discovery do not). An answer whose lengths do
+// not fit the wire (see wire.CheckLengths: a scripted value over 64 KiB, for instance) is not sent,
+// as no switch could send it: the client hears nothing and reports no reply. The fake has no test
+// to fail from its own goroutine, and it already drops what it cannot send without a word (a failed
+// write is ignored), so this is quiet as well.
 func (f *Switch) reply(r request, op byte, code int32, tlvs []wire.TLV, useSession bool) {
+	b, err := f.encodeReply(r, op, code, tlvs, useSession)
+	if err != nil {
+		return
+	}
+	_, _ = f.conn.WriteToUDP(b, r.from)
+}
+
+// encodeReply is the datagram of an answer, encrypted as reply says, or the error of
+// wire.CheckLengths when the answer does not fit the wire.
+func (f *Switch) encodeReply(r request, op byte, code int32, tlvs []wire.TLV, useSession bool) ([]byte, error) {
+	if err := wire.CheckLengths(tlvs); err != nil {
+		return nil, err
+	}
 	h := r.h
 	h.Op, h.ErrCode = op, code
 	f.mu.Lock()
@@ -186,9 +203,7 @@ func (f *Switch) reply(r request, op byte, code int32, tlvs []wire.TLV, useSessi
 	f.mu.Unlock()
 	b := wire.Marshal(h, tlvs)
 	if useSession && s != nil {
-		b = wire.RC4Session(b, s)
-	} else {
-		b = wire.RC4Static(b)
+		return wire.RC4Session(b, s), nil
 	}
-	_, _ = f.conn.WriteToUDP(b, r.from)
+	return wire.RC4Static(b), nil
 }

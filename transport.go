@@ -243,8 +243,14 @@ func (c *Client) discard(ctx context.Context) {
 }
 
 // send transmits one request with a fresh sequence number, after dropping what was left in the
-// socket.
+// socket. A request whose lengths do not fit the wire (a TLV value over wire.MaxTLVValue bytes, a
+// packet over wire.MaxPacket, which a very long Username or Password makes) is refused first with
+// an error that matches ErrInvalid: nothing is drained, no sequence number is used and nothing is
+// written, so the client is as it was.
 func (c *Client) send(ctx context.Context, op byte, tlvs []wire.TLV, static bool, to []*net.UDPAddr) error {
+	if err := wire.CheckLengths(tlvs); err != nil {
+		return err
+	}
 	c.discard(ctx)
 	c.seq = requestSeq(c.seq, op)
 	pkt := c.encrypt(wire.Marshal(wire.Header{Op: op, SwitchMAC: c.ident.header(), HostMAC: c.hostMAC, Seq: c.seq}, tlvs), static)
