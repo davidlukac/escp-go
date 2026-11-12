@@ -5,6 +5,7 @@
 //
 //	go run ./internal/mutationreport build/mutation.json >> "$GITHUB_STEP_SUMMARY"
 //	go run ./internal/mutationreport badge build/mutation.json > mutation.json
+//	go run ./internal/mutationreport extended build/mutation-extended.json >> "$GITHUB_STEP_SUMMARY"
 package main
 
 import (
@@ -52,20 +53,17 @@ func run(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 2 && args[0] == "badge" {
 		return writeBadge(args[1], stdout, stderr)
 	}
+	if len(args) == 2 && args[0] == "extended" {
+		return writeExtended(args[1], stdout)
+	}
 	if len(args) != 1 {
-		_, _ = fmt.Fprintln(stderr, "usage: mutationreport REPORT.json | mutationreport badge REPORT.json")
+		_, _ = fmt.Fprintln(stderr, "usage: mutationreport REPORT.json | mutationreport badge REPORT.json | mutationreport extended REPORT.json")
 		return exitUsage
 	}
 	_, _ = fmt.Fprintln(stdout, "### Mutation testing")
 	_, _ = fmt.Fprintln(stdout)
-	text, err := os.ReadFile(args[0]) //nolint:gosec // the report the operator names on the command line
-	if err != nil {
-		_, _ = fmt.Fprintln(stdout, "No report: the run stopped before it wrote one.")
-		return exitOK
-	}
-	var r report
-	if err := json.Unmarshal(text, &r); err != nil {
-		_, _ = fmt.Fprintf(stdout, "The report cannot be read: %v\n", err)
+	r, ok := loadReport(args[0], stdout)
+	if !ok {
 		return exitOK
 	}
 	counts, survivors := summarize(r)
@@ -79,6 +77,21 @@ func run(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 	return exitOK
+}
+
+// loadReport reads the report at path. When it cannot (the run stopped before it wrote one, or wrote
+// something else), it says so on stdout, for the job summary, and returns false.
+func loadReport(path string, stdout io.Writer) (r report, ok bool) {
+	text, err := os.ReadFile(path) //nolint:gosec // the report the operator names on the command line
+	if err != nil {
+		_, _ = fmt.Fprintln(stdout, "No report: the run stopped before it wrote one.")
+		return r, false
+	}
+	if err := json.Unmarshal(text, &r); err != nil {
+		_, _ = fmt.Fprintf(stdout, "The report cannot be read: %v\n", err)
+		return report{}, false
+	}
+	return r, true
 }
 
 // summarize counts the mutants per outcome ("KILLED: 16, LIVED: 1") and lists the ones that lived,
@@ -146,17 +159,7 @@ func writeBadge(path string, stdout, stderr io.Writer) int {
 // out, not covered and skipped mutants are not counted, as gremlins does not count them), "n/a" when
 // no mutant was both run and decided.
 func badgeOf(r report) badge {
-	killed, lived := 0, 0
-	for _, f := range r.Files {
-		for _, m := range f.Mutations {
-			switch m.Status {
-			case statusKilled:
-				killed++
-			case statusLived:
-				lived++
-			}
-		}
-	}
+	killed, lived := tally(r)
 	b := badge{SchemaVersion: 1, Label: "mutation score"}
 	if killed+lived == 0 {
 		b.Message, b.Color = "n/a", "lightgrey"
