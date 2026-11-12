@@ -27,8 +27,9 @@ spell:
 
 # What `lint` runs, in order: the spelling check; the project's own checks, which golangci-lint has no
 # rule for (devtools/subtests: a table of cases runs each case with t.Run; devtools/analyzers: `readwrite`,
-# a read followed by a write outside the modify guard, and `lockwait`, a blocking operation under a lock
-# without a `// lockwait: <reason>`), after the tests of the checks themselves; then golangci-lint, for
+# a read followed by a write outside the modify guard, `lockwait`, a blocking operation under a lock
+# without a `// lockwait: <reason>`, and `validatecall`, an exported function that takes a value with a
+# `Validate` method and does not call it), after the tests of the checks themselves; then golangci-lint, for
 # every build tag and operating system.
 lint: spell
 	go -C devtools build -o $(CURDIR)/build/subtests ./subtests
