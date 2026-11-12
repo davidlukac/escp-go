@@ -260,8 +260,8 @@ func TestQoSValidate(t *testing.T) {
 func TestHostnameValidateLength(t *testing.T) {
 	runValidate(t, []validateCase{
 		{"empty", Hostname(""), true},
-		{"the longest", Hostname(strings.Repeat("a", MaxHostnameLen)), false},
-		{"one too long", Hostname(strings.Repeat("a", MaxHostnameLen+1)), true},
+		{"the longest", Hostname(strings.Repeat("a", MaxHostnameLength)), false},
+		{"one too long", Hostname(strings.Repeat("a", MaxHostnameLength+1)), true},
 		{"a hyphen inside", Hostname("a-b"), false},
 		{"a leading hyphen", Hostname("-ab"), true},
 		{"a trailing hyphen", Hostname("ab-"), true},

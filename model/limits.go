@@ -7,8 +7,8 @@ import (
 const (
 	// MaxPort is the highest port number a 32-bit port mask can express.
 	MaxPort = 32
-	// MaxHostnameLen is the longest device description the switch accepts.
-	MaxHostnameLen = 32
+	// MaxHostnameLength is the longest device description the switch accepts.
+	MaxHostnameLength = 32
 )
 
 // The limits of a rate limit.

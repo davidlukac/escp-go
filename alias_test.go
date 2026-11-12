@@ -44,7 +44,7 @@ var MACFromBytes = model.MACFromBytes
 type MTUVLAN = model.MTUVLAN
 
 const MaxBandwidth = model.MaxBandwidth
-const MaxHostnameLen = model.MaxHostnameLen
+const MaxHostnameLength = model.MaxHostnameLength
 const MaxPort = model.MaxPort
 const MaxPortVLANID = model.MaxPortVLANID
 const MaxVLANID = model.MaxVLANID

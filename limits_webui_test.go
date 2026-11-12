@@ -44,7 +44,7 @@ func TestLibraryLimitsMatchTheWebUI(t *testing.T) {
 	web := loadWebUILimits(t)
 
 	matches := map[string]int{
-		"device_description_max_length": MaxHostnameLen,
+		"device_description_max_length": MaxHostnameLength,
 		"vlan_name_max_length":          MaxVLANNameLen,
 		"vlan_id_max_digits":            digits(int(MaxVLANID)),
 		"pvid_max_digits":               digits(int(MaxVLANID)),

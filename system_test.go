@@ -123,13 +123,13 @@ func TestParseSystemIgnoresValuesOfTheWrongLength(t *testing.T) {
 	}
 }
 
-// The longest name the switch accepts is exactly MaxHostnameLen characters.
+// The longest name the switch accepts is exactly MaxHostnameLength characters.
 func TestHostnameValidateLengthBoundary(t *testing.T) {
-	if err := Hostname(strings.Repeat("a", MaxHostnameLen)).Validate(); err != nil {
-		t.Errorf("%d characters: %v", MaxHostnameLen, err)
+	if err := Hostname(strings.Repeat("a", MaxHostnameLength)).Validate(); err != nil {
+		t.Errorf("%d characters: %v", MaxHostnameLength, err)
 	}
-	if err := Hostname(strings.Repeat("a", MaxHostnameLen+1)).Validate(); !errors.Is(err, ErrInvalid) {
-		t.Errorf("%d characters: %v, want ErrInvalid", MaxHostnameLen+1, err)
+	if err := Hostname(strings.Repeat("a", MaxHostnameLength+1)).Validate(); !errors.Is(err, ErrInvalid) {
+		t.Errorf("%d characters: %v, want ErrInvalid", MaxHostnameLength+1, err)
 	}
 }
 

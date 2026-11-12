@@ -11,7 +11,7 @@ type System struct {
 }
 
 // Hostname is the device description of a switch (System > System Info), what the web UI calls the
-// device description and the protocol the hostname: 1 to MaxHostnameLen letters, digits and
+// device description and the protocol the hostname: 1 to MaxHostnameLength letters, digits and
 // hyphens, not starting or ending with a hyphen. The rules are the web UI's.
 type Hostname string
 
@@ -19,8 +19,8 @@ var hostnameRE = regexp.MustCompile(`^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$`
 
 // Validate applies the rules; the error matches ErrInvalid.
 func (h Hostname) Validate() error {
-	if len(h) > MaxHostnameLen || !hostnameRE.MatchString(string(h)) {
-		return invalidf("escp: invalid device description %q: 1-%d letters, digits and hyphens, not starting or ending with a hyphen", string(h), MaxHostnameLen)
+	if len(h) > MaxHostnameLength || !hostnameRE.MatchString(string(h)) {
+		return invalidf("escp: invalid device description %q: 1-%d letters, digits and hyphens, not starting or ending with a hyphen", string(h), MaxHostnameLength)
 	}
 	return nil
 }
