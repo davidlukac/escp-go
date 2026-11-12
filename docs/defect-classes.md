@@ -94,7 +94,7 @@ AUTOMATION names each check by kind and name, so that a test can verify that the
 
 **Test requirement.** A test per property of the combination, written against the merged tree, not the branch.
 
-**Automation.** `make:apidiff`; `proposed:seams(#195)` (a script that lists functions changed by more than one pull request in a release range, with the pull requests); `reading:` the combined diff of the release, read as one change.
+**Automation.** `make:apidiff`; `script:scripts/seams` (run before the tag as `scripts/seams [-provider DIR] vPREVIOUS HEAD`: lists the exported symbols added, removed or changed in the range, the ones that call a changed declaration, and with a consumer checkout the ones it uses, then the production files that more than one commit touched; `test:TestTheListOfAFixtureRange` pins the output on a fixture repository, `test:TestCompare` each kind of change and of reach; it lists what to read and does not judge it); `reading:` the combined diff of the release, read as one change.
 
 **Adversarial probe.** Take the classes the release fixed; run each class's probe against every function the release added.
 
