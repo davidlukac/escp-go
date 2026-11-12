@@ -79,8 +79,8 @@ type Header struct {
 func Marshal(h Header, tlvs []TLV) []byte {
 	payload := []byte{}
 	for _, t := range tlvs {
-		payload = binary.BigEndian.AppendUint16(payload, uint16(t.Type))
-		payload = binary.BigEndian.AppendUint16(payload, uint16(len(t.Value)))
+		payload = binary.BigEndian.AppendUint16(payload, uint16(t.Type))       //nolint:gosec // G115: TLVType is a 16-bit wire number held in an int16: a same-width reinterpretation
+		payload = binary.BigEndian.AppendUint16(payload, uint16(len(t.Value))) //nolint:gosec // G115: no caller builds a value over 64 KiB (a request is a few bytes, a reply a fragment of a datagram), but Marshal does not check it: a longer value would wrap
 		payload = append(payload, t.Value...)
 	}
 	payload = append(payload, packetEnd...)
@@ -89,8 +89,8 @@ func Marshal(h Header, tlvs []TLV) []byte {
 	copy(b[offSwitchMAC:], h.SwitchMAC[:])
 	copy(b[offHostMAC:], h.HostMAC[:])
 	binary.BigEndian.PutUint16(b[offSeq:], h.Seq)
-	binary.BigEndian.PutUint32(b[offErrCode:], uint32(h.ErrCode))
-	binary.BigEndian.PutUint16(b[offLength:], uint16(HeaderLen+len(payload)))
+	binary.BigEndian.PutUint32(b[offErrCode:], uint32(h.ErrCode))             //nolint:gosec // G115: the error code is signed on the wire: a same-width reinterpretation of 32 bits
+	binary.BigEndian.PutUint16(b[offLength:], uint16(HeaderLen+len(payload))) //nolint:gosec // G115: as for the value length above, the packet is far below 64 KiB in practice and Marshal does not check it
 	binary.BigEndian.PutUint16(b[offFragment:], h.Fragment)
 	return append(b, payload...)
 }
@@ -112,13 +112,13 @@ func Unmarshal(b []byte) (Header, []TLV, error) {
 	copy(h.SwitchMAC[:], b[offSwitchMAC:offSwitchMAC+MACLen])
 	copy(h.HostMAC[:], b[offHostMAC:offHostMAC+MACLen])
 	h.Seq = binary.BigEndian.Uint16(b[offSeq:])
-	h.ErrCode = int32(binary.BigEndian.Uint32(b[offErrCode:]))
+	h.ErrCode = int32(binary.BigEndian.Uint32(b[offErrCode:])) //nolint:gosec // G115: the error code is signed on the wire: a same-width reinterpretation of 32 bits
 	h.Length = binary.BigEndian.Uint16(b[offLength:])
 	h.Fragment = binary.BigEndian.Uint16(b[offFragment:])
 	var tlvs []TLV
 	p := b[HeaderLen:]
 	for len(p) >= TLVHeaderLen {
-		t := TLVType(binary.BigEndian.Uint16(p))
+		t := TLVType(binary.BigEndian.Uint16(p)) //nolint:gosec // G115: TLVType is a 16-bit wire number held in an int16: a same-width reinterpretation
 		l := int(binary.BigEndian.Uint16(p[2:]))
 		if t == tlvEndType && l == 0 {
 			break
