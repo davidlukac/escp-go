@@ -42,7 +42,7 @@ func nameParsers() []nameParser {
 				err := v.UnmarshalText([]byte(s))
 				return string(v), err
 			},
-			extra: []string{string(VLANModeNone)}},
+			extra: []string{string(VLANModeNone), ""}},
 		{name: "Speed",
 			parse: func(s string) (string, error) { v, err := ParseSpeed(s); return string(v), err },
 			decode: func(s string) (string, error) {
@@ -50,7 +50,7 @@ func nameParsers() []nameParser {
 				err := v.UnmarshalText([]byte(s))
 				return string(v), err
 			},
-			extra: []string{string(SpeedLinkDown)}},
+			extra: []string{string(SpeedLinkDown), ""}},
 		{name: "Impact",
 			parse: func(s string) (string, error) { v, err := ParseImpact(s); return v.String(), err },
 			decode: func(s string) (string, error) {
