@@ -124,7 +124,7 @@ AUTOMATION names each check by kind and name, so that a test can verify that the
 
 **Test requirement.** Synchronize with channels and contexts, never with a sleep; release with `t.Cleanup`; ports from an allocator that gives them back; a deterministic clock or a bounded wait for anything timed. Where the fake is muted so that a call parks in its wait, a wrapper around the client's own socket (the package's `datagramConn` seam; `signalingConn` in `cancel_close_table_test.go` is one) that signals when the call has reached the read is an acceptable way to know that the call is waiting, and replaces a sleep.
 
-**Automation.** `make:soak` (weekly: shuffled, repeated, with the race detector, on three operating systems); `workflow:weekly.yml`; `proposed:nosleep(#195)` (a `forbidigo` pattern for `time.Sleep` in tests, with a reason-comment escape).
+**Automation.** `make:soak` (weekly: shuffled, repeated, with the race detector, on three operating systems), in three conditions that `internal/soak` defines once: `make:soak-idle`, `make:soak-single` (`GOMAXPROCS=1`) and `make:soak-loaded` (busy goroutines on every CPU beside the tests); `workflow:weekly.yml`; `proposed:nosleep(#195)` (a `forbidigo` pattern for `time.Sleep` in tests, with a reason-comment escape).
 
 **Adversarial probe.** Run `go test -race -shuffle=on -count=5`, with `GOMAXPROCS=1`, with a CPU hog beside it, and with two copies of the binary at once.
 

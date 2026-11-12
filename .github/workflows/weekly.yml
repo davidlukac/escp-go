@@ -2,13 +2,16 @@
 # that were published since the last release.
 #
 #   * soak: the whole suite with the race detector, in a random order, three times, on every operating
-#     system CI covers, with the leak test running 200 cycles instead of 20 (ESCP_SOAK). It is where a
-#     test that depends on timing, an order between tests or a goroutine that is left behind shows up;
-#     a pull request's run seldom does.
+#     system CI covers, with the leak test running 200 cycles instead of 20 (ESCP_SOAK), in three
+#     conditions (one step each): on an idle machine, with GOMAXPROCS=1, and with busy goroutines on
+#     every CPU beside the tests. It is where a test that depends on timing, an order between tests, a
+#     goroutine that is left behind or a read that is held up for longer than its timeout shows up; a
+#     pull request's run seldom does (the drain defect of #207 was seen only under load, 17 times in
+#     18000 runs). The conditions are defined once, in internal/soak, which `make soak` runs too.
 #   * vulnerabilities: govulncheck on the code and its dependencies. An advisory appears without any
 #     change of ours, so the check that runs on a push would not see it until the next one.
 #
-# `make soak` and `make vuln` reproduce both locally.
+# `make soak` (or `make soak-idle`, `soak-single`, `soak-loaded`) and `make vuln` reproduce both locally.
 name: Weekly checks
 
 on:
@@ -39,10 +42,18 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           go-version: stable
-      - name: The suite, shuffled, three times, with the race detector
-        run: go test -race -shuffle=on -count=3 ./...
-        env:
-          ESCP_SOAK: "200"
+      # `go run ./internal/soak <leg>` is what `make soak-<leg>` runs; the steps do not rely on make
+      # being on the Windows runner (the other Windows steps of this repository do not either). Each
+      # leg is its own step, so that a failure names its condition and a slow one does not hide in
+      # the others' time; the legs run even when an earlier one failed.
+      - name: The suite on an idle machine, shuffled, three times, with the race detector
+        run: go run ./internal/soak idle
+      - name: The same with GOMAXPROCS=1
+        if: ${{ success() || failure() }}
+        run: go run ./internal/soak single
+      - name: The same with busy goroutines on every CPU beside the tests
+        if: ${{ success() || failure() }}
+        run: go run ./internal/soak loaded
 
   vulnerabilities:
     name: Vulnerabilities

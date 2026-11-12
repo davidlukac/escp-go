@@ -16,6 +16,7 @@ For people who work on the library. Users want the [guides](README.md); the chec
 | `internal/coverpolicy` | the coverage policy checker and the badge (a build tool, not part of the API) |
 | `internal/mutationreport` | the job summary of a mutation run (a build tool) |
 | `internal/release` | cutting a version: the CHANGELOG entry, the checks, the tag (a build tool, `scripts/release.sh`) |
+| `internal/soak` | the weekly soak of the suite in three conditions: idle, `GOMAXPROCS=1`, and busy goroutines on every CPU (a build tool, `make soak`, called by `weekly.yml` too) |
 | `internal/fuzzrun` | every fuzz target of the module for a number of seconds each (a build tool, `scripts/fuzz.sh`) |
 | `devtools/subtests` | the check `make lint` runs for what golangci-lint cannot see: a table of cases in a test must run each case with `t.Run` (a `go/analysis` command in the devtools module; its one source is here, and the provider repository gets a verbatim copy) |
 | `devtools/analyzers` | the other checks `make lint` runs, one `multichecker`: `readwrite` (a read followed by a write outside the modify guard) and `lockwait` (a blocking operation under a lock needs a `// lockwait: <reason>`); one directory, copied verbatim into the provider repository like `devtools/subtests` |
