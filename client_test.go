@@ -14,6 +14,7 @@ import (
 	"github.com/davidlukac/escp-go/escptest"
 )
 
+// guarantee: Config.Validate
 func TestConfigValidate(t *testing.T) {
 	mac := MAC{2, 0, 0, 0, 0, 1}
 	for _, tc := range []struct {
@@ -66,6 +67,8 @@ func TestConfigValidate(t *testing.T) {
 
 // Dial refuses a configuration that cannot work, with the same error Validate gives and before it
 // looks anything up: the host below would not resolve, so a lookup would say something else.
+//
+// guarantee: Config.Validate
 func TestDialRefusesWhatValidateRefuses(t *testing.T) {
 	for i, cfg := range []Config{
 		{},
@@ -180,6 +183,9 @@ func TestCloseReleasesTheSocket(t *testing.T) {
 
 // Close ends a client for good: every call that takes the client returns ErrClosed and sends
 // nothing, reads, writes and the configuration download alike.
+//
+// guarantee: Client.Close
+// guarantee: ErrClosed
 func TestACallOnAClosedClientReturnsErrClosedAndSendsNothing(t *testing.T) {
 	ctx := context.Background()
 	cases := []struct {

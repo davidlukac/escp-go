@@ -13,6 +13,8 @@ import (
 
 // a client that was refused with ErrSwitchInUse keeps sending to the switch (the key
 // exchange replaces the switch's one session, which the other client is using).
+//
+// guarantee: ErrSwitchInUse
 func TestSeamARefusedClientStillTalksToTheSwitchOnEveryCall(t *testing.T) {
 	f := escptest.Start(t)
 	mac := MAC{0, 0, 0x5e, 0, 0x53, 0x42}

@@ -125,6 +125,8 @@ func (b *blockingConn) ReadFromUDP(buf []byte) (int, *net.UDPAddr, error) {
 
 // A call that has to wait for another call on the same client gives up when its own context ends,
 // without having sent anything, and the call it waited for is not disturbed.
+//
+// guarantee: Client
 func TestACallThatWaitsForTheClientStopsWhenItsContextEnds(t *testing.T) {
 	for name, call := range map[string]func(context.Context, *Client) error{
 		"read":   func(ctx context.Context, c *Client) error { _, err := c.LED(ctx); return err },

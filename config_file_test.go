@@ -26,6 +26,8 @@ func TestConfigFileSizeHashAndBase64(t *testing.T) {
 }
 
 // The file holds the account block of the switch: it must not reach a log or an error by accident.
+//
+// guarantee: model.ConfigFile
 func TestConfigFileNeverPrintsItsBytes(t *testing.T) {
 	const marker = "ACCOUNT-BLOCK-MARKER"
 	f := ConfigFile(marker)

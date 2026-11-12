@@ -46,6 +46,9 @@ func TestRejectedErrorWithAReasonReplacesTheGenericHint(t *testing.T) {
 // Every refusal of a caller's argument matches ErrInvalid and keeps its message. The message
 // fragments are what the provider and users have seen so far; they are the contract that the
 // change to ErrInvalid did not alter the text.
+//
+// guarantee: ErrInvalid
+// guarantee: model.ErrInvalid
 func TestEveryRefusedArgumentIsErrInvalid(t *testing.T) {
 	ctx := context.Background()
 	cases := []struct {
@@ -139,6 +142,9 @@ func TestEveryRefusedArgumentIsErrInvalid(t *testing.T) {
 
 // The class is for the caller's mistakes only: what the switch does, and replies the client cannot
 // read, stay what they were.
+//
+// guarantee: ErrInvalid
+// guarantee: model.ErrInvalid
 func TestFailuresOfTheSwitchAreNotErrInvalid(t *testing.T) {
 	ctx := context.Background()
 	t.Run("a refusal by the switch", func(t *testing.T) {

@@ -127,6 +127,7 @@ func dialLogged(t *testing.T, f *escptest.Switch, pass Password, log *slog.Logge
 	return c
 }
 
+// guarantee: Config.Logger
 func TestLoggerSeesTheRequestsAndRepliesAndNeverASecret(t *testing.T) {
 	f := escptest.Start(t)
 	log, rec := newLogRecorder()
@@ -218,6 +219,7 @@ func TestLoggerAttachesTheMACOfAPinnedSwitch(t *testing.T) {
 	}
 }
 
+// guarantee: Config.Logger
 func TestLoggerWarnsAboutALostPacketAndTheRetry(t *testing.T) {
 	f := escptest.Start(t)
 	f.DropFirst(2) // the first discovery probe goes out twice (to the switch and to the broadcast address)

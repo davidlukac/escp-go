@@ -217,6 +217,8 @@ func TestAMovedSwitchIsClaimedAtItsNewAddress(t *testing.T) {
 
 // Another client holding the address a switch moves to is not stolen from: the moved client is
 // refused with ErrSwitchInUse, and stays refused while the other holds it.
+//
+// guarantee: ErrSwitchInUse
 func TestAMoveOntoAClaimedAddressIsNotStolen(t *testing.T) {
 	port := escptest.FreeUDPPort(t)
 	holder, err := claimed(Config{Host: "127.0.0.2", SwitchPort: port})

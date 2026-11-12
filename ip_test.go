@@ -25,6 +25,8 @@ var (
 // The case seen on a real switch: the write was applied, the switch left the old address and the
 // reply never arrived. The client used to retry from the key exchange against the old address and
 // report "session key exchange: no reply" although the switch had moved.
+//
+// guarantee: Client.SetIPConfig
 func TestSetIPConfigSucceedsWhenTheReplyIsLostButTheSwitchMoved(t *testing.T) {
 	f := escptest.Start(t)
 	f.Configure(func(f *escptest.Faults) { f.OnSystemSet = escptest.SystemSetLeaves })
@@ -45,6 +47,8 @@ func TestSetIPConfigSucceedsWhenTheReplyIsLostButTheSwitchMoved(t *testing.T) {
 }
 
 // A write that was never applied is not a move: the error says so, and the client stays put.
+//
+// guarantee: Client.SetIPConfig
 func TestSetIPConfigReportsAWriteThatWasNotApplied(t *testing.T) {
 	f := escptest.Start(t)
 	f.Configure(func(f *escptest.Faults) { f.DropSets = true })
@@ -72,6 +76,8 @@ func TestSetIPConfigReportsAWriteThatWasNotApplied(t *testing.T) {
 
 // Applied but unreachable: the state cannot be established, which the caller is told to resolve by
 // looking at both addresses.
+//
+// guarantee: Client.SetIPConfig
 func TestSetIPConfigReportsAMoveThatCannotBeConfirmed(t *testing.T) {
 	f := escptest.Start(t)
 	f.Configure(func(f *escptest.Faults) { f.OnSystemSet = escptest.SystemSetVanishes })
@@ -94,6 +100,7 @@ func TestSetIPConfigReportsAMoveThatCannotBeConfirmed(t *testing.T) {
 // otherDevice is the MAC of a device that is not the fake.
 var otherDevice = MAC{0xaa, 0xbb, 0xcc, 0, 0, 1}
 
+// guarantee: Client.SetIPConfig
 func TestClassifyLostReply(t *testing.T) {
 	mac := escptest.DefaultMAC()
 	info := func(mac MAC, cfg IPConfig) Info {
@@ -162,6 +169,8 @@ func TestSettleLostReplyNamesWhatAnswered(t *testing.T) {
 
 // The caller's context ends right after the write was applied: the call must not report
 // "canceled" as if nothing happened. The probe runs anyway and finds the move.
+//
+// guarantee: Client.SetIPConfig
 func TestSetIPConfigSettlesWhenTheCallIsCanceledAfterTheWrite(t *testing.T) {
 	f := escptest.Start(t)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -206,6 +215,8 @@ func TestSetIPConfigCanceledBeforeItsWriteIsNotUnconfirmed(t *testing.T) {
 }
 
 // A refusal by the switch or by the gate means nothing was applied: no probe, no guessing.
+//
+// guarantee: Client.SetIPConfig
 func TestSetIPConfigDoesNotProbeAfterARefusal(t *testing.T) {
 	t.Run("the switch refuses", func(t *testing.T) {
 		f := escptest.Start(t)
