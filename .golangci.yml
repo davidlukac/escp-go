@@ -152,6 +152,8 @@ linters:
           msg: time.After keeps its timer until it fires; use a time.Timer and Stop it
         - pattern: ^.*\.(WriteTo|WriteToUDP|WriteToUDPAddrPort|WriteMsgUDP|WriteMsgUDPAddrPort)$
           msg: only transport.go and discover.go write to a socket (the write gate is in request.go)
+        - pattern: ^.*\.SetReadDeadline$
+          msg: only transport.go and discover.go set a read deadline, because a timed read is how absence is decided (DC-L09, DC-C06); a new one is a decision made there
         - pattern: ^(fmt\.Print(f|ln)?|print|println)$
           msg: the library logs through its slog.Logger (Config.Logger), never to stdout
         - pattern: ^log\.(Print|Fatal|Panic)(f|ln)?$
@@ -194,6 +196,12 @@ linters:
       # socket. Anywhere else a write to a socket goes around request.go and the write gate.
       - path: ^(transport|discover)\.go$|^escptest/
         text: only transport\.go and discover\.go write to a socket
+        linters:
+          - forbidigo
+      # A read deadline is set where the library decides that nothing came: the transport (the wait for a
+      # reply, the drain, the interrupt of a call) and discovery (the window that collects the answers).
+      - path: ^(transport|discover)\.go$
+        text: only transport\.go and discover\.go set a read deadline
         linters:
           - forbidigo
       # G115 (integer conversion overflow) is enforced everywhere except in the writers below: model/,

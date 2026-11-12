@@ -126,7 +126,7 @@ func (c *Client) accept(from *net.UDPAddr, data []byte) (reply, bool) {
 // read error of the socket itself as it is: a failing socket is not a silent switch.
 func (c *Client) recv(ctx context.Context, deadline time.Time) (reply, error) {
 	buf := make([]byte, maxDatagram)
-	for time.Now().Before(deadline) && ctx.Err() == nil {
+	for c.now().Before(deadline) && ctx.Err() == nil {
 		_ = c.conn.SetReadDeadline(deadline)
 		n, from, err := c.conn.ReadFromUDP(buf)
 		switch {

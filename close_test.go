@@ -34,11 +34,9 @@ func TestCloseEndsTheCallInFlightAndTheCallsWaitingBehindIt(t *testing.T) {
 	f.Mute()
 	inFlight, queued := make(chan error, 1), make(chan error, 1)
 	go func() { _, err := c.Ports(context.Background()); inFlight <- err }()
-	for f.Received() == 0 { // the first call is waiting for the silent switch
-		time.Sleep(time.Millisecond)
-	}
+	awaitCondition(t, "the first call to reach the silent switch", func() bool { return f.Received() > 0 }) // it is waiting for a reply
 	go func() { _, err := c.Ports(context.Background()); queued <- err }()
-	time.Sleep(20 * time.Millisecond) // the second call is queued on the lock
+	awaitQueued(t) // the second call is queued on the lock
 	closeWithin(t, c, 5*time.Second)
 	atClose := f.Received()
 	defer func() {
@@ -72,9 +70,7 @@ func TestAWriteCutShortByCloseReturnsErrClosed(t *testing.T) {
 	f.Configure(func(f *escptest.Faults) { f.DropSets = true })
 	res := make(chan error, 1)
 	go func() { res <- c.SetLoopPrevention(context.Background(), true) }()
-	for f.DroppedSets() == 0 {
-		time.Sleep(time.Millisecond)
-	}
+	awaitCondition(t, "the fake to drop the write", func() bool { return f.DroppedSets() > 0 })
 	closeWithin(t, c, 5*time.Second)
 	if err := <-res; !errors.Is(err, ErrClosed) {
 		t.Fatalf("got %v, want ErrClosed", err)

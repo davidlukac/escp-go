@@ -23,8 +23,9 @@ import (
 // that parks the call between its read and its write, runs a second call that touches the same
 // request or state, releases the first and asserts the final state: both changes are there, and no
 // write carried a value that was stale by then (DC-L03). The catalog's first test for the class
-// parks two calls of one method (TestReadModifyWriteCallsDoNotUndoEachOther); the rows below
-// cover the pairs that the incident of #141 and the guards of #183 were about.
+// parks two calls of one method (the row of two SetPortPriorities calls below, which replaced a test
+// that waited a fixed time to see whether the second call had finished); the rows cover the pairs
+// that the incident of #141 and the guards of #183 were about.
 
 // parkedPairWanted is an address other than the fake's static one and its lease: the three
 // differ in the mask and the gateway (the fake answers only from one IP), so a write that carries

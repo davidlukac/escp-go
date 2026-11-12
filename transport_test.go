@@ -453,17 +453,21 @@ func TestAFragmentedReplyOfExactlyTheLimitIsAcceptedAndOneByteMoreIsRefused(t *t
 }
 
 // slowFragmentsConn answers every read, after a pause, with one more packet that says more follow.
+// The pause is the test's clock moving on: nothing sleeps.
 type slowFragmentsConn struct {
 	datagramConn
 	from  *net.UDPAddr
 	pkt   []byte
 	pause time.Duration
+	now   time.Time // the clock the client reads (seams.clock), advanced by every read
 }
 
 func (s *slowFragmentsConn) SetReadDeadline(time.Time) error { return nil }
 
+func (s *slowFragmentsConn) clock() time.Time { return s.now }
+
 func (s *slowFragmentsConn) ReadFromUDP(b []byte) (int, *net.UDPAddr, error) {
-	time.Sleep(s.pause)
+	s.now = s.now.Add(s.pause)
 	return copy(b, s.pkt), s.from, nil
 }
 
@@ -476,8 +480,10 @@ func TestTheDeadlineOfAFragmentedReplyIsOneForTheWholeReply(t *testing.T) {
 	}
 	c.seq = 7
 	pkt := wire.Marshal(wire.Header{Op: wire.OpReply, Seq: c.seq, Fragment: 1}, []wire.TLV{{Type: 768, Value: []byte{1}}})
-	c.conn = &slowFragmentsConn{from: &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 1}, pkt: wire.RC4Static(pkt), pause: 20 * time.Millisecond}
-	got, err := c.collectFragments(context.Background(), 768, time.Now().Add(100*time.Millisecond))
+	conn := &slowFragmentsConn{from: &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 1}, pkt: wire.RC4Static(pkt), pause: 20 * time.Millisecond,
+		now: time.Date(2000, time.January, 1, 0, 0, 0, 0, time.UTC)}
+	c.conn, c.clock = conn, conn.clock
+	got, err := c.collectFragments(context.Background(), 768, conn.now.Add(100*time.Millisecond))
 	if err != nil || got.complete {
 		t.Fatalf("complete=%v err=%v, want an incomplete reply and no error when the deadline passes", got.complete, err)
 	}

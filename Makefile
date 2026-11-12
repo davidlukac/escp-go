@@ -28,8 +28,9 @@ spell:
 # What `lint` runs, in order: the spelling check; the project's own checks, which golangci-lint has no
 # rule for (devtools/subtests: a table of cases runs each case with t.Run; devtools/analyzers: `readwrite`,
 # a read followed by a write outside the modify guard, `lockwait`, a blocking operation under a lock
-# without a `// lockwait: <reason>`, and `validatecall`, an exported function that takes a value with a
-# `Validate` method and does not call it), after the tests of the checks themselves; then golangci-lint, for
+# without a `// lockwait: <reason>`, `validatecall`, an exported function that takes a value with a
+# `Validate` method and does not call it, and `nosleep`, a sleep or a guess-wait on the clock without a
+# `// nosleep: <reason>`, run a second time with the `live` tag), after the tests of the checks themselves; then golangci-lint, for
 # every build tag and operating system.
 lint: spell
 	go -C devtools build -o $(CURDIR)/build/subtests ./subtests
@@ -37,6 +38,7 @@ lint: spell
 	go -C devtools test -count=1 ./...
 	build/subtests ./...
 	build/analyzers ./...
+	GOFLAGS=-tags=live build/analyzers -nosleep ./...
 	$(DEVTOOL) golangci-lint run ./...
 	$(DEVTOOL) golangci-lint run --build-tags live ./...
 	@bin="$$($(DEVTOOL) -n golangci-lint)"; for os in $(LINT_GOOS); do echo "golangci-lint run (GOOS=$$os)"; GOOS=$$os "$$bin" run ./... || exit 1; done

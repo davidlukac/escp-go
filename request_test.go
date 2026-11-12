@@ -8,7 +8,6 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/davidlukac/escp-go/escptest"
 	"github.com/davidlukac/escp-go/internal/wire"
@@ -216,63 +215,6 @@ func TestWriteNeedsThePortCount(t *testing.T) {
 			t.Fatalf("the switch received %d writes", n)
 		}
 	})
-}
-
-// Two calls that each read a setting and write all of it back must not run at the same time: the
-// later write would undo the change of the earlier one (two SetPortPriorities for different ports
-// lost one of them; SetHostname wrote back a stale address). The gate holds the first call after
-// its read until the second has had every chance to run.
-func TestReadModifyWriteCallsDoNotUndoEachOther(t *testing.T) {
-	f := escptest.Start(t)
-	f.EnableModel(nil)
-	var calls atomic.Int32
-	inGate := make(chan struct{})
-	release := make(chan struct{})
-	gate := func(ctx context.Context, sw Reader, op Operation) error {
-		if calls.Add(1) == 1 {
-			close(inGate)
-			select {
-			case <-release:
-			case <-time.After(10 * time.Second):
-			}
-		}
-		return nil
-	}
-	c := newBoundClient(t, Config{Host: "127.0.0.1", Username: "admin", Password: "secret", Timeout: 5 * time.Second,
-		SwitchPort: f.UDPPort(), BroadcastAddr: escptest.Loopback(), WriteGate: gate}, withLoopback())
-	t.Cleanup(func() { c.Close() })
-	ctx := context.Background()
-	first := make(chan error, 1)
-	go func() { first <- c.SetPortPriorities(ctx, []PortPriority{{Port: 3, Priority: PriorityHighest}}) }()
-	<-inGate
-	second := make(chan error, 1)
-	go func() { second <- c.SetPortPriorities(ctx, []PortPriority{{Port: 4, Priority: PriorityHighest}}) }()
-	select {
-	case err := <-second:
-		// Without the lock the second call finishes while the first is held; the first then
-		// writes back what it read before, without the second's change.
-		close(release)
-		if err != nil {
-			t.Fatal(err)
-		}
-	case <-time.After(300 * time.Millisecond): // the second waits for the first, as it must
-		close(release)
-		if err := <-second; err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err := <-first; err != nil {
-		t.Fatal(err)
-	}
-	got, err := c.QoS(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, p := range got.Priorities {
-		if (p.Port == 3 || p.Port == 4) && p.Priority != PriorityHighest {
-			t.Errorf("port %d has priority %d: the change was undone by the other call", p.Port, p.Priority)
-		}
-	}
 }
 
 // A read-modify-write call that is canceled while it waits for another one returns the context's

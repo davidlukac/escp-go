@@ -86,14 +86,14 @@ func TestUsedAndClosedClientsLeaveNoGoroutinesBehind(t *testing.T) {
 	if err := f.Close(); err != nil {
 		t.Fatal(err)
 	}
-	// a goroutine that is on its way out may take a moment: look until none is left, or give up
+	// a goroutine that is on its way out has no handle to wait for: look until none is left, or give up
 	var left []string
-	for deadline := time.Now().Add(3 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
-		if left = libraryGoroutines(t); len(left) == 0 {
-			return
-		}
+	if !awaitUntil(func() bool {
+		left = libraryGoroutines(t)
+		return len(left) == 0
+	}) {
+		t.Fatalf("%d goroutine(s) of the library are still running after %d cycles:\n%s", len(left), cycles, strings.Join(left, "\n\n"))
 	}
-	t.Fatalf("%d goroutine(s) of the library are still running after %d cycles:\n%s", len(left), cycles, strings.Join(left, "\n\n"))
 }
 
 // The check itself sees a goroutine that runs code of this module and is not a test, and sees it go.
@@ -109,10 +109,5 @@ func TestTheLeakCheckSeesAStrayGoroutine(t *testing.T) {
 	}
 	close(release)
 	<-done
-	for deadline := time.Now().Add(3 * time.Second); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
-		if len(libraryGoroutines(t)) == 0 {
-			return
-		}
-	}
-	t.Fatal("the goroutine ended, the check still sees it")
+	awaitCondition(t, "the check to stop seeing the goroutine that ended", func() bool { return len(libraryGoroutines(t)) == 0 })
 }

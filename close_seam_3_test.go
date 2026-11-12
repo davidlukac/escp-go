@@ -22,9 +22,7 @@ func TestSeamCloseMidManagementWriteSettlesOnAClosedClient(t *testing.T) {
 			SwitchPort: f.UDPPort(), BroadcastAddr: escptest.Loopback()}, withLoopback())
 		res := make(chan error, 1)
 		go func() { res <- c.SetIPConfig(context.Background(), lostReplyWanted) }()
-		for f.DroppedSets() == 0 {
-			time.Sleep(time.Millisecond)
-		}
+		awaitCondition(t, "the fake to drop the write", func() bool { return f.DroppedSets() > 0 })
 		_ = c.Close()
 		var err error
 		select {
@@ -84,9 +82,7 @@ func TestCloseMidEnableDHCPWriteIsCutShort(t *testing.T) {
 	f.Configure(func(f *escptest.Faults) { f.DropSets = true })
 	res := make(chan error, 1)
 	go func() { res <- c.EnableDHCP(context.Background()) }()
-	for f.DroppedSets() == 0 {
-		time.Sleep(time.Millisecond)
-	}
+	awaitCondition(t, "the fake to drop the write", func() bool { return f.DroppedSets() > 0 })
 	closeWithin(t, c, 5*time.Second)
 	if err := <-res; !errors.Is(err, ErrClosed) || !errors.Is(err, ErrMoveUnconfirmed) {
 		t.Fatalf("got %v, want ErrClosed joined with ErrMoveUnconfirmed", err)
@@ -108,9 +104,7 @@ func TestSetIPConfigCanceledWhileItsWriteWaitsIsUnconfirmed(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	res := make(chan error, 1)
 	go func() { res <- c.SetIPConfig(ctx, lostReplyWanted) }()
-	for f.DroppedSets() == 0 {
-		time.Sleep(time.Millisecond)
-	}
+	awaitCondition(t, "the fake to drop the write", func() bool { return f.DroppedSets() > 0 })
 	cancel()
 	err := <-res
 	if !errors.Is(err, ErrMoveUnconfirmed) || !strings.Contains(err.Error(), "may not have taken effect yet") || errors.Is(err, ErrNoReply) {
