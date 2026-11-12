@@ -2,7 +2,6 @@ package escp
 
 import (
 	"context"
-	"net"
 	"testing"
 
 	"github.com/davidlukac/escp-go/escptest"
@@ -18,18 +17,12 @@ func discoveryShapedReply(c *Client, seq uint16) []byte {
 		[]wire.TLV{{Type: 1, Value: []byte("TL-SG108E")}, {Type: 2, Value: []byte("switch")}, {Type: 3, Value: []byte{1, 2, 3, 4, 5, 6}}}))
 }
 
-// leaveInTheSocket delivers a datagram to the client's socket from the switch's address, as a reply
-// that was meant for another client of the same process (or for an earlier request) does.
+// leaveInTheSocket leaves a datagram in the client's socket, from the switch's address, as a reply
+// that was meant for another client of the same process (or for an earlier request) does. It is
+// there when the function returns, by construction: see staleConn.
 func leaveInTheSocket(t *testing.T, c *Client, data []byte) {
 	t.Helper()
-	other, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer other.Close()
-	if _, err := other.WriteToUDP(data, &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: localPort(t, c.conn)}); err != nil {
-		t.Fatal(err)
-	}
+	staleConnOf(c).deliver(data)
 }
 
 func TestAStaleReplyInTheSocketIsNotTheAnswerToTheNextRequest(t *testing.T) {
@@ -47,6 +40,9 @@ func TestAStaleReplyInTheSocketIsNotTheAnswerToTheNextRequest(t *testing.T) {
 	}
 	if got != want {
 		t.Fatalf("LED = %t, want %t", got, want)
+	}
+	if left := staleConnOf(c).waitingAtWrites(); len(left) == 0 || left[0] != 0 {
+		t.Fatalf("datagrams still waiting when the request was written = %v, want none (the drain takes the stale reply before the request goes out)", left)
 	}
 }
 
@@ -82,5 +78,11 @@ func TestAFloodOfStaleDatagramsDoesNotHoldARequestBack(t *testing.T) {
 	got, err := c.LED(ctx)
 	if err != nil || got != want {
 		t.Fatalf("LED = %t, %v; want %t, nil", got, err, want)
+	}
+	if left := staleConnOf(c).waitingAtWrites(); len(left) == 0 || left[0] != maxDiscarded {
+		t.Fatalf("datagrams still waiting when the request was written = %v, want %d (the drain stops at its bound, the rest is skipped by the wait for the reply)", left, maxDiscarded)
+	}
+	if left := staleConnOf(c).waiting(); left != 0 {
+		t.Fatalf("%d datagrams left after the request was answered, want 0", left)
 	}
 }
