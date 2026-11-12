@@ -4,7 +4,7 @@ Test errors with `errors.Is` and `errors.As`, never by message.
 
 | Error | Meaning |
 |---|---|
-| `ErrInvalid` | an argument was refused before any write was sent; the message names the value and what is allowed |
+| `ErrInvalid` | an argument was refused before any write was sent, or a text or JSON value was refused by the decoder of a scalar type (`PortID`, `Hostname`, `Speed`, ...) with the rule of its `Validate`; the message names the value and what is allowed |
 | `ErrNoReply` | the switch did not answer in time |
 | `ErrWriteUnconfirmed`, `*UnconfirmedWriteError` | a write was sent and never answered: it may have been applied, once or several times (also matches `ErrNoReply`); read the setting back before deciding, see "When a write gets no answer" in [writing safely](writing-safely.md) |
 | `ErrRejected`, `*RejectedError` | the switch answered with a non-zero code: it refused a write, would not report a setting or did not accept the session key; the error carries the code (`ReplyCode`) and, for the known ones, the reason |
