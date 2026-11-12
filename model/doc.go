@@ -12,6 +12,13 @@
 // without depending on the client. The client that sends these values, Dial and its Client, is in
 // package escp, which returns them.
 //
+// The decoders of the scalar types (PortID, LAGID, VLANID, PortVLANID, Priority, Kbps, Hostname,
+// VLANName, Speed, VLANMode, QoSMode, Impact, Method) apply that Validate, so that decoding a file, a
+// snapshot or a map key refuses what a writer would refuse, with an error that matches ErrInvalid. The
+// zero value and, for most of the types, the empty text read as "not set", and the values a switch
+// only reports (SpeedLinkDown, VLANModeNone) are read. A record (PortConfig, Mirror, ...) has no
+// decoder of its own: decode it, then call its Validate before writing.
+//
 // The names a program uses most are short: model.PortID, model.MAC, model.PortConfig. Package escp
 // documents how to connect and what each call does; this package documents the values.
 //
