@@ -5,7 +5,7 @@
 # Dependabot bumps them there. `go tool` builds the pinned version on first use (cached afterwards).
 DEVTOOL := go tool -modfile=devtools/go.mod
 
-.PHONY: test lint spell actionlint modcheck vuln cover cover-html apidiff fuzz mutation mutation-diff pkgdoc pkgdoc-serve compat-table settings-docs soak hooks pre-commit
+.PHONY: test lint spell actionlint modcheck vuln cover cover-html apidiff fuzz mutation mutation-diff pkgdoc pkgdoc-serve compat-table settings-docs soak soak-idle soak-single soak-loaded hooks pre-commit
 
 # Unit tests against the fake switch. No hardware is touched.
 test:
@@ -107,7 +107,7 @@ fuzz:
 # GOFLAGS=-count=1: gremlins sizes the timeout of a mutant from the time of its first test run, and a cached
 # result takes no time, so without it every mutant of a package whose tests ran before "times out".
 MUTATE := GOFLAGS=-count=1 $(DEVTOOL) gremlins unleash . --workers $(or $(WORKERS),4) --coverpkg ./... --output build/mutation.json \
-	-E '^escptest/' -E '^internal/coverpolicy/' -E '^internal/mutationreport/' -E '^internal/release/' -E '^internal/fuzzrun/' -E '^internal/pkgdoc/' -E '^devtools/' -E '^examples/' \
+	-E '^escptest/' -E '^internal/coverpolicy/' -E '^internal/mutationreport/' -E '^internal/release/' -E '^internal/fuzzrun/' -E '^internal/soak/' -E '^internal/pkgdoc/' -E '^devtools/' -E '^examples/' \
 	$(if $(EFFICACY),--threshold-efficacy $(EFFICACY))
 
 # gremlins does not create the directory of its report: without it the run ends with "impossible to
@@ -138,10 +138,29 @@ compat-table:
 settings-docs:
 	go test . -run TestTheGeneratedTablesAreCurrent -update-docs
 
-# What the weekly workflow runs: the suite shuffled and repeated with the race detector, and the
-# leak test at 200 cycles (it takes a few minutes).
+# What the weekly workflow runs, from one source (internal/soak, which the workflow calls as well): the
+# suite shuffled and repeated with the race detector, three ways, and the leak test at 200 cycles
+# (several minutes per way). `soak` runs all three; each has a target of its own:
+#   soak-idle    nothing else running (the first soak, kept as it was);
+#   soak-single  GOMAXPROCS=1, which interleaves goroutines in orders a multi-core run seldom produces;
+#   soak-loaded  busy goroutines on every CPU beside the tests, which delay a goroutine for longer than
+#                a short timeout (the stale-datagram defect of the drain, #206 and #207, showed only so).
+# SOAK_FLAGS and SOAK_PACKAGES narrow a run, for example
+# `make soak-loaded SOAK_FLAGS='-count 200 -run TestAStale' SOAK_PACKAGES=.` (see `go run ./internal/soak -h`).
+SOAK := go run ./internal/soak $(SOAK_FLAGS)
+SOAK_TAIL = $(if $(SOAK_PACKAGES),-- $(SOAK_PACKAGES))
+
 soak:
-	ESCP_SOAK=200 go test -race -shuffle=on -count=3 ./...
+	$(SOAK) $(SOAK_TAIL)
+
+soak-idle:
+	$(SOAK) idle $(SOAK_TAIL)
+
+soak-single:
+	$(SOAK) single $(SOAK_TAIL)
+
+soak-loaded:
+	$(SOAK) loaded $(SOAK_TAIL)
 
 # Enable the repository's git hooks (pre-commit runs `make pre-commit`).
 hooks:
