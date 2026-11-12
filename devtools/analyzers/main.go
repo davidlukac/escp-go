@@ -14,4 +14,4 @@ package main
 import "golang.org/x/tools/go/analysis/multichecker"
 
 // main is the process entry point.
-func main() { multichecker.Main(Readwrite, Lockwait) }
+func main() { multichecker.Main(Readwrite, Lockwait, Validatecall) }

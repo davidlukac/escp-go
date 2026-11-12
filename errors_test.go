@@ -43,19 +43,20 @@ func TestRejectedErrorWithAReasonReplacesTheGenericHint(t *testing.T) {
 	}
 }
 
-// Every refusal of a caller's argument matches ErrInvalid and keeps its message. The message
-// fragments are what the provider and users have seen so far; they are the contract that the
-// change to ErrInvalid did not alter the text.
-//
-// guarantee: ErrInvalid
-// guarantee: model.ErrInvalid
-func TestEveryRefusedArgumentIsErrInvalid(t *testing.T) {
+// refusedArgument is one refusal of a caller's argument: the call, and what its message still says.
+// A row whose name starts with the name of a writer (`SetPVIDs empty`) is the refusal of that writer, which
+// TestEveryWriterWithAnArgumentHasARefusedArgumentRow counts.
+type refusedArgument struct {
+	name string
+	call func(c *Client) error
+	want string
+}
+
+// refusedArguments is the table of TestEveryRefusedArgumentIsErrInvalid, one source for the tests that
+// read it.
+func refusedArguments() []refusedArgument {
 	ctx := context.Background()
-	cases := []struct {
-		name string
-		call func(c *Client) error
-		want string
-	}{
+	return []refusedArgument{
 		{"PortID.Validate", func(*Client) error { return PortID(0).Validate() }, "invalid port 0 (valid: 1-32)"},
 		{"Kbps.Validate", func(*Client) error { return Kbps(100).Validate() }, "100 kbps is not a valid rate"},
 		{"LAG.Validate group", func(*Client) error { return LAG{ID: 0, Ports: MustPortSet(1, 2)}.Validate() }, "invalid LAG group 0"},
@@ -118,8 +119,28 @@ func TestEveryRefusedArgumentIsErrInvalid(t *testing.T) {
 		{"SetPortPriorities empty", func(c *Client) error { return c.SetPortPriorities(ctx, nil) }, "no priorities to set"},
 		{"SetPortPriorities empty list", func(c *Client) error { return c.SetPortPriorities(ctx, []PortPriority{}) }, "no priorities to set"},
 		{"SetPVIDs empty", func(c *Client) error { return c.SetPVIDs(ctx, nil) }, "no PVIDs to set"},
+		{"SetPVIDs port", func(c *Client) error {
+			return c.SetPVIDs(ctx, []PortPVID{{Port: 0, PVID: 1}})
+		}, "invalid port 0"},
+		{"SetHostname", func(c *Client) error { return c.SetHostname(ctx, "-bad-") }, "invalid device description"},
+		{"SetIPConfig", func(c *Client) error {
+			return c.SetIPConfig(ctx, cfgOf("192.0.2.0", "255.255.255.0", "192.0.2.1"))
+		}, "is not a usable host address"},
+		{"SetVLANMode", func(c *Client) error {
+			return c.SetVLANMode(ctx, VLANModeSetting{Mode: VLANModeMTU})
+		}, "invalid port 0"},
+		{"DeleteDot1QVLAN", func(c *Client) error { return c.DeleteDot1QVLAN(ctx, 4095) }, "invalid VLAN id 4095"},
 	}
-	for _, tc := range cases {
+}
+
+// Every refusal of a caller's argument matches ErrInvalid and keeps its message. The message
+// fragments are what the provider and users have seen so far; they are the contract that the
+// change to ErrInvalid did not alter the text.
+//
+// guarantee: ErrInvalid
+// guarantee: model.ErrInvalid
+func TestEveryRefusedArgumentIsErrInvalid(t *testing.T) {
+	for _, tc := range refusedArguments() {
 		t.Run(tc.name, func(t *testing.T) {
 			f := escptest.Start(t)
 			c := dialFake(t, f, "secret")
