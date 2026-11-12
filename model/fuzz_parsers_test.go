@@ -74,7 +74,13 @@ func nameParsers() []nameParser {
 			},
 			extra: []string{""}},
 		{name: "PortID",
-			parse: func(s string) (string, error) { v, err := ParsePortID(s); return v.String(), err }},
+			parse: func(s string) (string, error) { v, err := ParsePortID(s); return v.String(), err },
+			decode: func(s string) (string, error) {
+				var v PortID
+				err := v.UnmarshalText([]byte(s))
+				return v.String(), err
+			},
+			extra: []string{"", "0"}},
 		{name: "IPv4",
 			parse: func(s string) (string, error) { v, err := ParseIPv4(s); return v.String(), err }},
 	}
@@ -86,7 +92,7 @@ func nameParsers() []nameParser {
 func FuzzParseNames(f *testing.F) {
 	for _, s := range []string{
 		"", "auto", "100Mbps-full", "link-down", "none", "mtu", "port-based", "802.1q", "cosmetic", "traffic", "management",
-		"SetLED", "LED", "20230218", "2023021", "202302180", "３", "1", "01", "+1", "32", "33", "-1", "1.2.3.4", "192.0.2.1", "::1",
+		"SetLED", "LED", "20230218", "2023021", "202302180", "３", "0", "1", "01", "+1", "32", "33", "-1", "1.2.3.4", "192.0.2.1", "::1",
 		"1.2.3.4%eth0", "999.1.1.1", "dscp/802.1p", "port-based ", "\x00",
 	} {
 		f.Add(s)

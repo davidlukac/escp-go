@@ -27,9 +27,9 @@ func (p PortID) Validate() error {
 // must be valid (Validate), and the error then matches ErrInvalid; any other text is refused with
 // an error that matches ErrInvalid too.
 func ParsePortID(s string) (PortID, error) {
-	n, err := strconv.Atoi(s)
-	if err != nil || strconv.Itoa(n) != s {
-		return 0, invalidf("escp: %q is not a port number", s)
+	n, ok := canonicalInt(s)
+	if !ok {
+		return 0, notANumber(s, "a port number")
 	}
 	p := PortID(n)
 	return p, p.Validate()
