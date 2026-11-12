@@ -35,10 +35,16 @@ func (m VLANMode) Validate() error {
 	return err
 }
 
-// UnmarshalText reads a mode name, so that a decoder refuses what no switch reports: the three modes
-// and VLANModeNone (a reading names it). An error matches ErrInvalid. The text of a VLANMode is the
+// UnmarshalText reads a mode name, so that a decoder refuses what no switch reports: the three modes,
+// VLANModeNone (a reading names it) and the empty text, which is the zero VLANMode (no mode set, or
+// none read), so that the zero VLANModeSetting reads back from its own encoding. Validate still
+// refuses the zero VLANMode as a setting. An error matches ErrInvalid. The text of a VLANMode is the
 // value itself, so nothing is needed to encode one.
 func (m *VLANMode) UnmarshalText(text []byte) error {
+	if len(text) == 0 {
+		*m = ""
+		return nil
+	}
 	for _, known := range append(VLANModes(), VLANModeNone) {
 		if string(known) == string(text) {
 			*m = known

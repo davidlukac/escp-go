@@ -67,9 +67,15 @@ func (s Speed) Validate() error {
 }
 
 // UnmarshalText reads a speed name, so that a decoder refuses what no port has: the six configurable
-// speeds and SpeedLinkDown (a reading reports it). An error matches ErrInvalid. The text of a Speed is
-// the value itself, so nothing is needed to encode one.
+// speeds, SpeedLinkDown (a reading reports it) and the empty text, which is the zero Speed (no speed
+// set, or none read), so that the zero Port, PortConfig and PortStats read back from their own
+// encoding. Validate still refuses the zero Speed as a setting. An error matches ErrInvalid. The text
+// of a Speed is the value itself, so nothing is needed to encode one.
 func (s *Speed) UnmarshalText(text []byte) error {
+	if len(text) == 0 {
+		*s = ""
+		return nil
+	}
 	for _, known := range append(configurableSpeeds[:len(configurableSpeeds):len(configurableSpeeds)], SpeedLinkDown) {
 		if string(known) == string(text) {
 			*s = known
