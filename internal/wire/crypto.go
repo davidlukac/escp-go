@@ -17,8 +17,8 @@ func teaDecryptBlock(b []byte) []byte {
 	v1 := binary.BigEndian.Uint32(b[4:])
 	sum := uint32(0xC6EF3720)
 	for range teaRounds {
-		v1 -= ((v0 << 4) + teaKey[2]) ^ (v0 + sum) ^ (uint32(int32(v0)>>5) + teaKey[3])
-		v0 -= ((v1 << 4) + teaKey[0]) ^ (v1 + sum) ^ (uint32(int32(v1)>>5) + teaKey[1])
+		v1 -= ((v0 << 4) + teaKey[2]) ^ (v0 + sum) ^ (uint32(int32(v0)>>5) + teaKey[3]) //nolint:gosec // G115: TEA shifts the word as signed (arithmetic shift) and back: a same-width reinterpretation of 32 bits, no value is lost
+		v0 -= ((v1 << 4) + teaKey[0]) ^ (v1 + sum) ^ (uint32(int32(v1)>>5) + teaKey[1]) //nolint:gosec // G115: TEA shifts the word as signed (arithmetic shift) and back: a same-width reinterpretation of 32 bits, no value is lost
 		sum += 0x61C88647
 	}
 	out := make([]byte, 8)
@@ -50,7 +50,8 @@ func rc4State(key []byte, n int) []int {
 	}
 	j := 0
 	for i := range n {
-		j = ((j+s[i]+int(int8(key[i%len(key)])))%n + n) % n
+		signed := int(int8(key[i%len(key)])) //nolint:gosec // G115: the jar's key bytes are signed: a same-width reinterpretation of 8 bits, as in the original
+		j = ((j+s[i]+signed)%n + n) % n
 		s[i], s[j] = s[j], s[i]
 	}
 	return s
@@ -66,7 +67,7 @@ func rc4(data []byte, state []int, n int) []byte {
 		i = (i + 1) % n
 		j = (j + s[i]) % n
 		s[i], s[j] = s[j], s[i]
-		out[k] = data[k] ^ byte(s[(s[i]+s[j])%n])
+		out[k] = data[k] ^ byte(s[(s[i]+s[j])%n]) //nolint:gosec // G115: every entry of s is a permutation of 0..n-1 and n is 256 or 8, so it fits a byte
 	}
 	return out
 }
@@ -120,16 +121,16 @@ func RSASessionTLV(key []byte) []byte {
 	words := make([]uint16, rsaWords)
 	mask := big.NewInt(0xFFFF)
 	for i := range words {
-		words[i] = uint16(new(big.Int).And(new(big.Int).Rsh(c, uint(16*i)), mask).Uint64())
+		words[i] = uint16(new(big.Int).And(new(big.Int).Rsh(c, uint(16*i)), mask).Uint64()) //nolint:gosec // G115: the value is masked with 0xFFFF on the line above
 	}
 	n := rsaWords
 	for n > 1 && words[n-1] == 0 {
 		n--
 	}
 	out := make([]byte, rsaTLVLen)
-	out[1] = byte(n)
+	out[1] = byte(n) //nolint:gosec // G115: n is at most rsaWords (4)
 	for i, w := range words {
-		out[2+2*i] = byte(w)
+		out[2+2*i] = byte(w) //nolint:gosec // G115: the low byte of a 16-bit word, the truncation is the point
 		out[3+2*i] = byte(w >> 8)
 	}
 	return out

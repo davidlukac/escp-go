@@ -196,11 +196,16 @@ linters:
         text: only transport\.go and discover\.go write to a socket
         linters:
           - forbidigo
-      # G115 (integer conversion overflow): the protocol is a fixed-width binary
-      # format. Conversions are either bit-level masking/shifting by design or
-      # operate on values range-checked beforehand (ports 1-32, rates up to
-      # 1,000,000 kbps, TLV lengths bounded by the packet buffer).
-      - text: "G115"
+      # G115 (integer conversion overflow) is enforced everywhere except in the writers below: model/,
+      # internal/wire/, the readers and the parsers of the root package are checked, so a new narrowing
+      # conversion of a value read from the network needs a bounds check or a //nolint:gosec with a
+      # reason. The writers each convert a value their own argument check (Validate) has just bounded
+      # (a port 1-32, a group id, a rate, a VLAN id) into the byte or word of a request; the fake switch's
+      # state does the same for a port the test passed. A new writer file is reported once and its
+      # author lists it here with that reason, or checks the value. The rule does not see a narrowing
+      # done inside a helper that takes an int, nor the files listed here.
+      - path: ^(bandwidth|lag|mirror|ports|qos|storm|vlan_8021q_write|vlan_mode|vlan_port)\.go$|^escptest/state\.go$
+        text: "G115"
         linters:
           - gosec
       # The examples that talk to a switch are compiled and never run: running them would send
