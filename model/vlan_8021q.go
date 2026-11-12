@@ -38,8 +38,21 @@ type VLANName string
 // Validate applies the rules; the error matches ErrInvalid.
 func (n VLANName) Validate() error {
 	if len(n) > MaxVLANNameLen || !vlanNamePattern.MatchString(string(n)) {
-		return invalidf("escp: invalid VLAN name %q (at most %d letters, digits, hyphens or underscores)", string(n), MaxVLANNameLen)
+		return invalidf("escp: invalid VLAN name %s (at most %d letters, digits, hyphens or underscores)", quoteBounded(string(n)), MaxVLANNameLen)
 	}
+	return nil
+}
+
+// UnmarshalText reads a VLAN name with the rule of Validate, so that a decoder (encoding/json for a
+// string, a map key, a configuration file) refuses what a writer refuses; the error is Validate's and
+// matches ErrInvalid, and the receiver is left alone on a refusal. The empty text is a name, as it
+// is for Validate.
+func (n *VLANName) UnmarshalText(text []byte) error {
+	v := VLANName(text)
+	if err := v.Validate(); err != nil {
+		return err
+	}
+	*n = v
 	return nil
 }
 
