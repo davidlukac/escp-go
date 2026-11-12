@@ -58,8 +58,8 @@ modcheck:
 #   catalogcheck  every name the defect catalog gives to a check resolves: a renamed test or a removed
 #                 target fails here (devtools/catalogcheck; it exits 1 with one line per problem);
 #   guarantee     the exported identifiers whose doc comment states a guarantee and that no test names
-#                 with a `// guarantee: <Name>` marker (devtools/guarantee; report mode, never fails
-#                 the build: it lists them and prints the count; `build/guarantee -strict` fails).
+#                 with a `// guarantee: <Name>` marker (devtools/guarantee, run with -strict: it lists
+#                 them and fails; without the flag it only reports).
 .PHONY: catalogcheck guarantee
 lint: catalogcheck guarantee
 
@@ -69,7 +69,7 @@ catalogcheck:
 
 guarantee:
 	go -C devtools build -o $(CURDIR)/build/guarantee ./guarantee
-	build/guarantee -root .
+	build/guarantee -strict -root .
 
 # Known vulnerabilities in the code and its dependencies.
 vuln:

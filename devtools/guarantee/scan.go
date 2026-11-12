@@ -80,7 +80,7 @@ func (r Result) Print(w io.Writer) {
 		_, _ = fmt.Fprintf(w, "%s:%d: `// guarantee: %s` names no exported identifier of its package\n", m.File, m.Line, m.Name)
 	}
 	total := len(r.Matched) + len(r.Unmatched)
-	_, _ = fmt.Fprintf(w, "guarantee (report mode): %d exported identifiers state a guarantee; %d have a test marker, %d do not; %d stale marker(s)\n",
+	_, _ = fmt.Fprintf(w, "guarantee: %d exported identifiers state a guarantee; %d have a test marker, %d do not; %d stale marker(s)\n",
 		total, len(r.Matched), len(r.Unmatched), len(r.Stale))
 }
 
