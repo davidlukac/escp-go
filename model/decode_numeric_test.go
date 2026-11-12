@@ -233,14 +233,16 @@ func TestNumericDecodersRefuseWithTheMessageOfValidate(t *testing.T) {
 // guarantee: PortID.UnmarshalText
 // guarantee: PortID.UnmarshalJSON
 //
-// A number must be written in its one canonical decimal spelling, in the text form and as a JSON
-// integer: anything else is refused with ErrInvalid and leaves the receiver as it was. A quoted number,
-// a fraction and an exponent were refused by encoding/json before the decoders existed and still are;
+// A number must be written in its one canonical decimal spelling, in the text form, as a JSON integer
+// and inside a JSON string: anything else is refused with ErrInvalid and leaves the receiver as it was.
+// A fraction and an exponent were refused by encoding/json before the decoders existed and still are;
 // a negative zero was read before and is refused now.
 func TestNumericDecodersRefuseOtherSpellings(t *testing.T) {
 	huge := strings.Repeat("9", 40)
 	texts := []string{"+3", "03", "-0", " 3", "3 ", "3\n", "3.0", "1e1", "0x3", "abc", "null", "٣", huge, "00", "-"}
-	jsons := []string{`"3"`, `""`, `3.0`, `1e1`, `1E1`, `-0`, `+3`, `03`, `true`, `[1]`, `{}`, ``, ` 3`, `3 `, `"null"`, huge, `0.0`, `-`}
+	jsons := []string{`3.0`, `1e1`, `1E1`, `-0`, `+3`, `03`, `true`, `[1]`, `{}`, ``, ` 3`, `3 `, huge, `0.0`, `-`,
+		// A JSON string is read as its text is (before Go 1.27 that is how a map key arrives).
+		`"+3"`, `"03"`, `"-0"`, `" 3"`, `"3 "`, `"3.0"`, `"1e1"`, `"0x3"`, `"null"`, `"abc"`, `"\u0663"`, `"` + huge + `"`, `"3`, `"\x"`, `"3"x`}
 	for _, d := range numericDecoders() {
 		for _, in := range texts {
 			t.Run(fmt.Sprintf("%s text %q", d.name, in), func(t *testing.T) {
@@ -268,11 +270,11 @@ func TestNumericDecodersRefuseOtherSpellings(t *testing.T) {
 
 // guarantee: PortID.UnmarshalJSON
 //
-// Through encoding/json a quoted number, a fraction, an exponent and a negative zero are refused in a
-// struct field, and the field keeps its value.
+// Through encoding/json a fraction, an exponent, a negative zero and a string that is no canonical
+// number are refused in a struct field, and the field keeps its value.
 func TestNumericDecodersRefuseOtherSpellingsInAField(t *testing.T) {
 	for _, d := range numericDecoders() {
-		for _, in := range []string{`"3"`, `3.0`, `1e1`, `-0`, `true`, `[3]`} {
+		for _, in := range []string{`3.0`, `1e1`, `-0`, `true`, `[3]`, `"3.0"`, `"+3"`, `"-0"`, `"x"`} {
 			t.Run(d.name+" "+in, func(t *testing.T) {
 				got, err := d.field(seedNumber, in)
 				if err == nil || got != seedNumber {
@@ -395,4 +397,47 @@ func TestParsePortIDAndTheDecoderAgreeOnSpelling(t *testing.T) {
 			}
 		})
 	}
+}
+
+// guarantee: PortID.UnmarshalJSON
+// guarantee: Kbps.UnmarshalJSON
+//
+// A JSON string is read as its content is by the text decoder, in a struct field and directly: the
+// canonical number reads, the empty string and "0" are zero, and a number Validate refuses is refused
+// with Validate's error and leaves the receiver as it was. (Before Go 1.27 encoding/json hands the key
+// of a map to UnmarshalJSON as a quoted string, so a key and a quoted field cannot be told apart.)
+func TestNumericDecodersReadAJSONString(t *testing.T) {
+	for _, d := range numericDecoders() {
+		forms := map[string]func(int, string) (int, error){"JSON": d.jsn, "struct field": d.field}
+		for form, decode := range forms {
+			for _, n := range append([]int{0}, d.valid...) {
+				in := `"` + strconv.Itoa(n) + `"`
+				t.Run(fmt.Sprintf("%s %s %s", d.name, form, in), func(t *testing.T) {
+					if got, err := decode(seedNumber, in); err != nil || got != n {
+						t.Errorf("decoding %s = %d, %v; want %d", in, got, err, n)
+					}
+				})
+			}
+			t.Run(d.name+" "+form+" the empty string", func(t *testing.T) {
+				if got, err := decode(seedNumber, `""`); err != nil || got != 0 {
+					t.Errorf("decoding the empty string = %d, %v; want 0", got, err)
+				}
+			})
+			for _, n := range d.invalid {
+				in := `"` + strconv.Itoa(n) + `"`
+				t.Run(fmt.Sprintf("%s %s %s", d.name, form, in), func(t *testing.T) {
+					got, err := decode(seedNumber, in)
+					if want := d.validate(n); !errors.Is(err, ErrInvalid) || err.Error() != want.Error() || got != seedNumber {
+						t.Errorf("decoding %s = %d, %v; want %v and the receiver unchanged", in, got, err, want)
+					}
+				})
+			}
+		}
+	}
+	t.Run("an escaped digit is the digit", func(t *testing.T) {
+		var p PortID
+		if err := p.UnmarshalJSON([]byte(`"3"`)); err != nil || p != 3 {
+			t.Errorf("got %d, %v; want 3", p, err)
+		}
+	})
 }

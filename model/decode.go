@@ -1,6 +1,7 @@
 package model
 
 import (
+	"encoding/json"
 	"strconv"
 )
 
@@ -66,12 +67,21 @@ func readNumberText[T numeric](dst *T, text []byte, what string) error {
 }
 
 // readNumberJSON reads the JSON form of a numeric type: null leaves the receiver alone (the
-// convention of encoding/json), any other value must be an integer literal (canonicalInt), so that a
-// quoted number, a fraction, an exponent and a negative zero are refused, and readNumber then
-// applies the rule to it.
+// convention of encoding/json); a JSON string is read as its content is by readNumberText (the
+// empty text is zero), because encoding/json before Go 1.27 hands the key of a map to UnmarshalJSON
+// as a quoted string, where a key and a quoted field cannot be told apart; any other value must be an
+// integer literal (canonicalInt), so that a fraction, an exponent and a negative zero are refused,
+// and readNumber then applies the rule to it.
 func readNumberJSON[T numeric](dst *T, data []byte, what string) error {
 	if string(data) == "null" {
 		return nil
+	}
+	if len(data) > 0 && data[0] == '"' {
+		var text string
+		if err := json.Unmarshal(data, &text); err != nil {
+			return notANumber(string(data), what)
+		}
+		return readNumberText(dst, []byte(text), what)
 	}
 	n, ok := canonicalInt(string(data))
 	if !ok {
@@ -86,8 +96,10 @@ func readNumberJSON[T numeric](dst *T, data []byte, what string) error {
 // record says "not set" (a port that is in no LAG, a mirror without a monitoring port, no rate
 // limit); whether "not set" is allowed where the value is used stays with Validate and the writers.
 // A value that is refused leaves the receiver as it was, and a JSON null does not touch it. The two
-// forms are both needed: encoding/json hands a JSON number to UnmarshalJSON and the text of a map
-// key to UnmarshalText. The encoders did not change, a value still encodes as its number.
+// forms are both needed: encoding/json hands a JSON number to UnmarshalJSON and, from Go 1.27, the
+// text of a map key to UnmarshalText; before Go 1.27 it hands the key to UnmarshalJSON as a quoted
+// string, so UnmarshalJSON reads a string as the text form too. The encoders did not change, a value
+// still encodes as its number.
 
 // UnmarshalText reads the port number written in decimal (the spelling ParsePortID takes), or the
 // empty text, or "0" for no port; a port that is not valid is refused with Validate's error. It is
@@ -96,7 +108,9 @@ func (p *PortID) UnmarshalText(text []byte) error {
 	return readNumberText(p, text, "a port number")
 }
 
-// UnmarshalJSON reads a JSON integer for a port with the rule of UnmarshalText; null leaves p alone.
+// UnmarshalJSON reads a JSON integer for a port with the rule of UnmarshalText; a JSON string holding
+// the canonical number, or empty, reads the same (before Go 1.27 that is how a map key arrives); null
+// leaves p alone.
 func (p *PortID) UnmarshalJSON(data []byte) error {
 	return readNumberJSON(p, data, "a port number")
 }
@@ -107,8 +121,9 @@ func (g *LAGID) UnmarshalText(text []byte) error {
 	return readNumberText(g, text, "a LAG group number")
 }
 
-// UnmarshalJSON reads a JSON integer for a LAG group with the rule of UnmarshalText; null leaves g
-// alone.
+// UnmarshalJSON reads a JSON integer for a LAG group with the rule of UnmarshalText; a JSON string holding
+// the canonical number, or empty, reads the same (before Go 1.27 that is how a map key arrives); null
+// leaves g alone.
 func (g *LAGID) UnmarshalJSON(data []byte) error {
 	return readNumberJSON(g, data, "a LAG group number")
 }
@@ -119,8 +134,9 @@ func (v *VLANID) UnmarshalText(text []byte) error {
 	return readNumberText(v, text, "a VLAN id")
 }
 
-// UnmarshalJSON reads a JSON integer for a VLAN id with the rule of UnmarshalText; null leaves v
-// alone.
+// UnmarshalJSON reads a JSON integer for a VLAN id with the rule of UnmarshalText; a JSON string holding
+// the canonical number, or empty, reads the same (before Go 1.27 that is how a map key arrives); null
+// leaves v alone.
 func (v *VLANID) UnmarshalJSON(data []byte) error {
 	return readNumberJSON(v, data, "a VLAN id")
 }
@@ -131,7 +147,8 @@ func (g *PortVLANID) UnmarshalText(text []byte) error {
 	return readNumberText(g, text, "a port-based VLAN id")
 }
 
-// UnmarshalJSON reads a JSON integer for a port-based VLAN id with the rule of UnmarshalText; null
+// UnmarshalJSON reads a JSON integer for a port-based VLAN id with the rule of UnmarshalText; a JSON string holding
+// the canonical number, or empty, reads the same (before Go 1.27 that is how a map key arrives); null
 // leaves g alone.
 func (g *PortVLANID) UnmarshalJSON(data []byte) error {
 	return readNumberJSON(g, data, "a port-based VLAN id")
@@ -143,8 +160,9 @@ func (p *Priority) UnmarshalText(text []byte) error {
 	return readNumberText(p, text, "a priority")
 }
 
-// UnmarshalJSON reads a JSON integer for a priority with the rule of UnmarshalText; null leaves p
-// alone.
+// UnmarshalJSON reads a JSON integer for a priority with the rule of UnmarshalText; a JSON string holding
+// the canonical number, or empty, reads the same (before Go 1.27 that is how a map key arrives); null
+// leaves p alone.
 func (p *Priority) UnmarshalJSON(data []byte) error {
 	return readNumberJSON(p, data, "a priority")
 }
@@ -156,7 +174,9 @@ func (k *Kbps) UnmarshalText(text []byte) error {
 	return readNumberText(k, text, "a rate in kbps")
 }
 
-// UnmarshalJSON reads a JSON integer for a rate with the rule of UnmarshalText; null leaves k alone.
+// UnmarshalJSON reads a JSON integer for a rate with the rule of UnmarshalText; a JSON string holding
+// the canonical number, or empty, reads the same (before Go 1.27 that is how a map key arrives); null
+// leaves k alone.
 func (k *Kbps) UnmarshalJSON(data []byte) error {
 	return readNumberJSON(k, data, "a rate in kbps")
 }
