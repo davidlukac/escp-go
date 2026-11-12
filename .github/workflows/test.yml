@@ -148,6 +148,70 @@ jobs:
             echo "No release yet: nothing to compare with."
           fi
 
+  # The provider's `main` built and tested against this pull request's tree of the library, so a
+  # change the library's own tests cannot see (a removed field, a changed default, a stricter
+  # check) shows up here, before the merge, while the author can still decide. Informational, like
+  # `api`: the provider requires a released library version, so a break found here is a migration
+  # row of the CHANGELOG and a provider change after the release, not necessarily a reason to
+  # change the pull request. It runs the provider's `go test ./...` only: the acceptance
+  # scenarios (TF_ACC, `make testacc`) stay in the provider's own CI, and no `live` test is ever
+  # compiled in. The Go version is the provider's own (its go.mod).
+  canary:
+    name: Provider against this change
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: davidlukac/terraform-provider-tplinkeasysmart
+          ref: main
+          path: provider
+          persist-credentials: false
+      # The same action ./.github/actions/setup wraps, but reading the provider's go.mod: the
+      # provider may need a newer Go than this module's floor.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: provider/go.mod
+          cache: true
+          cache-dependency-path: provider/go.sum
+      # The provider's lifecycle tests drive a real Terraform CLI; without one on PATH each test
+      # downloads its own and the job times out (the provider's own setup action does this too).
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: latest
+          terraform_wrapper: false
+      # A go.work (the mechanism of the provider's `make work`) links this checkout, one directory
+      # up, in place of the library version the provider's go.mod requires; go.mod stays untouched.
+      - name: Build and test the provider with this library tree
+        id: with-change
+        working-directory: provider
+        run: |
+          go work init . ..
+          go build ./...
+          go test -race -count=1 ./...
+      # Tells "this change breaks the provider" from "the provider is red on its own": the same
+      # build and tests with the library version its go.mod requires. It never fails the job, the
+      # step above already did; the verdict is the annotation and the job summary.
+      - name: Does the provider pass without this change?
+        if: failure() && steps.with-change.outcome == 'failure'
+        working-directory: provider
+        env:
+          GOWORK: "off"
+        run: |
+          if go build ./... && go test -race -count=1 ./...; then
+            verdict="This library change breaks the provider: it builds and passes with the library version its go.mod requires."
+          else
+            verdict="The provider is red on its own, with the library version its go.mod requires: this may not be caused by this change."
+          fi
+          echo "::error title=Provider canary::${verdict}"
+          echo "### Provider canary" >> "$GITHUB_STEP_SUMMARY"
+          echo "${verdict}" >> "$GITHUB_STEP_SUMMARY"
+
   # Publishes the measured coverage as a shields.io endpoint file (coverage.json) on
   # the `badges` branch, written by CI only, never by hand. The README badge reads
   # it from there. Runs on pushes to main, from the go.mod-version unit run.
