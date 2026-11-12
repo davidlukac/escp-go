@@ -17,6 +17,7 @@ How to use this page:
 |---|---|
 | Any change | [DC-C01](#dc-c01) (promises), [DC-C05](#dc-c05) (tests), [DC-C08](#dc-c08) (hygiene) |
 | Adds or changes a call that can block (a lock, a retry, a lease or settle wait, a lookup, a read of fragments), or `Close` | [DC-L01](#dc-l01), [DC-L02](#dc-l02), [DC-L03](#dc-l03), [DC-C06](#dc-c06) |
+| Decides that something is absent, empty or silent from a timed read (a drain, a probe, a "no answer" check) | [DC-L09](#dc-l09), [DC-L01](#dc-l01), [DC-C06](#dc-c06) |
 | Adds or changes a writer, a gate, an `Operation` or an impact class | [DC-L02](#dc-l02), [DC-L03](#dc-l03), [DC-L05](#dc-l05), [DC-L07](#dc-l07), [DC-L08](#dc-l08) |
 | Adds a parser, a decoder, or uses anything read from the network | [DC-L05](#dc-l05), [DC-L06](#dc-l06), [DC-L04](#dc-l04) |
 | Changes how a switch is found, named, moved or claimed, or what a client does after a refusal | [DC-L04](#dc-l04), [DC-L01](#dc-l01), [DC-L02](#dc-l02) |
@@ -295,3 +296,18 @@ AUTOMATION names each check by kind and name, so that a test can verify that the
 **Automation.** `make:apidiff`, `lint:exhaustive`, `lint:revive` (argument limit), `lint:recvcheck`, `test:TestEveryRefusedArgumentIsErrInvalid`; `proposed:apishape(#195)` (an analyzer over the exported API: an exported field and an unexported field of the same name, a function with more than three parameters of one type, an exported interface above a size, a closed-set type without `Validate` or `String`).
 
 **Adversarial probe.** Write the ten-line consumer in five hostile styles: an unkeyed literal, a copy compared with `==`, a `switch` over every enum value without a default, an implementation of every exported interface, a JSON round trip of every type.
+
+<a id="dc-l09"></a>
+### DC-L09 An emptiness check that is itself a timed read
+
+**Rule.** A timeout counts as proof that nothing is there only if the read was seen to wait for it; a read that returns a timeout without having waited (its deadline passed before it started) proves nothing, and the check reads again, within the bound the loop already has. The rule narrows the window (a hold-up after the check's own clock read and before the poller's check is still not seen); closing it takes a read that never consults a deadline or a second confirming read.
+
+**Why.** `Client.discard` emptied the socket before each request by reading with a deadline of `drainWait` (1 ms) and taking a timeout for "empty". Go's poller checks the deadline before it tries the socket, so a goroutine that was not scheduled for longer than 1 ms between setting the deadline and reading got a timeout with a datagram queued; the datagram was then read as the answer to the request just sent. It showed as a flaky stale-datagram test on a loaded macOS machine (#206), and as a window for any consumer on a loaded host (#207).
+
+**Design question.** What does this check conclude from a timeout, and can the timeout come without the wait (the deadline already passed when the read began, a canceled or closed socket, a clock step)? What does the check do then, and what ends the loop (a bound, the context, `Close`)?
+
+**Test requirement.** A test over the `datagramConn` seam with a clock the test controls (no sleeping): a timeout that did not wait, with data queued, does not end the check; a timeout that waited does; the exact minimum is a wait; a flood and a socket that only ever times out end at the bound; a closed socket and a canceled context end the check; a read error that is only ICMP noise does not end it, and ends at the bound when it never stops.
+
+**Automation.** `test:TestADrainTimeoutThatDidNotWaitDoesNotProveTheSocketEmpty`, `test:TestAStaleReplyInTheSocketIsNotTheAnswerToTheNextRequest`, `test:TestAFloodOfStaleDatagramsDoesNotHoldARequestBack`; `reading:` a check that draws a conclusion from a timeout cannot be found by a script, and a deadline that is short compared with the scheduler's pauses is the signal.
+
+**Adversarial probe.** Hold the reading goroutine for longer than the deadline between setting it and reading (a wrapper over the seam), with a datagram queued, a flood queued and nothing queued; assert what is left in the socket, the number of reads and that the check ends.
