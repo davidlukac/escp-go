@@ -121,11 +121,17 @@ func TestEveryStaleDatagramInTheSocketIsDroppedAndNotOnlyTheFirst(t *testing.T) 
 	}
 	leaveInTheSocket(t, c, discoveryShapedReply(c, discoverySeqBase)) // a number no request uses
 	leaveInTheSocket(t, c, discoveryShapedReply(c, nextSeq(c.seq)))   // the number of the next request
+	if n := staleConnOf(c).waiting(); n != 2 {
+		t.Fatalf("%d stale datagrams in the socket before the request, want 2", n)
+	}
 	got, err := c.LED(ctx)
 	if err != nil {
 		t.Fatalf("the second stale reply was taken for the answer: %v", err)
 	}
 	if got != want {
 		t.Fatalf("LED = %t, want %t", got, want)
+	}
+	if left := staleConnOf(c).waitingAtWrites(); len(left) == 0 || left[0] != 0 {
+		t.Fatalf("datagrams still waiting when the request was written = %v, want none (both are dropped before it goes out)", left)
 	}
 }
