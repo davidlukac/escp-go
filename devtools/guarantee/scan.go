@@ -7,6 +7,7 @@ import (
 	"go/token"
 	"io"
 	"io/fs"
+	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -54,6 +55,9 @@ type Marker struct {
 	File string
 	Line int
 	Name string
+	// handed is set when the name was `<dir>.<Name>` and the identifier it names belongs to the
+	// package in <dir>, so it is that package's marker and no stale one.
+	handed bool
 }
 
 // Result is what a scan found.
@@ -111,6 +115,7 @@ func Scan(root string) (Result, error) {
 	if err != nil {
 		return Result{}, fmt.Errorf("scanning %s: %w", root, err)
 	}
+	handOver(dirs)
 	for _, dir := range sortedKeys(dirs) {
 		dirs[dir].match(&res)
 	}
@@ -145,7 +150,7 @@ func (p *pkgDir) match(res *Result) {
 		}
 	}
 	for _, m := range p.order {
-		if !p.exported[m.Name] {
+		if !p.exported[m.Name] && !m.handed {
 			res.Stale = append(res.Stale, m)
 		}
 	}
@@ -187,13 +192,64 @@ func (p *pkgDir) addMarkers(fset *token.FileSet, rel string, f *ast.File) {
 			}
 			for _, name := range strings.FieldsFunc(m[1], func(r rune) bool { return r == ',' || unicode.IsSpace(r) }) {
 				mk := Marker{File: rel, Line: fset.Position(c.Pos()).Line, Name: strings.Trim(name, "`")}
-				if _, dup := p.markers[mk.Name]; !dup {
-					p.markers[mk.Name] = mk
-				}
+				p.addMarker(mk)
 				p.order = append(p.order, mk)
 			}
 		}
 	}
+}
+
+// addMarker records a marker for its name, the first one of a name being the one kept.
+func (p *pkgDir) addMarker(mk Marker) {
+	if _, dup := p.markers[mk.Name]; !dup {
+		p.markers[mk.Name] = mk
+	}
+}
+
+// handOver gives a marker of the form `<dir>.<Name>` to the package in the directory whose last element
+// is <dir>, when that package has an exported identifier <Name>: a promise a package states is often
+// kept by the code of another (the write gate of model is run by the client of the root package), and
+// the test that pins it is in that other package. A method or field name (`Client.Close`) is no address,
+// as no directory is named like an exported type, and a directory name that two directories share is no
+// address either.
+func handOver(dirs map[string]*pkgDir) {
+	byBase := map[string]string{} // last element of a directory -> the directory; "" when two share it
+	for _, dir := range sortedKeys(dirs) {
+		if dir == "." {
+			continue
+		}
+		base := path.Base(dir)
+		if _, dup := byBase[base]; dup {
+			byBase[base] = ""
+			continue
+		}
+		byBase[base] = dir
+	}
+	for _, dir := range sortedKeys(dirs) {
+		p := dirs[dir]
+		for i, mk := range p.order {
+			target, ok := handTarget(dirs, byBase, dir, mk.Name)
+			if !ok {
+				continue
+			}
+			mk.Name = mk.Name[strings.Index(mk.Name, ".")+1:]
+			dirs[target].addMarker(mk)
+			p.order[i].handed = true
+		}
+	}
+}
+
+// handTarget finds the directory a marker name `<dir>.<Name>` hands the marker to, if it does.
+func handTarget(dirs map[string]*pkgDir, byBase map[string]string, ownDir, name string) (string, bool) {
+	base, rest, ok := strings.Cut(name, ".")
+	if !ok {
+		return "", false
+	}
+	target := byBase[base]
+	if target == "" || target == ownDir || !dirs[target].exported[rest] {
+		return "", false
+	}
+	return target, true
 }
 
 // sentenceOf returns the first sentence of the comment that states a guarantee, or "".

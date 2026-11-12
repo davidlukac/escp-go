@@ -10,7 +10,10 @@
 //	// guarantee: Client.Close
 //
 // The name is the identifier (`Dial`, `ErrClosed`), a method or a field as `Type.Name`; several names
-// may follow one marker, separated by commas or spaces.
+// may follow one marker, separated by commas or spaces. A promise that one package states and the
+// code of another keeps (the write gate of model, run by the client of the root package) is pinned by
+// a test of the other one: that test puts the directory of the identifier's package in front of the
+// name (`// guarantee: model.WriteGate`).
 //
 // The command is in report mode: it prints one line per unmatched identifier (`file:line: Name:
 // sentence`), the names a marker uses that no exported identifier has, and the count, and exits 0.
