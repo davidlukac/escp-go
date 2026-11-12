@@ -153,9 +153,9 @@ jobs:
   # check) shows up here, before the merge, while the author can still decide. Informational, like
   # `api`: the provider requires a released library version, so a break found here is a migration
   # row of the CHANGELOG and a provider change after the release, not necessarily a reason to
-  # change the pull request. It runs the provider's unit tests only: the Terraform lifecycle tests
-  # (TF_ACC) and the regression scenarios need a Terraform binary and stay in the provider's own CI,
-  # and no `live` test is ever compiled in. The Go version is the provider's own (its go.mod).
+  # change the pull request. It runs the provider's `go test ./...` only: the acceptance
+  # scenarios (TF_ACC, `make testacc`) stay in the provider's own CI, and no `live` test is ever
+  # compiled in. The Go version is the provider's own (its go.mod).
   canary:
     name: Provider against this change
     if: github.event_name == 'pull_request'
@@ -179,6 +179,12 @@ jobs:
           go-version-file: provider/go.mod
           cache: true
           cache-dependency-path: provider/go.sum
+      # The provider's lifecycle tests drive a real Terraform CLI; without one on PATH each test
+      # downloads its own and the job times out (the provider's own setup action does this too).
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: latest
+          terraform_wrapper: false
       # A go.work (the mechanism of the provider's `make work`) links this checkout, one directory
       # up, in place of the library version the provider's go.mod requires; go.mod stays untouched.
       - name: Build and test the provider with this library tree
