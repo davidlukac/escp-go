@@ -5,7 +5,7 @@
 # Dependabot bumps them there. `go tool` builds the pinned version on first use (cached afterwards).
 DEVTOOL := go tool -modfile=devtools/go.mod
 
-.PHONY: test lint spell actionlint modcheck vuln cover cover-html apidiff fuzz mutation mutation-diff pkgdoc pkgdoc-serve compat-table settings-docs soak soak-idle soak-single soak-loaded hooks pre-commit
+.PHONY: test lint spell actionlint modcheck vuln cover cover-html apidiff fuzz mutation mutation-diff mutation-extended pkgdoc pkgdoc-serve compat-table settings-docs soak soak-idle soak-single soak-loaded hooks pre-commit
 
 # Unit tests against the fake switch. No hardware is touched.
 test:
@@ -106,9 +106,25 @@ fuzz:
 # by hand to the report tool is caught by its tests), so their numbers would only be noise.
 # GOFLAGS=-count=1: gremlins sizes the timeout of a mutant from the time of its first test run, and a cached
 # result takes no time, so without it every mutant of a package whose tests ran before "times out".
-MUTATE := GOFLAGS=-count=1 $(DEVTOOL) gremlins unleash . --workers $(or $(WORKERS),4) --coverpkg ./... --output build/mutation.json \
-	-E '^escptest/' -E '^internal/coverpolicy/' -E '^internal/mutationreport/' -E '^internal/release/' -E '^internal/fuzzrun/' -E '^internal/soak/' -E '^internal/pkgdoc/' -E '^devtools/' -E '^examples/' \
-	$(if $(EFFICACY),--threshold-efficacy $(EFFICACY))
+# PKG=<directory> (model, safety, or . for the root package) limits a run to the files of that directory:
+# gremlins takes only the module root as its path, so every other directory with Go files is excluded.
+PKG_DIRS := $(patsubst ./%,%,$(sort $(shell find . -name '*.go' -not -path './build/*' -not -path './.git/*' -not -path './devtools/*' -not -path '*/testdata/*' -exec dirname {} \;)))
+PKG_EXCLUDES := $(if $(PKG),$(foreach d,$(filter-out $(PKG),$(PKG_DIRS)),-E '^$(if $(filter .,$(d)),,$(d)/)[^/]+$$'))
+GREMLINS := GOFLAGS=-count=1 $(DEVTOOL) gremlins unleash . --workers $(or $(WORKERS),4) --coverpkg ./... $(PKG_EXCLUDES) \
+	-E '^escptest/' -E '^internal/coverpolicy/' -E '^internal/mutationreport/' -E '^internal/release/' -E '^internal/fuzzrun/' -E '^internal/soak/' -E '^internal/pkgdoc/' -E '^devtools/' -E '^examples/'
+MUTATE := $(GREMLINS) --output build/mutation.json $(if $(EFFICACY),--threshold-efficacy $(EFFICACY))
+
+# The extended operators: the ones gremlins ships and leaves off (invert-logical swaps && and ||,
+# invert-assignments turns += into -=, invert-bitwise swaps & | ^ << >>, invert-bwassign the same for
+# the assignment forms, invert-loopctrl swaps break and continue, remove-self-assignments drops x += y
+# to x = y), with the five default operators of `make mutation` switched off, so that the two runs
+# are two disjoint sets and their numbers add up. `make mutation-extended` runs them over the module
+# (a quarter of an hour or more with 4 workers) into build/mutation-extended.json; PKG=model limits a
+# run to one directory (the quick way to look at one area; PKG works for the other mutation targets too). Informational: there is no efficacy threshold on
+# purpose, the weekly workflow runs it with continue-on-error and prints the survivors in its summary.
+EXTENDED_ON := --invert-assignments --invert-bitwise --invert-bwassign --invert-logical --invert-loopctrl --remove-self-assignments
+DEFAULTS_OFF := --arithmetic-base=false --conditionals-boundary=false --conditionals-negation=false --increment-decrement=false --invert-negatives=false
+MUTATE_EXTENDED := $(GREMLINS) --output build/mutation-extended.json $(DEFAULTS_OFF) $(EXTENDED_ON)
 
 # gremlins does not create the directory of its report: without it the run ends with "impossible to
 # write file" and the job summary says there was no report.
@@ -119,6 +135,10 @@ mutation:
 mutation-diff:
 	@mkdir -p build
 	$(MUTATE) --diff $(or $(BASE),origin/main)
+
+mutation-extended:
+	@mkdir -p build
+	$(MUTATE_EXTENDED)
 
 # The package documentation as pkg.go.dev renders it, from the working tree: HTML and plain text
 # per package under build/pkgdoc (gitignored). `make pkgdoc-serve` browses it on localhost:8089.
