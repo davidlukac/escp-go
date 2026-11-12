@@ -81,6 +81,8 @@ func TestPortSetIsTheWireMask(t *testing.T) {
 }
 
 // A mask of the wrong length is refused; it is never the empty set.
+//
+// guarantee: ParsePortMask
 func TestParsePortMaskRefusesTheWrongLength(t *testing.T) {
 	for _, tc := range []struct {
 		name string

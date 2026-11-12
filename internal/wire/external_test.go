@@ -11,6 +11,7 @@ import (
 	"github.com/davidlukac/escp-go/internal/wire"
 )
 
+// guarantee: Unmarshal
 func TestUnmarshalRejectsPacketsThatLieAboutTheirStructure(t *testing.T) {
 	good := wire.Marshal(wire.Header{Op: wire.OpReply, Seq: 7}, []wire.TLV{{Type: 5, Value: []byte{1, 2}}})
 	if _, tlvs, err := wire.Unmarshal(good); err != nil || len(tlvs) != 1 {
@@ -91,6 +92,8 @@ func TestOpNameNamesEveryOpAndNumbersTheRest(t *testing.T) {
 
 // The smallest packets that are packets: a header and the end marker; a TLV with no value; a TLV
 // whose value ends exactly where the packet does. One byte less is refused.
+//
+// guarantee: Unmarshal
 func TestUnmarshalAcceptsThePacketsAtTheEdgeOfValidity(t *testing.T) {
 	end := []byte{0xff, 0xff, 0, 0}
 	build := func(op byte, payload []byte) []byte {

@@ -25,6 +25,7 @@ func listenAt(t *testing.T, port int) func() (*net.UDPConn, error) {
 	}
 }
 
+// guarantee: FreeUDPPort
 func TestAPortHandedOutIsNotGivenAgain(t *testing.T) {
 	first := FreeUDPPort(t) // released, but reserved
 	calls := 0
@@ -88,6 +89,8 @@ func TestListenErrorIsReturned(t *testing.T) {
 // port released by one must not be handed to another while the first is still going to use it.
 // Four child processes (this test binary, run as helpers) reserve many ports each and stay alive;
 // no port may appear twice.
+//
+// guarantee: FreeUDPPort
 func TestPortsAreReservedAcrossProcesses(t *testing.T) {
 	const children, portsEach = 4, 200
 	type child struct {

@@ -98,6 +98,7 @@ func TestKbpsValidateBounds(t *testing.T) {
 	})
 }
 
+// guarantee: StormConfig.Validate
 func TestStormConfigLimitedAndValidate(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -376,6 +377,7 @@ func TestPortVLANIDValidateBounds(t *testing.T) {
 	})
 }
 
+// guarantee: PortVLANLimit
 func TestPortVLANLimit(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
@@ -396,6 +398,7 @@ func TestPortVLANLimit(t *testing.T) {
 	}
 }
 
+// guarantee: PortVLANLimit
 func TestPortBasedVLANGroupLimitAndGroup(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
