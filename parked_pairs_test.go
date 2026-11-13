@@ -320,20 +320,20 @@ func queuedForModify() bool {
 }
 
 // awaitSecond returns once the second call has finished (finished is true, with its result) or is
-// queued behind the first (finished is false). It yields to the scheduler between looks, and
-// needs no pause: one of the two always comes.
-func awaitSecond(second <-chan error) (err error, finished bool) {
-	for {
+// queued behind the first (finished is false). It polls with awaitCondition: one of the two always
+// comes, and the test fails if neither does.
+func awaitSecond(t *testing.T, second <-chan error) (err error, finished bool) {
+	t.Helper()
+	awaitCondition(t, "the second call to finish or to queue behind the first", func() bool {
 		select {
-		case err := <-second:
-			return err, true
+		case err = <-second:
+			finished = true
+			return true
 		default:
 		}
-		if queuedForModify() {
-			return nil, false
-		}
-		runtime.Gosched()
-	}
+		return queuedForModify()
+	})
+	return err, finished
 }
 
 // parkedPairClient is a client of the fake with the held write gate; it pins the MAC and looks
@@ -383,7 +383,7 @@ func TestReadModifyWritePairsKeepBothChanges(t *testing.T) {
 			}
 			second := make(chan error, 1)
 			go func() { second <- tc.callSecond(ctx, c) }()
-			secondErr, finished := awaitSecond(second)
+			secondErr, finished := awaitSecond(t, second)
 			if finished {
 				// Without the lock the second call completes here, between the read and the
 				// write of the first, and the first then writes back what it read before.
