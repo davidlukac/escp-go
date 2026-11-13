@@ -114,7 +114,7 @@ fuzz:
 PKG_DIRS := $(patsubst ./%,%,$(sort $(shell find . -name '*.go' -not -path './build/*' -not -path './.git/*' -not -path './devtools/*' -not -path '*/testdata/*' -exec dirname {} \;)))
 PKG_EXCLUDES := $(if $(PKG),$(foreach d,$(filter-out $(PKG),$(PKG_DIRS)),-E '^$(if $(filter .,$(d)),,$(d)/)[^/]+$$'))
 GREMLINS := GOFLAGS=-count=1 $(DEVTOOL) gremlins unleash . --workers $(or $(WORKERS),4) --coverpkg ./... $(PKG_EXCLUDES) \
-	-E '^escptest/' -E '^internal/coverpolicy/' -E '^internal/mutationreport/' -E '^internal/release/' -E '^internal/fuzzrun/' -E '^internal/soak/' -E '^internal/pkgdoc/' -E '^devtools/' -E '^examples/'
+	-E '^escptest/' -E '^internal/coverpolicy/' -E '^internal/mutationreport/' -E '^internal/release/' -E '^internal/seams/' -E '^internal/fuzzrun/' -E '^internal/soak/' -E '^internal/pkgdoc/' -E '^devtools/' -E '^examples/'
 MUTATE := $(GREMLINS) --output build/mutation.json $(if $(EFFICACY),--threshold-efficacy $(EFFICACY))
 
 # The extended operators: the ones gremlins ships and leaves off (invert-logical swaps && and ||,
