@@ -1,6 +1,8 @@
 package escptest
 
 import (
+	"slices"
+
 	"github.com/davidlukac/escp-go/internal/wire"
 )
 
@@ -91,6 +93,10 @@ func (f *Switch) handleWrite(r request) {
 		f.reply(r, wire.OpSetReply, rejectCode, nil, true)
 		return
 	}
+	if code := systemSetRefusal(r.tlvs); code != 0 {
+		f.reply(r, wire.OpSetReply, code, nil, true)
+		return
+	}
 	if code := f.refuse(r.tlvs); code != 0 {
 		f.reply(r, wire.OpSetReply, code, nil, true)
 		return
@@ -107,6 +113,32 @@ func (f *Switch) handleWrite(r request) {
 		return
 	}
 	f.reply(r, wire.OpSetReply, 0, nil, true)
+}
+
+// refusedPartialSystemSet is the reply code of a System-page SET that leaves out one of the five settings
+// of the page.
+const refusedPartialSystemSet int32 = 3
+
+// systemPage lists the settings of the System page: the device description, the DHCP flag, the address,
+// the mask and the gateway. The switch takes the page as a whole.
+var systemPage = [...]wire.TLVType{wire.TLVHostname, wire.TLVDHCP, wire.TLVIP, wire.TLVNetmask, wire.TLVGateway}
+
+// systemSetRefusal is the refusal code of a SET that carries some of the settings of the System page but
+// not all five, or 0. Measured on firmware 20250710 (PROTOCOL.md): a SET without the DHCP flag and a SET
+// without the gateway are each refused with code 3 and change nothing. Nobody has tried the other
+// omissions (a SET with the device description alone could cost a real switch its address), so they are
+// refused by extension of the same rule, and the fake does not claim to know more than that.
+func systemSetRefusal(tlvs []wire.TLV) int32 {
+	found := 0
+	for _, typ := range systemPage {
+		if slices.ContainsFunc(tlvs, func(t wire.TLV) bool { return t.Type == typ }) {
+			found++
+		}
+	}
+	if found == 0 || found == len(systemPage) {
+		return 0
+	}
+	return refusedPartialSystemSet
 }
 
 // record remembers an accepted write, without the credentials, and stores it when the switch keeps state.

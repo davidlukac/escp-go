@@ -20,6 +20,12 @@
 //   - EnableModel: the rules between settings (refusals, exclusivity, derived values) as measured
 //     on hardware, firmware 20250710, and 20230218 where a comment says so; it implies the first two.
 //
+// Whatever the mode, it refuses a System-page SET that is not complete: one that carries some but not
+// all of the device description, the DHCP flag, the address, the mask and the gateway is answered with
+// error code 3 and changes nothing. Only two omissions are measured on a switch (firmware 20250710: no
+// DHCP flag, no gateway); the rest follow the same rule by extension, because nobody tried them on
+// hardware, and the fake does not claim to know what the switch does for them.
+//
 // The names follow one convention: Enable... switches a behavior on, Set... seeds a value (SetMAC,
 // SetFirmware, SetLease), and the accessors read back what the switch saw (WriteCount, LastSet,
 // AllSets, PortSetting, LED, Hostname, Received).
