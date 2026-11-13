@@ -197,13 +197,13 @@ AUTOMATION names each check by kind and name, so that a test can verify that the
 
 **Rule.** Every path that reports the outcome of a write states whether the request was sent: a refusal before the send says nothing was sent; an unknown outcome is its own typed error that survives every later step (re-key, settle, retry) and is never matched by a known outcome.
 
-**Why.** A write that got no reply was reported as "no reply" and sent again, although the switch may have applied it (#149). After the fix, a call canceled before its write was reported as unconfirmed, a failed re-key dropped the typed error, and a settled "not applied" still matched the unconfirmed sentinel (#183).
+**Why.** A write that got no reply was reported as "no reply" and sent again, although the switch may have applied it (#149). After the fix, a call canceled before its write was reported as unconfirmed, a failed re-key dropped the typed error, and a settled "not applied" still matched the unconfirmed sentinel (#183). A call canceled or closed while the drain of an attempt was reading still wrote that attempt, and the caller read "canceled" for a request that may have been applied; `send` looks at the context again after the drain (#234).
 
-**Design question.** For each exit of the write path (refused by validation, refused by the gate, canceled before the lock, canceled after the send, re-key failed, settle failed): was a datagram sent, what does the error say, which sentinels match?
+**Design question.** For each exit of the write path (refused by validation, refused by the gate, canceled before the lock, canceled or closed during the drain, canceled after the send, re-key failed, settle failed): was a datagram sent, what does the error say, which sentinels match?
 
 **Test requirement.** A table of fault and exit against (sent or not, the error identity through `errors.Is` and `errors.As`, writes the fake applied), using the fake's `DropSets`, `RSADrop` and cancellation.
 
-**Automation.** `test:TestAWriteTheSwitchNeverAnswersIsUnconfirmedAndSentAsOftenAsItsImpactAllows`, `test:TestEveryWriteMethodDeclaresItsOperation`, `test:TestOnlyKnownPlacesSendASET`; `proposed:outcometable(#195)` (a generated table test over the fake's fault list and every exit); `reading:` whether a `sent` flag is set on every return needs a person.
+**Automation.** `test:TestAWriteTheSwitchNeverAnswersIsUnconfirmedAndSentAsOftenAsItsImpactAllows`, `test:TestEveryWriteMethodDeclaresItsOperation`, `test:TestOnlyKnownPlacesSendASET`, `test:TestACallEndedDuringTheDrainSendsNothing`; `proposed:outcometable(#195)` (a generated table test over the fake's fault list and every exit); `reading:` whether a `sent` flag is set on every return needs a person.
 
 **Adversarial probe.** Cut a write at every step (before the gate, before the lock, after the send, in the middle of a re-key, in the middle of a settle) and compare the reported outcome with the fake's write count.
 
@@ -304,7 +304,7 @@ AUTOMATION names each check by kind and name, so that a test can verify that the
 
 **Why.** `Client.discard` emptied the socket before each request by reading with a deadline of `drainWait` (1 ms) and taking a timeout for "empty". Go's poller checks the deadline before it tries the socket, so a goroutine that was not scheduled for longer than 1 ms between setting the deadline and reading got a timeout with a datagram queued; the datagram was then read as the answer to the request just sent. It showed as a flaky stale-datagram test on a loaded macOS machine (#206), and as a window for any consumer on a loaded host (#207).
 
-**Design question.** What does this check conclude from a timeout, and can the timeout come without the wait (the deadline already passed when the read began, a canceled or closed socket, a clock step)? What does the check do then, and what ends the loop (a bound, the context, `Close`)?
+**Design question.** What does this check conclude from a timeout, and can the timeout come without the wait (the deadline already passed when the read began, a canceled or closed socket, a clock step)? What does the check do then, and what ends the loop (a bound, the context, `Close`)? When the context ended it, what does the caller do next (it must not go on to write: `send` looks at the context again after the drain, #234)?
 
 **Test requirement.** A test over the `datagramConn` seam with a clock the test controls (no sleeping): a timeout that did not wait, with data queued, does not end the check; a timeout that waited does; the exact minimum is a wait; a flood and a socket that only ever times out end at the bound; a closed socket and a canceled context end the check; a read error that is only ICMP noise does not end it, and ends at the bound when it never stops.
 

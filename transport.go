@@ -223,8 +223,8 @@ const maxDiscarded = 64
 // The drain ends at the first read that waited out its timeout, at a read error that is more than
 // ICMP noise (a closed socket among them; noise is skipped, as recv does, and counts toward the
 // bound), when ctx ends (the exchange's context, so Close and a cancellation end it too) and after
-// maxDiscarded reads. When ctx ended, send still writes its request: the drain only stops early,
-// and the reply of that request is not read, because recv refuses to read for a context that is done.
+// maxDiscarded reads. An early stop for ctx is not reported here: send looks at ctx again before it
+// writes, so a call canceled or closed during the drain sends nothing.
 func (c *Client) discard(ctx context.Context) {
 	buf := make([]byte, maxDatagram)
 	for range maxDiscarded {
@@ -246,12 +246,18 @@ func (c *Client) discard(ctx context.Context) {
 // socket. A request whose lengths do not fit the wire (a TLV value over wire.MaxTLVValue bytes, a
 // packet over wire.MaxPacket, which a very long Username or Password makes) is refused first with
 // an error that matches ErrInvalid: nothing is drained, no sequence number is used and nothing is
-// written, so the client is as it was.
+// written, so the client is as it was. A call whose context ended during the drain (a cancellation,
+// a deadline, or Close, which ends the context of the call) returns its error the same way: the
+// context is looked at after the drain and before the sequence number is used, so nothing is
+// written and the client is as it was.
 func (c *Client) send(ctx context.Context, op byte, tlvs []wire.TLV, static bool, to []*net.UDPAddr) error {
 	if err := wire.CheckLengths(tlvs); err != nil {
 		return err
 	}
 	c.discard(ctx)
+	if err := expired(ctx); err != nil { // the drain ends early when ctx ends: nothing is sent for a call that has ended
+		return err
+	}
 	c.seq = requestSeq(c.seq, op)
 	pkt := c.encrypt(wire.Marshal(wire.Header{Op: op, SwitchMAC: c.ident.header(), HostMAC: c.hostMAC, Seq: c.seq}, tlvs), static)
 	for _, d := range to {
@@ -288,7 +294,7 @@ func (c *Client) exchange(ctx context.Context, op byte, tlvs []wire.TLV, static 
 	defer c.interruptOnDone(ctx)()
 	c.ident.forget()
 	for attempt := 0; attempt <= c.cfg.Retries; attempt++ {
-		if err := expired(ctx); err != nil { // a call canceled before an attempt sends nothing, not even a retry; one canceled during the drain still sends this attempt (see discard)
+		if err := expired(ctx); err != nil { // a call canceled before an attempt sends nothing, not even a retry (send looks again after the drain, so one canceled during it sends nothing either)
 			return reply{}, err
 		}
 		if err := c.send(ctx, op, tlvs, static, to); err != nil {
