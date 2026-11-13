@@ -148,19 +148,20 @@ func TestADroppedClientGivesUpItsSwitch(t *testing.T) {
 			t.Fatal(err)
 		}
 	}()
-	deadline := time.Now().Add(20 * time.Second)
-	for {
+	// the finalizer of the dropped client runs after a collection, on its own goroutine: collect and
+	// try again, yielding between the tries, until the claim is free
+	awaitCondition(t, "the claim of the dropped client to be given up", func() bool {
 		runtime.GC()
 		c, err := claimed(cfg)
 		if err == nil {
 			c.Close()
-			return
+			return true
 		}
-		if !errors.Is(err, ErrSwitchInUse) || time.Now().After(deadline) {
+		if !errors.Is(err, ErrSwitchInUse) {
 			t.Fatalf("the claim of a dropped client was not given up: %v", err)
 		}
-		time.Sleep(10 * time.Millisecond)
-	}
+		return false
+	})
 }
 
 func TestConcurrentDialsOfOneSwitchLetExactlyOneIn(t *testing.T) {

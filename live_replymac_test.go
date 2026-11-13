@@ -92,7 +92,7 @@ func TestLiveEveryReplyCarriesTheSwitchMAC(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(10 * time.Millisecond) // nosleep: a live test against a real switch, outside CI, kept as it was; the recorder runs on the calling goroutine, so the pause is probably vestigial and a live run can show it
 
 	kinds := make([]string, 0, len(rec.seen))
 	for k := range rec.seen {

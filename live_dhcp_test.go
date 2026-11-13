@@ -76,6 +76,7 @@ func TestLiveDHCPProbe(t *testing.T) {
 	watch := func(limit time.Duration, done func(Info) bool) Info {
 		var last Info
 		var lastLine string
+		// nosleep: a live test watches a real switch and its DHCP server, whose timing is what it observes; once a second is the rate of the questions
 		for end := time.Now().Add(limit); time.Now().Before(end); time.Sleep(time.Second) {
 			got, err := look()
 			line := fmt.Sprintf("ip %s mask %s gateway %s dhcp=%t", got.IP, got.Netmask, got.Gateway, got.DHCP)

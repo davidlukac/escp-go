@@ -3,7 +3,7 @@ package escp
 import (
 	"context"
 	"errors"
-	"sync/atomic"
+	"sync"
 	"testing"
 	"time"
 
@@ -14,24 +14,25 @@ import (
 func TestSeamCloseDuringLeaseWaitReturnsInMoments(t *testing.T) {
 	f := escptest.Start(t)
 	f.Configure(func(f *escptest.Faults) { f.OnSystemSet = escptest.SystemSetLeaves })
-	var lookups atomic.Int32
-	// like the production locator: a lookup with its own window, which knows nothing of Close
+	inLookup := make(chan struct{})
+	var once sync.Once
+	// like the production locator, a lookup that knows nothing of Close: only the context it was given
+	// ends it (there is no window to wait out, so a Close that returns has ended the lookup)
 	locator := func(ctx context.Context, _ MAC) (Info, error) {
-		lookups.Add(1)
-		select {
-		case <-ctx.Done():
-		case <-time.After(200 * time.Millisecond):
-		}
+		once.Do(func() { close(inLookup) })
+		<-ctx.Done()
 		return Info{}, ErrNotFound
 	}
 	c, _ := dialLeasing(t, f, withMoveWait(4*time.Second), withLocator(locator))
 	res := make(chan error, 1)
 	go func() { res <- c.EnableDHCP(context.Background()) }()
-	for lookups.Load() == 0 {
-		time.Sleep(time.Millisecond)
+	select {
+	case <-inLookup: // EnableDHCP is inside the lookup, which does not return by itself
+	case err := <-res:
+		t.Fatalf("EnableDHCP ended with %v before it began the lookup", err)
 	}
 	start := time.Now()
-	_ = c.Close()
+	closeWithin(t, c, callBound)
 	took := time.Since(start)
 	err := <-res
 	t.Logf("Close took %v; EnableDHCP returned %v (is ErrClosed: %v)", took, err, errors.Is(err, ErrClosed))

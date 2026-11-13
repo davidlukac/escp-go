@@ -12,15 +12,17 @@ import (
 // Close during the wait for the new address of SetIPConfig.
 func TestSeamCloseDuringMoveWaitReturnsInMoments(t *testing.T) {
 	f := escptest.Start(t)
-	c := dialFast(t, f, "secret", withMoveWait(4*time.Second))
+	log, missed := newLogSignal("the switch is not at the new address yet; asking again")
+	c := dialFast(t, f, "secret", withMoveWait(4*time.Second), withLogger(log))
 	res := make(chan error, 1)
 	go func() {
 		res <- c.SetIPConfig(context.Background(), cfgOf("127.0.0.2", "255.255.255.0", "127.0.0.254"))
 	}()
-	for f.WriteCount() == 0 {
-		time.Sleep(time.Millisecond)
+	select {
+	case <-missed: // awaitAddress has probed the new address once and found nobody: it is in its wait
+	case err := <-res:
+		t.Fatalf("SetIPConfig ended with %v before it waited for the new address", err)
 	}
-	time.Sleep(300 * time.Millisecond) // in awaitAddress by now
 	start := time.Now()
 	_ = c.Close()
 	took := time.Since(start)

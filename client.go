@@ -82,8 +82,8 @@ type seams struct {
 	shared bool
 	// locator finds a switch by MAC address; the default is Locate on the interfaces of this host.
 	locator func(ctx context.Context, mac model.MAC) (model.Info, error)
-	// clock replaces time.Now where a test must decide how much time has passed (the drain);
-	// nil means time.Now.
+	// clock replaces time.Now where a test must decide how much time has passed (the drain, the
+	// deadline of a read for a reply); nil means time.Now.
 	clock func() time.Time
 }
 
