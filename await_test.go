@@ -3,7 +3,6 @@ package escp
 import (
 	"context"
 	"log/slog"
-	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -13,24 +12,31 @@ import (
 // nosleep analyzer of devtools). A test that must know that a call has reached a place uses the seam
 // that says so: a channel, a signal from the socket wrapper (signalingConn), the write gate
 // (pairGate), the lookup it is blocked in, a line the library logs (logSignal), or, for a state that
-// has no signal, awaitCondition. The two helpers below are the clock-free ones: they yield to the
-// scheduler between looks and have no pause, and the bound they carry is the failure of the test, not
-// the length of the wait.
+// has no signal, awaitCondition. The helpers below are the one place that polls: awaitUntil looks, and
+// parks for pollInterval between looks (a spin on runtime.Gosched starves the network poller under
+// GOMAXPROCS=1 and burns a processor on a loaded runner). The pause is the interval of the poll, and
+// the bound they carry is the failure of the test, not the length of the wait.
 
 // awaitBound is how long awaitCondition looks before the test fails. It is a limit for a test that
 // would hang, generous because it is never waited out when the code is right.
 const awaitBound = 20 * time.Second
 
+// pollInterval is the pause between two looks of awaitUntil. It is how often the condition is
+// looked at, never how long the awaited event takes: the wait ends at the first look after the event.
+const pollInterval = time.Millisecond
+
 // awaitUntil returns true once cond is true, and false after awaitBound. It looks again after
-// yielding to the scheduler, so whatever has to run for cond to become true can run, with no pause
-// between looks.
+// parking the goroutine for pollInterval, so whatever has to run for cond to become true can run,
+// the network poller included. It is the one polling loop of the tests: a helper that needs one
+// calls it and does not spin on its own.
 func awaitUntil(cond func() bool) bool {
 	deadline := time.Now().Add(awaitBound)
 	for !cond() {
 		if time.Now().After(deadline) {
 			return false
 		}
-		runtime.Gosched()
+		// nosleep: the poll interval of a condition wait, bounded by awaitBound, and never a guess of how long the awaited event takes
+		time.Sleep(pollInterval)
 	}
 	return true
 }

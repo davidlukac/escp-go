@@ -34,7 +34,7 @@ func TestStormControlAndAnIngressLimitOnOnePortDoNotBothGetThrough(t *testing.T)
 	<-hold
 	bw := make(chan error, 1)
 	go func() { bw <- c.SetBandwidth(context.Background(), PortBandwidth{Port: 2, Ingress: 640}) }()
-	if err, finished := awaitSecond(bw); finished { // it must queue behind the other call, not end
+	if err, finished := awaitSecond(t, bw); finished { // it must queue behind the other call, not end
 		t.Fatalf("SetBandwidth did not wait for the storm control write that is in progress: %v", err)
 	}
 	close(release)
