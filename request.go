@@ -126,7 +126,7 @@ func (c *Client) setTLVs(ctx context.Context, op model.Operation, tlvs ...wire.T
 
 // setTLVsSent is setTLVs that also reports whether the request may have reached the switch: false
 // means nothing was sent for certain (the gate refused, or the call was canceled or the client
-// closed before it got the lock), so there is nothing to settle.
+// closed before it got the lock, or the request was refused for its size), so there is nothing to settle.
 func (c *Client) setTLVsSent(ctx context.Context, op model.Operation, tlvs ...wire.TLV) (sent bool, err error) {
 	if gate := c.cfg.WriteGate; gate != nil {
 		if err := gate(ctx, c, op); err != nil {
@@ -140,7 +140,7 @@ func (c *Client) setTLVsSent(ctx context.Context, op model.Operation, tlvs ...wi
 	}
 	defer c.mu.Unlock()
 	c.log.InfoContext(ctx, "write", "operation", op.Name.String(), "impact", op.Impact.String(), "ports", op.Ports.String())
-	return true, c.withSession(ctx, func() error {
+	err = c.withSession(ctx, func() error {
 		if !repeatable(op.Name) {
 			// A write that is not sent twice first proves that the switch still knows the session: a
 			// read that gets no answer re-keys (and is repeated), where the write could only be reported
@@ -165,6 +165,9 @@ func (c *Client) setTLVsSent(ctx context.Context, op model.Operation, tlvs ...wi
 		}
 		return nil
 	})
+	// A request refused for its size (ErrInvalid, see send) was not written: nothing may have
+	// reached the switch, so there is nothing to settle, as for a write the gate refused.
+	return !errors.Is(err, ErrInvalid), err
 }
 
 // repeatable reports whether a write may be run a second time after a new session key. Only the

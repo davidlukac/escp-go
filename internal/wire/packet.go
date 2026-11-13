@@ -75,12 +75,14 @@ type Header struct {
 }
 
 // Marshal encodes a header and TLVs into one packet, appending the terminating TLV and
-// filling in the length field.
+// filling in the length field. It has no error result: the callers bound the lengths first with
+// CheckLengths (a value over MaxTLVValue or a packet over MaxPacket would wrap in its 16-bit
+// field, and the packet would say something other than what it holds).
 func Marshal(h Header, tlvs []TLV) []byte {
 	payload := []byte{}
 	for _, t := range tlvs {
 		payload = binary.BigEndian.AppendUint16(payload, uint16(t.Type))       //nolint:gosec // G115: TLVType is a 16-bit wire number held in an int16: a same-width reinterpretation
-		payload = binary.BigEndian.AppendUint16(payload, uint16(len(t.Value))) //nolint:gosec // G115: no caller builds a value over 64 KiB (a request is a few bytes, a reply a fragment of a datagram), but Marshal does not check it: a longer value would wrap
+		payload = binary.BigEndian.AppendUint16(payload, uint16(len(t.Value))) //nolint:gosec // G115: bounded by CheckLengths, which every caller runs first (the value is at most MaxTLVValue)
 		payload = append(payload, t.Value...)
 	}
 	payload = append(payload, packetEnd...)
@@ -90,7 +92,7 @@ func Marshal(h Header, tlvs []TLV) []byte {
 	copy(b[offHostMAC:], h.HostMAC[:])
 	binary.BigEndian.PutUint16(b[offSeq:], h.Seq)
 	binary.BigEndian.PutUint32(b[offErrCode:], uint32(h.ErrCode))             //nolint:gosec // G115: the error code is signed on the wire: a same-width reinterpretation of 32 bits
-	binary.BigEndian.PutUint16(b[offLength:], uint16(HeaderLen+len(payload))) //nolint:gosec // G115: as for the value length above, the packet is far below 64 KiB in practice and Marshal does not check it
+	binary.BigEndian.PutUint16(b[offLength:], uint16(HeaderLen+len(payload))) //nolint:gosec // G115: bounded by CheckLengths, as for the value length above (the packet is at most MaxPacket)
 	binary.BigEndian.PutUint16(b[offFragment:], h.Fragment)
 	return append(b, payload...)
 }
