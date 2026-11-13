@@ -58,6 +58,8 @@ type resend struct {
 // switch takes a page as a whole, and so they send back what they have just read. It is allowed only
 // while every such TLV carries, byte for byte, what the switch reported before the call: the request then
 // asserts the address and the DHCP flag the switch already has, and changes nothing of how it is reached.
+// The re-send is not a choice: the switch refuses a System-page SET that leaves out the DHCP flag or the
+// gateway (error code 3, nothing changed; measured on firmware 20250710, see PROTOCOL.md).
 // A writer that is not here has no excuse for a TLV above its class. Whether such a writer should declare
 // the higher class instead is the question this table keeps in view (an owner decision, see the issue).
 var reassertsWhatItRead = map[Method]resend{
