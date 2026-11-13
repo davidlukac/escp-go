@@ -40,10 +40,11 @@ func (c *Client) System(ctx context.Context) (model.System, error) {
 	return parseSystem(ports, auto)
 }
 
-// SetHostname changes the device description. Like the vendor utility, the
-// request carries the current IP settings (read via discovery) unchanged, so
-// the management address is re-asserted as it is. Verified live on firmware
-// 20230218 and 20250710.
+// SetHostname changes the device description. The switch refuses a System-page
+// SET that leaves out the DHCP flag or the gateway (see PROTOCOL.md), so, like
+// the vendor utility, the request carries the current IP settings (read via
+// discovery) unchanged, and the management address is re-asserted as it is.
+// Verified live on firmware 20230218 and 20250710.
 func (c *Client) SetHostname(ctx context.Context, name model.Hostname) error {
 	if err := name.Validate(); err != nil {
 		return err
@@ -67,7 +68,11 @@ func (c *Client) SetHostname(ctx context.Context, name model.Hostname) error {
 }
 
 // writeSystem sends the System-page SET: device description, DHCP flag and the
-// static address triple. The switch takes all of them in one request.
+// static address triple. The switch takes all of them in one request and
+// refuses a request that leaves out the DHCP flag or the gateway (error code 3,
+// nothing changed; measured on firmware 20250710, a request with the device
+// description alone was not tried), so all five travel together, whichever one
+// the caller changes.
 func (c *Client) writeSystem(ctx context.Context, op model.Operation, name model.Hostname, dhcp bool, cfg model.IPConfig) (sent bool, err error) {
 	return c.setTLVsSent(ctx, op,
 		wire.TLV{Type: wire.TLVHostname, Value: append([]byte(name), 0)},

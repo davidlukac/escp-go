@@ -196,13 +196,14 @@ Notes:
 
 | Type | Dir | Bytes | Layout | Status |
 |---|---|---|---|---|
-| 2 | SET | NUL string | device description (hostname), sent with 9 (DHCP flag) and 4, 5, 6 (current IP, mask, gateway, 4 bytes each) as the vendor utility sends them | verified live |
-| 4, 5, 6 | SET | 4 each | new IP, mask and gateway, with TLV 2 (name kept) and 9 (DHCP flag kept) | verified live (20250710) |
+| 2 | SET | NUL string | device description (hostname), sent with 9 (DHCP flag) and 4, 5, 6 (current IP, mask, gateway, 4 bytes each): the switch requires the whole group (see the notes), and the vendor utility sends it that way | verified live; group measured (20250710) |
+| 4, 5, 6 | SET | 4 each | new IP, mask and gateway, with TLV 2 (name kept) and 9 (DHCP flag kept); all five go together | verified live (20250710) |
 | 9 | SET | | DHCP flag; 1 asks the DHCP server for a lease, 0 with a static triple puts the switch back on that address | measured (20250710) |
 
 Notes:
 
 - **Device description (2):** renamed and restored, IP configuration unchanged. Letters, digits, hyphens only.
+- **The System-page SET is all-or-nothing (measured, firmware 20250710):** a SET with TLVs 2, 4, 5 and 6 and **without** the DHCP flag (9) is refused with error code 3 and changes nothing; so is a SET with 2, 9, 4 and 5 and **without** the gateway (6). The full set of five (2, 9, 4, 5, 6) is accepted. A SET with the device description (2) alone was **not tried**: it could cost the switch its management address. A client that changes any one of the name, the DHCP flag, the address, the mask or the gateway must therefore send the other four as the switch reported them (a discovery read just before); this is why the library's `SetHostname` re-sends the address settings, and why it is still declared cosmetic: no argument of the call can change them, the values are exactly what discovery reported.
 - **Management address (4, 5, 6):** the same SET as the device description. Verified live on firmware 20250710: the switch answers from the old or the new address (the client accepts both), takes about two seconds to move, and the configuration file is byte-identical after moving back. A first packet to an address the host has not yet ARP-resolved can fail with `host is down`, so the client polls discovery until the switch reports the new address.
 - **DHCP flag (9):** the same SET, with TLV 9 = 1: the switch asks its DHCP server for a lease. Measured on firmware 20250710 (a router whose pool starts at .20): the write is answered; the switch is **silent for about two seconds**, then answers discovery at the **leased address** with DHCP 1 and the lease's mask and gateway (about four seconds after the write in total); the old static address no longer answers. Management works at the lease.
 - **A static address written while DHCP is on is ignored** (the lease stays, flag still 1), and so is the address a device-description write carries. A SET with TLV 9 = 0 and a static triple puts the switch back on that address within a fraction of a second; the static triple is not remembered while it leases, so it must be sent again. The configuration file was byte-identical to the one before after DHCP on and off again.
