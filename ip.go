@@ -26,7 +26,7 @@ const (
 // found nothing, or something else answered. Its address is then unknown: look at both.
 //
 // It is only returned for a write that was sent. A call that ended (canceled, past its deadline, or
-// closed) after the write's first datagram was handed to the socket is settled, and may return it;
+// closed) after the write was attempted (a datagram of it was handed to the socket, even if the socket failed) is settled, and may return it;
 // a call that ended before that, nothing of the write having been sent, returns the context's error
 // (or ErrClosed) at once and never ErrMoveUnconfirmed, because the switch is where it was.
 var ErrMoveUnconfirmed = errors.New("escp: the switch did not answer at its new address")
@@ -76,7 +76,8 @@ func addrOf(ip net.IP) netip.Addr {
 // reported as ErrMoveUnconfirmed, not as "not applied". A write the switch refuses, or the gate refuses, is not probed:
 // nothing was applied. Nor is a call that ends before the write was sent (while it reads the
 // switch first, opens the session or waits to send): it returns the context's error, or ErrClosed
-// when Close ended it, at once.
+// when Close ended it, at once. A read before the write, or the key exchange, that the switch never
+// answers is not probed either: nothing was sent, so the error is the plain ErrNoReply.
 //
 // Callers must guard: a wrong address, mask or gateway can cut the management path for good.
 // EnableDHCP is the way back to a lease.

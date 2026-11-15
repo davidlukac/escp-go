@@ -152,16 +152,15 @@ func (c *Client) setTLVsSent(ctx context.Context, op model.Operation, tlvs ...wi
 			// read that gets no answer re-keys (and is repeated), where the write could only be reported
 			// as unconfirmed although the switch cannot have decrypted it.
 			if _, err := c.exchange(ctx, wire.OpGet, []wire.TLV{{Type: wire.TLVLED}}, false, []*net.UDPAddr{c.dest}); err != nil {
-				return unmarked(err)
+				return err
 			}
 		}
 		req := append([]wire.TLV{
 			{Type: wire.TLVUsername, Value: append([]byte(c.cfg.Username), 0)},
 			{Type: wire.TLVPassword, Value: append([]byte(c.cfg.Password.Reveal()), 0)},
 		}, tlvs...)
-		r, err := c.exchange(ctx, wire.OpSet, req, false, []*net.UDPAddr{c.dest})
-		wrote = wrote || !isNotWritten(err)
-		err = unmarked(err)
+		r, written, err := c.exchangeWritten(ctx, wire.OpSet, req, false, []*net.UDPAddr{c.dest})
+		wrote = wrote || written
 		if errors.Is(err, ErrNoReply) {
 			return &UnconfirmedWriteError{Method: op.Name, Err: err}
 		}

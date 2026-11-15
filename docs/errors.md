@@ -5,10 +5,10 @@ Test errors with `errors.Is` and `errors.As`, never by message.
 | Error | Meaning |
 |---|---|
 | `ErrInvalid` | an argument was refused before any write was sent, or a text or JSON value was refused by the decoder of a scalar type (`PortID`, `Hostname`, `Speed`, ...) with the rule of its `Validate`; the message names the value and what is allowed |
-| `ErrNoReply` | the switch did not answer in time |
+| `ErrNoReply` | the switch did not answer in time (for `SetIPConfig` and `EnableDHCP`, also the plain answer when the read before the write or the session key exchange went unanswered: nothing was sent, so nothing is probed) |
 | `ErrWriteUnconfirmed`, `*UnconfirmedWriteError` | a write was sent and never answered: it may have been applied, once or several times (also matches `ErrNoReply`); read the setting back before deciding, see "When a write gets no answer" in [writing safely](writing-safely.md) |
 | `ErrRejected`, `*RejectedError` | the switch answered with a non-zero code: it refused a write, would not report a setting or did not accept the session key; the error carries the code (`ReplyCode`) and, for the known ones, the reason |
-| `ErrMoveUnconfirmed` | `SetIPConfig` or `EnableDHCP` lost track of the switch: look at both addresses (or look it up by its MAC) before believing either. Only for a write that was sent: a call canceled, past its deadline or closed after the write's first datagram is settled (a probe, within a bounded time) and may return it; a call that ended before that sent nothing and returns the context's error (or `ErrClosed`) at once |
+| `ErrMoveUnconfirmed` | `SetIPConfig` or `EnableDHCP` lost track of the switch: look at both addresses (or look it up by its MAC) before believing either. Only for a write that was sent: a call canceled, past its deadline or closed after the write was attempted (even a write that failed at the socket) is settled (a probe, within a bounded time) and may return it; a call that ended before that sent nothing and returns the context's error (or `ErrClosed`) at once |
 | `ErrNoInterface` | `Discover` has nowhere to send |
 | `ErrInvalidConfigFile` | a configuration backup that is not complete, after the download was repeated |
 | `ErrReplyTooLarge` | a fragmented reply bigger than any switch sends |

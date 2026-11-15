@@ -13,6 +13,7 @@ import (
 
 	"github.com/davidlukac/escp-go/escptest"
 	"github.com/davidlukac/escp-go/internal/wire"
+	"github.com/davidlukac/escp-go/model"
 )
 
 // unsentWriteClock is the base of steppingClock: the deadline a drain read gets is a time before
@@ -130,6 +131,32 @@ var managementWrites = []struct {
 	{"EnableDHCP", func(ctx context.Context, c *Client) error { return c.EnableDHCP(ctx) }},
 }
 
+// cutCall runs do with a context that ends the way end says, during the read cut chooses, and fails
+// the test when that read never came.
+func cutCall(t *testing.T, c *Client, cut *cutAtConn, where, end string, do func(context.Context, *Client) error) error {
+	t.Helper()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	var closed sync.WaitGroup
+	callCtx := ctx
+	cut.wait = true // the context's end interrupts the read, and the read returns when it has
+	switch end {
+	case endByCancel:
+		cut.during = cancel
+	case endByClose:
+		cut.during = func() { closed.Go(func() { _ = c.Close() }) } // Close waits for the call, which is in this read
+	case endByDeadline:
+		tc := &timesOutCtx{Context: ctx, done: make(chan struct{})}
+		callCtx, cut.during = tc, tc.timeOut
+	}
+	err := do(callCtx, c)
+	closed.Wait()
+	if !cut.cut() {
+		t.Fatalf("the call was never cut in %q: it returned %v", where, err)
+	}
+	return err
+}
+
 // runUnsentWindow runs one management write whose call ends in the window, the switch ignoring every
 // write (so that a write that was sent is counted and not applied), and returns the number of
 // writes the switch ignored, the number of lookups the client made, and the error.
@@ -150,25 +177,7 @@ func runUnsentWindow(t *testing.T, w unsentWindow, end string, do func(context.C
 	c.conn = cut
 	c.clock = steppingClock()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	var closed sync.WaitGroup
-	callCtx := ctx
-	cut.wait = true // the context's end interrupts the read, and the read returns when it has
-	switch end {
-	case endByCancel:
-		cut.during = cancel
-	case endByClose:
-		cut.during = func() { closed.Go(func() { _ = c.Close() }) } // Close waits for the call, which is in this read
-	case endByDeadline:
-		tc := &timesOutCtx{Context: ctx, done: make(chan struct{})}
-		callCtx, cut.during = tc, tc.timeOut
-	}
-	err = do(callCtx, c)
-	closed.Wait()
-	if !cut.cut() {
-		t.Fatalf("the call was never cut in %q: it returned %v", w.name, err)
-	}
+	err = cutCall(t, c, cut, w.name, end, do)
 	return f.DroppedSets(), *looked, err
 }
 
@@ -363,7 +372,7 @@ func TestAManagementWriteWhoseSessionOrReadBeforeItIsNeverAnsweredIsNotSettled(t
 
 // What an exchange knows after the send of an attempt: the request is written once any datagram of
 // it was handed to the socket, in this attempt or an earlier one, and a refusal of a later attempt
-// loses its mark then.
+// loses its mark then; the error that comes out never carries it.
 func TestAnExchangeKnowsWhetherTheRequestWasWrittenAfterEachAttempt(t *testing.T) {
 	refused := notWritten(context.Canceled)
 	failed := errSocketWrite
@@ -372,12 +381,11 @@ func TestAnExchangeKnowsWhetherTheRequestWasWrittenAfterEachAttempt(t *testing.T
 		err         error
 		before      bool
 		wantWritten bool
-		wantMarked  bool
 		wantErr     error
 	}{
 		{name: "the first attempt is sent", err: nil, wantWritten: true},
 		{name: "a later attempt is sent", err: nil, before: true, wantWritten: true},
-		{name: "the first attempt is refused before the write", err: refused, wantWritten: false, wantMarked: true, wantErr: context.Canceled},
+		{name: "the first attempt is refused before the write", err: refused, wantWritten: false, wantErr: context.Canceled},
 		{name: "a later attempt is refused after an earlier one was written", err: refused, before: true, wantWritten: true, wantErr: context.Canceled},
 		{name: "the first attempt fails at the socket", err: failed, wantWritten: true, wantErr: errSocketWrite},
 		{name: "a later attempt fails at the socket", err: failed, before: true, wantWritten: true, wantErr: errSocketWrite},
@@ -388,8 +396,116 @@ func TestAnExchangeKnowsWhetherTheRequestWasWrittenAfterEachAttempt(t *testing.T
 			if written != tt.wantWritten {
 				t.Errorf("written = %v, want %v", written, tt.wantWritten)
 			}
-			if !errors.Is(err, tt.wantErr) || isNotWritten(err) != tt.wantMarked {
-				t.Errorf("error = %v (marked: %v), want %v (marked: %v)", err, isNotWritten(err), tt.wantErr, tt.wantMarked)
+			if !errors.Is(err, tt.wantErr) || isNotWritten(err) {
+				t.Errorf("error = %v (marked: %v), want %v, never marked", err, isNotWritten(err), tt.wantErr)
+			}
+		})
+	}
+}
+
+// exportedCalls is one call of each kind of exported method that sends a request: the reads that
+// go through the TLV read, the discovery and the fragmented read, and the writes.
+var exportedCalls = []struct {
+	name string
+	do   func(context.Context, *Client) error
+}{
+	{"LED", func(ctx context.Context, c *Client) error { _, err := c.LED(ctx); return err }},
+	{"Info", func(ctx context.Context, c *Client) error { _, err := c.Info(ctx); return err }},
+	{"Bandwidth", func(ctx context.Context, c *Client) error { _, err := c.Bandwidth(ctx); return err }},
+	{"IGMP", func(ctx context.Context, c *Client) error { _, err := c.IGMP(ctx); return err }},
+	{"LAGs", func(ctx context.Context, c *Client) error { _, err := c.LAGs(ctx); return err }},
+	{"PortMirror", func(ctx context.Context, c *Client) error { _, err := c.PortMirror(ctx); return err }},
+	{"QoS", func(ctx context.Context, c *Client) error { _, err := c.QoS(ctx); return err }},
+	{"StormControl", func(ctx context.Context, c *Client) error { _, err := c.StormControl(ctx); return err }},
+	{"LoopPrevention", func(ctx context.Context, c *Client) error { _, err := c.LoopPrevention(ctx); return err }},
+	{"System", func(ctx context.Context, c *Client) error { _, err := c.System(ctx); return err }},
+	{"MTUVLAN", func(ctx context.Context, c *Client) error { _, err := c.MTUVLAN(ctx); return err }},
+	{"PortBasedVLAN", func(ctx context.Context, c *Client) error { _, err := c.PortBasedVLAN(ctx); return err }},
+	{"Ports", func(ctx context.Context, c *Client) error { _, err := c.Ports(ctx); return err }},
+	{"Dot1Q", func(ctx context.Context, c *Client) error { _, err := c.Dot1Q(ctx); return err }},
+	{"PortStats", func(ctx context.Context, c *Client) error { _, err := c.PortStats(ctx); return err }},
+	{"ConfigBackup", func(ctx context.Context, c *Client) error { _, err := c.ConfigBackup(ctx); return err }},
+	{"SetLED", func(ctx context.Context, c *Client) error { return c.SetLED(ctx, true) }},
+	{"SetLoopPrevention", func(ctx context.Context, c *Client) error { return c.SetLoopPrevention(ctx, true) }},
+	{"SetHostname", func(ctx context.Context, c *Client) error { return c.SetHostname(ctx, "unsent") }},
+	{"SetIPConfig", func(ctx context.Context, c *Client) error { return c.SetIPConfig(ctx, lostReplyWanted) }},
+	{"EnableDHCP", func(ctx context.Context, c *Client) error { return c.EnableDHCP(ctx) }},
+}
+
+// A call that ends in the drain of its first request returns the context's error itself, as it did
+// before the mark existed: callers compare it with ==, ask the error for Timeout, or look for it with
+// errors.Is, and none of that may meet a type of this package. Where the call opens a session first
+// the error is wrapped by the key exchange, and it matches the context's error and is not the mark.
+func TestACallEndedInItsDrainReturnsTheContextsErrorWithoutTheMark(t *testing.T) {
+	for _, call := range exportedCalls {
+		for _, end := range []string{endByCancel, endByDeadline, endByClose} {
+			for _, noSession := range []bool{false, true} {
+				t.Run(fmt.Sprintf("%s/%s/no session=%v", call.name, end, noSession), func(t *testing.T) {
+					f := escptest.Start(t)
+					c, _ := dialLeasing(t, f, withMoveWait(300*time.Millisecond))
+					if _, err := c.LED(context.Background()); err != nil { // the session exists and the switch is known
+						t.Fatal(err)
+					}
+					if noSession {
+						c.mu.Lock()
+						c.session = nil
+						c.mu.Unlock()
+					}
+					cut := &cutAtConn{drainCutConn: &drainCutConn{datagramConn: c.conn}, at: 0, atDrain: true}
+					c.conn, c.clock = cut, steppingClock()
+					err := cutCall(t, c, cut, call.name, end, call.do)
+
+					if marked, ok := errors.AsType[*notWrittenError](err); ok {
+						t.Fatalf("the mark reached the caller: %T %v", marked, err)
+					}
+					want := wantedEnd(end)
+					if !errors.Is(err, want) {
+						t.Fatalf("error = %v, want %v", err, want)
+					}
+					if noSession && call.name != "Info" { // the key exchange wraps what it could not send; Info sends no key
+						return
+					}
+					if err != want { //nolint:errorlint // the contract is the context's error itself
+						t.Errorf("error = %T %v, want %v itself", err, err, want)
+					}
+					if end == endByDeadline {
+						if netErr, ok := errors.AsType[net.Error](err); !ok || !netErr.Timeout() {
+							t.Errorf("a call past its deadline must answer net.Error.Timeout: %T %v", err, err)
+						}
+					}
+				})
+			}
+		}
+	}
+}
+
+// A write that was sent in a first pass and went unanswered is repeated after a new session key
+// (a write that cannot cut the management path is); a call that ends before the second pass writes
+// anything still sent the first one, twice (one retry), and says so: sent is true across the passes.
+func TestAWriteSentInTheFirstPassStaysSentWhenTheSecondPassEndsBeforeItsWrite(t *testing.T) {
+	for _, end := range []string{endByCancel, endByDeadline, endByClose} {
+		t.Run(end, func(t *testing.T) {
+			f := escptest.Start(t)
+			f.Configure(func(f *escptest.Faults) { f.DropSets = true })
+			c, _ := dialLeasing(t, f)
+			if _, err := c.LED(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+			// First pass: the write twice (one retry) without a reply, then the key exchange (one
+			// datagram); the second pass ends in the drain before its write, which is the first drain
+			// after three datagrams.
+			cut := &cutAtConn{drainCutConn: &drainCutConn{datagramConn: c.conn}, at: 3, atDrain: true}
+			c.conn, c.clock = cut, steppingClock()
+			var sent bool
+			err := cutCall(t, c, cut, "the second pass", end, func(ctx context.Context, c *Client) (err error) {
+				sent, err = c.writeSystem(ctx, model.MethodSetHostname.Operation(), "unsent", false, lostReplyWanted)
+				return err
+			})
+			if !sent {
+				t.Errorf("sent = false, but the first pass wrote the request: %v", err)
+			}
+			if got := f.DroppedSets(); got != 2 {
+				t.Errorf("the switch received the write %d time(s), want twice (the first pass)", got)
 			}
 		})
 	}

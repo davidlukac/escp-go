@@ -242,18 +242,16 @@ func (c *Client) discard(ctx context.Context) {
 	}
 }
 
-// notWrittenError marks an error that was returned although no datagram of the request was handed
-// to the socket: send refused it before the write (see send), or exchange never reached a write. It
-// matches what it wraps (ErrInvalid for a size refusal, the context's error for a call that ended),
-// reads as it does, and only adds the one fact a write needs to know, whether there is anything to
-// settle: setTLVsSent looks for it, and nothing else does.
+// notWrittenError marks an error that send returns for a request it refused before the write (see
+// send). It matches what it wraps (ErrInvalid for a size refusal, the context's error for a call that
+// ended) and reads as it does. It exists only between send and its callers, which take the mark off
+// (writtenAfter, exchangeFragments): no error a method of Client returns carries it.
 type notWrittenError struct{ err error }
 
 func (e *notWrittenError) Error() string { return e.err.Error() }
 func (e *notWrittenError) Unwrap() error { return e.err }
 
-// notWritten marks err as one that came before any write; nil and an error already marked stay as
-// they are.
+// notWritten marks err as a refusal before the write; nil and an error already marked stay as they are.
 func notWritten(err error) error {
 	if err == nil || isNotWritten(err) {
 		return err
@@ -277,18 +275,14 @@ func unmarked(err error) error {
 
 // writtenAfter is what an exchange knows after one attempt's send returned err: whether the request
 // was handed to the socket by now (in this attempt or an earlier one, before) and the error to
-// return. An error of this attempt's refusal before the write keeps its mark only while nothing was
+// return, without the mark. A refusal before the write leaves it unwritten only while nothing was
 // written: once an earlier attempt was, the request may have reached the switch, whatever stopped the
 // next one.
 func writtenAfter(err error, before bool) (written bool, out error) {
-	switch {
-	case err == nil:
+	if err == nil {
 		return true, nil
-	case before:
-		return true, unmarked(err)
-	default:
-		return !isNotWritten(err), err
 	}
+	return before || !isNotWritten(err), unmarked(err)
 }
 
 // send transmits one request with a fresh sequence number, after dropping what was left in the
@@ -331,55 +325,55 @@ func (c *Client) mayExchange() error {
 
 // exchange sends one packet and waits for the reply with the same sequence
 // number from the switch, retrying on silence. Callers hold c.mu.
-//
-// An error that comes before the first write (a closed client, a socket that does not open, a
-// request refused for its size, a call that ended before or during the drain of the first attempt)
-// is marked notWrittenError; one from the first write on never is, a cancellation between two
-// attempts included, because the request may have reached the switch.
-func (c *Client) exchange(ctx context.Context, op byte, tlvs []wire.TLV, static bool, to []*net.UDPAddr) (rep reply, err error) {
-	wrote := false // a datagram of this request was handed to the socket, or the write failed
-	defer func() {
-		if !wrote {
-			err = notWritten(err)
-		}
-	}()
+func (c *Client) exchange(ctx context.Context, op byte, tlvs []wire.TLV, static bool, to []*net.UDPAddr) (reply, error) {
+	rep, _, err := c.exchangeWritten(ctx, op, tlvs, static, to)
+	return rep, err
+}
+
+// exchangeWritten is exchange that also reports whether a datagram of the request was handed to the
+// socket (or the write failed, which may have left in part): false means nothing of it was sent, for
+// certain, whatever the error says (a closed client, a socket that does not open, a request refused
+// for its size, a call that ended before or during the drain of the first attempt). From the first
+// write on it is true, a cancellation between two attempts included. The error is the plain one: the
+// mark send puts on a refusal before the write never leaves this function.
+func (c *Client) exchangeWritten(ctx context.Context, op byte, tlvs []wire.TLV, static bool, to []*net.UDPAddr) (rep reply, wrote bool, err error) {
 	if err := c.mayExchange(); err != nil {
-		return reply{}, err
+		return reply{}, false, err
 	}
 	ctx, release := c.withStop(ctx)
 	defer release()
 	defer func() { err = closedBy(ctx, err) }()
 	if err := c.open(ctx); err != nil {
-		return reply{}, err
+		return reply{}, false, err
 	}
 	defer c.interruptOnDone(ctx)()
 	c.ident.forget()
 	for attempt := 0; attempt <= c.cfg.Retries; attempt++ {
 		if err := expired(ctx); err != nil { // a call canceled before an attempt sends nothing, not even a retry (send looks again after the drain, so one canceled during it sends nothing either)
-			return reply{}, err
+			return reply{}, wrote, err
 		}
 		var sendErr error
 		if wrote, sendErr = writtenAfter(c.send(ctx, op, tlvs, static, to), wrote); sendErr != nil {
-			return reply{}, sendErr
+			return reply{}, wrote, sendErr
 		}
 		c.log.DebugContext(ctx, "request sent", "op", wire.OpName(op), "seq", c.seq, "attempt", attempt+1, "tlvs", tlvTypes(tlvs), "bytes", tlvBytes(tlvs))
 		rep, err := c.recv(ctx, c.attemptDeadline(ctx))
 		if err == nil {
 			c.log.DebugContext(ctx, "reply received", "op", wire.OpName(rep.op), "seq", c.seq, "error_code", int(rep.err), "tlvs", tlvTypes(rep.tlvs), "bytes", tlvBytes(rep.tlvs))
 			if err := c.reclaim(); err != nil { // the first contact names the switch by its MAC
-				return reply{}, err
+				return reply{}, wrote, err
 			}
-			return rep, nil
+			return rep, wrote, nil
 		}
 		if !errors.Is(err, errSilent) {
-			return reply{}, err
+			return reply{}, wrote, err
 		}
 		if err := expired(ctx); err != nil {
-			return reply{}, err
+			return reply{}, wrote, err
 		}
 		c.log.WarnContext(ctx, "no reply", "op", wire.OpName(op), "seq", c.seq, "attempt", attempt+1, "attempts", c.cfg.Retries+1)
 	}
-	return reply{}, ErrNoReply
+	return reply{}, wrote, ErrNoReply
 }
 
 // exchangeFragments is exchange for replies that span several packets: it collects the values
