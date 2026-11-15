@@ -29,9 +29,11 @@ func TestDialSendsNothingAndBindsNoSocket(t *testing.T) {
 		cfg  func(f *escptest.Switch) Config
 	}{
 		{"an address", func(f *escptest.Switch) Config {
+			// hostport: the test gives the client its port on the config this returns.
 			return Config{Host: "127.0.0.1", SwitchPort: f.UDPPort(), BroadcastAddr: escptest.Loopback()}
 		}},
 		{"a MAC and no address", func(f *escptest.Switch) Config {
+			// hostport: the test gives the client its port on the config this returns.
 			return Config{MAC: wantMAC, SwitchPort: f.UDPPort(), BroadcastAddr: escptest.Loopback()}
 		}},
 	}
