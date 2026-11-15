@@ -10,6 +10,7 @@ Each exists because the defect it finds was found late, more than once.
 | `lockwait` | a blocking operation (channel, `time.Sleep`, `WaitGroup.Wait`, a socket read or write, a call that takes a context) between taking a lock and releasing it | escp-go#154 (the firmware gate held its lock across a read of the switch) |
 | `validatecall` | an exported function or method of the root package that takes a value of a type with a `Validate` method and never calls it (or a helper that does), or uses the value before it does | escp-go#169 (an empty `SetPortPriorities` sent a full rewrite), and the class of seven releases of input validation fixed one entry at a time |
 | `nosleep` | a `time.Sleep` in a test or in production code, and in a test a `time.After` that is not the failure bound of a `select` case (a case that calls `t.Fatal`, `t.Error` and the like as one of its own statements, or panics) | the flaky tests of 0.6.0 to 0.9.0 (escp-go#195, DC-C06): a guess that is too short flakes, and one that is wrong passes without reaching the path |
+| `hostport` | in a `_test.go` file, a `Config` literal that sets `SwitchPort` and not `HostPort`, unless the variable it initializes has its `HostPort` assigned, or it is handed to a function of the package that assigns the `HostPort` of its parameter (`newBoundClient`, `claimed`) | escp-go#237 (DC-C06): 57 literals left the client on the real reply port 29809, shared with any other ESCP client on the host; two tests lost their reply to a stranger |
 
 ## The annotations
 
@@ -28,6 +29,9 @@ An annotation without a reason is itself reported.
   context, a signal from a seam, a line the library logs), and a state with no event is polled with a bound by
   `awaitUntil` in `await_test.go`, the one place that pauses (one annotated `pollInterval` sleep); a second
   sleep elsewhere is reported.
+- `// hostport: <reason>` on the literal's line, on the line above it or in the function's doc comment. Write why
+  the test needs the real reply port (it tests the default), or where the port is set instead (the helper the
+  config is handed to). Everything else takes its port from `escptest.FreeUDPPort(t)`.
 
 ## Running one
 
@@ -41,7 +45,7 @@ go -C devtools test ./analyzers             # the fixtures
 ```
 
 Configuration is by flag, with the escp-go client's names as the defaults (`-readwrite.readers`,
-`-readwrite.writers`, `-readwrite.guards`, `-readwrite.receivers`, `-lockwait.lockfuncs`, `-validatecall.packages`, `-validatecall.names`); the doc comment of
+`-readwrite.writers`, `-readwrite.guards`, `-readwrite.receivers`, `-lockwait.lockfuncs`, `-validatecall.packages`, `-validatecall.names`, `-hostport.type`); the doc comment of
 each analyzer (`Readwrite`, `Lockwait`, `Validatecall`) is the reference. Another repository passes its own in its Makefile.
 
 ## Limits
@@ -53,6 +57,7 @@ behind a stuck call (the defect of escp-go#162) because nothing in the function 
 a call in flight pin that. `nosleep` sees a wait on the clock, not a wait that is too long on a channel: a `select` case that fails the test
 after a timeout is accepted as the bound of a wait that has a signal, so a long timeout used as if it were the event,
 a channel nothing sends to, and a timer made with `time.NewTimer`, `time.Tick` or `time.AfterFunc` are read in review.
+`hostport` reads the literals of one package: a helper in another package that sets the port, a config built from another value (`cfg := other`) and a port set to the constant 0 are not seen, and a literal returned by a function to a caller that sets the port carries the annotation.
 `readwrite` matches methods by name (and optionally by receiver type), so a type
 that is not the client with a method of the same name is a false hit unless `-readwrite.receivers` is set.
 

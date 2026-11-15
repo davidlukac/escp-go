@@ -47,7 +47,7 @@ func TestDecryptChoosesTheKeyThatYieldsAHeader(t *testing.T) {
 }
 
 func TestAcceptFiltersForeignAndStaleDatagrams(t *testing.T) {
-	c, err := Dial(Config{Host: "127.0.0.1", SwitchPort: 1})
+	c, err := Dial(Config{Host: "127.0.0.1", SwitchPort: 1, HostPort: escptest.FreeUDPPort(t)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -422,7 +422,7 @@ func TestAFragmentedReplyOfExactlyTheLimitIsAcceptedAndOneByteMoreIsRefused(t *t
 		{"one byte more", chunk + 1, ErrReplyTooLarge, maxFragmentedReply + 1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			c, err := Dial(Config{Host: "127.0.0.1", SwitchPort: 1})
+			c, err := Dial(Config{Host: "127.0.0.1", SwitchPort: 1, HostPort: escptest.FreeUDPPort(t)})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -474,7 +474,7 @@ func (s *slowFragmentsConn) ReadFromUDP(b []byte) (int, *net.UDPAddr, error) {
 // The deadline of a fragmented reply is one for the whole reply: a sender that keeps sending
 // packets cannot restart it with each one.
 func TestTheDeadlineOfAFragmentedReplyIsOneForTheWholeReply(t *testing.T) {
-	c, err := Dial(Config{Host: "127.0.0.1", SwitchPort: 1})
+	c, err := Dial(Config{Host: "127.0.0.1", SwitchPort: 1, HostPort: escptest.FreeUDPPort(t)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -494,7 +494,7 @@ func TestTheDeadlineOfAFragmentedReplyIsOneForTheWholeReply(t *testing.T) {
 
 // A packet that carries nothing of the wanted TLV adds no bytes, so the packets are counted too.
 func TestAFragmentedReplyOfTooManyPacketsIsRefusedWhateverTheyCarry(t *testing.T) {
-	c, err := Dial(Config{Host: "127.0.0.1", SwitchPort: 1})
+	c, err := Dial(Config{Host: "127.0.0.1", SwitchPort: 1, HostPort: escptest.FreeUDPPort(t)})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -30,7 +30,8 @@ spell:
 # a read followed by a write outside the modify guard, `lockwait`, a blocking operation under a lock
 # without a `// lockwait: <reason>`, `validatecall`, an exported function that takes a value with a
 # `Validate` method and does not call it, and `nosleep`, a sleep or a guess-wait on the clock without a
-# `// nosleep: <reason>`, run a second time with the `live` tag), after the tests of the checks themselves; then golangci-lint, for
+# `// nosleep: <reason>`, run a second time with the `live` tag, and `hostport`, a test client aimed at the fake
+# that is left the real reply port without a `// hostport: <reason>`), after the tests of the checks themselves; then golangci-lint, for
 # every build tag and operating system.
 lint: spell
 	go -C devtools build -o $(CURDIR)/build/subtests ./subtests

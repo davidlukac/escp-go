@@ -15,6 +15,8 @@ import (
 )
 
 // guarantee: Config.Validate
+//
+// hostport: the table only validates values, no case dials a client.
 func TestConfigValidate(t *testing.T) {
 	mac := MAC{2, 0, 0, 0, 0, 1}
 	for _, tc := range []struct {

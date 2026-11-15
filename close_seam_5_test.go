@@ -20,7 +20,7 @@ func TestSeamARefusedClientStillTalksToTheSwitchOnEveryCall(t *testing.T) {
 	mac := MAC{0, 0, 0x5e, 0, 0x53, 0x42}
 	f.SetMAC(mac)
 	cfgAddr := Config{Host: "127.0.0.1", Username: "admin", Password: "secret", SwitchPort: f.UDPPort(), HostPort: escptest.FreeUDPPort(t), BroadcastAddr: escptest.Loopback(), Timeout: 5 * time.Second, Retries: NoRetries}
-	loser, err := claimed(cfgAddr)
+	loser, err := claimed(t, cfgAddr)
 	if err != nil {
 		t.Fatal(err)
 	}
