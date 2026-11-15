@@ -54,3 +54,32 @@ func withHost(cfg Config) *Client {
 
 // pair returns two values, for an assignment with one call on its right.
 func pair() (Config, error) { return Config{}, nil }
+
+// withConstantPort assigns a constant: that is the default or a fixed number, not a port from an allocator.
+func withConstantPort(cfg Config) *Client {
+	if cfg.HostPort == 0 {
+		cfg.HostPort = 29809
+	}
+	return Dial(cfg)
+}
+
+// withZeroedPort is the same with 0.
+func withZeroedPort(cfg Config) *Client {
+	cfg.HostPort = 0
+	return Dial(cfg)
+}
+
+// make2 returns a configuration of unknown origin.
+func make2() Config { return Config{} }
+
+// twoInts returns two values, for an assignment with one call on its right.
+func twoInts() (int, error) { return freePort(), nil }
+
+// portFor reads a configuration and returns a number: it does not assign anything.
+func portFor(cfg Config) int { return cfg.SwitchPort }
+
+// shifted assigns the HostPort of a parameter that is not the configuration, and takes a configuration.
+func shifted(o Other, cfg Config) *Client {
+	o.HostPort = freePort()
+	return Dial(cfg)
+}
