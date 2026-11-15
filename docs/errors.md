@@ -8,7 +8,7 @@ Test errors with `errors.Is` and `errors.As`, never by message.
 | `ErrNoReply` | the switch did not answer in time |
 | `ErrWriteUnconfirmed`, `*UnconfirmedWriteError` | a write was sent and never answered: it may have been applied, once or several times (also matches `ErrNoReply`); read the setting back before deciding, see "When a write gets no answer" in [writing safely](writing-safely.md) |
 | `ErrRejected`, `*RejectedError` | the switch answered with a non-zero code: it refused a write, would not report a setting or did not accept the session key; the error carries the code (`ReplyCode`) and, for the known ones, the reason |
-| `ErrMoveUnconfirmed` | `SetIPConfig` or `EnableDHCP` lost track of the switch: look at both addresses (or look it up by its MAC) before believing either |
+| `ErrMoveUnconfirmed` | `SetIPConfig` or `EnableDHCP` lost track of the switch: look at both addresses (or look it up by its MAC) before believing either. Only for a write that was sent: a call canceled, past its deadline or closed after the write's first datagram is settled (a probe, within a bounded time) and may return it; a call that ended before that sent nothing and returns the context's error (or `ErrClosed`) at once |
 | `ErrNoInterface` | `Discover` has nowhere to send |
 | `ErrInvalidConfigFile` | a configuration backup that is not complete, after the download was repeated |
 | `ErrReplyTooLarge` | a fragmented reply bigger than any switch sends |

@@ -51,7 +51,7 @@ func (c *Client) ensureSession(ctx context.Context) error {
 	r, err := c.exchange(ctx, wire.OpSet, []wire.TLV{{Type: wire.TLVRSAKey, Value: wire.RSASessionTLV(key)}}, true, []*net.UDPAddr{c.dest})
 	if err != nil {
 		c.session = nil
-		return fmt.Errorf("escp: session key exchange: %w", err)
+		return fmt.Errorf("escp: session key exchange: %w", unmarked(err))
 	}
 	if r.err != wire.ErrCodeKeyAccepted {
 		c.session = nil

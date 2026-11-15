@@ -28,7 +28,9 @@ const leaseWait = 60 * time.Second
 // The write may be applied without a reply. When it got none and the lookup finds the switch static
 // at its old address, the error says the write was not applied (it matches ErrNoReply); when nothing
 // can be established the error matches ErrMoveUnconfirmed and the caller must look for the switch by its
-// MAC before it believes anything. Callers must guard: a network without a DHCP server leaves the
+// MAC before it believes anything. A call that ends before the write was sent (canceled, past its
+// deadline or closed while it reads the switch, opens the session or waits to send) returns the
+// context's error, or ErrClosed, at once and waits for no lease. Callers must guard: a network without a DHCP server leaves the
 // switch without an address, and the way back then needs this host to be on the address the switch
 // falls back to.
 func (c *Client) EnableDHCP(ctx context.Context) error {

@@ -125,8 +125,13 @@ func (c *Client) setTLVs(ctx context.Context, op model.Operation, tlvs ...wire.T
 }
 
 // setTLVsSent is setTLVs that also reports whether the request may have reached the switch: false
-// means nothing was sent for certain (the gate refused, or the call was canceled or the client
-// closed before it got the lock, or the request was refused for its size), so there is nothing to settle.
+// means nothing of the write was sent for certain, so there is nothing to settle and the error is
+// the whole story. That holds for a write the gate refused, a call canceled or closed before it got
+// the lock, a request refused for its size, and a call that ended (or failed) before the write was
+// handed to the socket: during the read that precedes a write that is not repeated, during the
+// session key exchange, or during the drain before the write. The write counts as sent from its
+// first datagram on: a write that was sent and not answered is settled, a cancellation between its
+// attempts included.
 func (c *Client) setTLVsSent(ctx context.Context, op model.Operation, tlvs ...wire.TLV) (sent bool, err error) {
 	if gate := c.cfg.WriteGate; gate != nil {
 		if err := gate(ctx, c, op); err != nil {
@@ -140,13 +145,14 @@ func (c *Client) setTLVsSent(ctx context.Context, op model.Operation, tlvs ...wi
 	}
 	defer c.mu.Unlock()
 	c.log.InfoContext(ctx, "write", "operation", op.Name.String(), "impact", op.Impact.String(), "ports", op.Ports.String())
+	wrote := false // the write itself was handed to the socket, in any pass
 	err = c.withSession(ctx, func() error {
 		if !repeatable(op.Name) {
 			// A write that is not sent twice first proves that the switch still knows the session: a
 			// read that gets no answer re-keys (and is repeated), where the write could only be reported
 			// as unconfirmed although the switch cannot have decrypted it.
 			if _, err := c.exchange(ctx, wire.OpGet, []wire.TLV{{Type: wire.TLVLED}}, false, []*net.UDPAddr{c.dest}); err != nil {
-				return err
+				return unmarked(err)
 			}
 		}
 		req := append([]wire.TLV{
@@ -154,6 +160,8 @@ func (c *Client) setTLVsSent(ctx context.Context, op model.Operation, tlvs ...wi
 			{Type: wire.TLVPassword, Value: append([]byte(c.cfg.Password.Reveal()), 0)},
 		}, tlvs...)
 		r, err := c.exchange(ctx, wire.OpSet, req, false, []*net.UDPAddr{c.dest})
+		wrote = wrote || !isNotWritten(err)
+		err = unmarked(err)
 		if errors.Is(err, ErrNoReply) {
 			return &UnconfirmedWriteError{Method: op.Name, Err: err}
 		}
@@ -165,9 +173,7 @@ func (c *Client) setTLVsSent(ctx context.Context, op model.Operation, tlvs ...wi
 		}
 		return nil
 	})
-	// A request refused for its size (ErrInvalid, see send) was not written: nothing may have
-	// reached the switch, so there is nothing to settle, as for a write the gate refused.
-	return !errors.Is(err, ErrInvalid), err
+	return wrote, err
 }
 
 // repeatable reports whether a write may be run a second time after a new session key. Only the
