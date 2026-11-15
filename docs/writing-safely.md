@@ -65,7 +65,7 @@ A write whose reply never comes is **not** known to have failed: the switch may 
 
 - read the setting back and compare with what you meant to write; for an absolute value (every setting but the address ones) writing it again is safe;
 - a write of `ImpactManagement` is **never** repeated after a new session key, because a second send can be refused for what the first one already did (`DeleteDot1QVLAN` of a VLAN that is gone answers with a rejection that looks like "it did not work"); the session is dropped, so the next call keys again;
-- `SetIPConfig` and `EnableDHCP` settle the outcome themselves and return `ErrMoveUnconfirmed` when they cannot.
+- `SetIPConfig` and `EnableDHCP` settle the outcome themselves and return `ErrMoveUnconfirmed` when they cannot. They settle a write that was sent: a call that ends (canceled, past its deadline, or by `Close`) after the write was attempted (a write that failed at the socket included) still probes the switch, because "canceled" would not say whether it moved. A call that ends before that, while it reads the switch, opens the session or drops what is left in the socket before the write, sent nothing: it returns the context's error (or `ErrClosed`) at once, without a probe and without `ErrMoveUnconfirmed`.
 
 ## What the client does not do
 

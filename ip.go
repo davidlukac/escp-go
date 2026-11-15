@@ -24,6 +24,11 @@ const (
 // ErrMoveUnconfirmed means the switch was told to move but it is not known whether it did:
 // it did not answer at the new address in time, or it did not answer the write and a probe
 // found nothing, or something else answered. Its address is then unknown: look at both.
+//
+// It is only returned for a write that was sent. A call that ended (canceled, past its deadline, or
+// closed) after the write was attempted (a datagram of it was handed to the socket, even if the socket failed) is settled, and may return it;
+// a call that ended before that, nothing of the write having been sent, returns the context's error
+// (or ErrClosed) at once and never ErrMoveUnconfirmed, because the switch is where it was.
 var ErrMoveUnconfirmed = errors.New("escp: the switch did not answer at its new address")
 
 // ipConfigFromInfo parses the address triple of a discovery reply. It refuses
@@ -69,7 +74,10 @@ func addrOf(ip net.IP) netip.Addr {
 // time), because "canceled" would not say whether the switch moved; a probe that still
 // shows the old settings then proves little (the write may be taking effect), so it is
 // reported as ErrMoveUnconfirmed, not as "not applied". A write the switch refuses, or the gate refuses, is not probed:
-// nothing was applied.
+// nothing was applied. Nor is a call that ends before the write was sent (while it reads the
+// switch first, opens the session or waits to send): it returns the context's error, or ErrClosed
+// when Close ended it, at once. A read before the write, or the key exchange, that the switch never
+// answers is not probed either: nothing was sent, so the error is the plain ErrNoReply.
 //
 // Callers must guard: a wrong address, mask or gateway can cut the management path for good.
 // EnableDHCP is the way back to a lease.
