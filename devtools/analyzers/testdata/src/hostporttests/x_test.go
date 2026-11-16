@@ -94,3 +94,165 @@ func TestMethodsAndOtherFields(t *testing.T) {
 	got, err := pair() // an assignment of two values from one call
 	_, _ = got, err
 }
+
+// A function that assigns a constant to the HostPort of its parameter does not give the client a port.
+func TestConstantsAreNotAPort(t *testing.T) {
+	_ = withConstantPort(Config{SwitchPort: 29808}) // want `binds the real reply port 29809`
+	_ = withZeroedPort(Config{SwitchPort: 29808})   // want `binds the real reply port 29809`
+	cfg := Config{SwitchPort: 29808}                // want `binds the real reply port 29809`
+	cfg.HostPort = 29809
+	_ = Dial(cfg)
+	other := Config{SwitchPort: 29808} // want `binds the real reply port 29809`
+	other.HostPort = 0
+	_ = Dial(other)
+}
+
+// A configuration built by assigning its fields is judged the same way: the port must be there before the
+// first use.
+func TestBuiltByAssignment(t *testing.T) {
+	var bare Config
+	bare.Host = "127.0.0.1"
+	bare.SwitchPort = 29808 // want `binds the real reply port 29809`
+	_ = Dial(bare)
+
+	var good Config
+	good.Host = "127.0.0.1"
+	good.SwitchPort = 29808
+	good.HostPort = freePort()
+	_ = Dial(good)
+
+	var pointer = &Config{}
+	pointer.SwitchPort = 29808 // want `binds the real reply port 29809`
+	_ = Dial(*pointer)
+
+	withPortFirst := &Config{}
+	withPortFirst.HostPort = freePort()
+	withPortFirst.SwitchPort = 29808
+	_ = Dial(*withPortFirst)
+
+	var handed Config
+	handed.SwitchPort = 29808
+	_ = withPort(handed) // the function gives the port
+
+	var noSwitch Config // not aimed at the fake: no SwitchPort
+	noSwitch.Host = "192.0.2.1"
+	_ = Dial(noSwitch)
+
+	var zero Config
+	zero.SwitchPort = 29808 // want `binds the real reply port 29809`
+	zero.HostPort = 29809
+	_ = Dial(zero)
+}
+
+// The order matters: a port assigned after the configuration was used is too late.
+func TestThePortComesAfterTheFirstUse(t *testing.T) {
+	cfg := Config{SwitchPort: 29808} // want `binds the real reply port 29809`
+	_ = Dial(cfg)
+	cfg.HostPort = freePort()
+
+	var late Config
+	late.SwitchPort = 29808 // want `binds the real reply port 29809`
+	_ = []Config{late}
+	late.HostPort = freePort()
+
+	var returned Config
+	returned.SwitchPort = 29808 // want `binds the real reply port 29809`
+	func() Config { return returned }()
+	returned.HostPort = freePort()
+
+	var copied Config
+	copied.SwitchPort = 29808 // want `binds the real reply port 29809`
+	again := copied
+	copied.HostPort = freePort()
+	_ = again
+
+	var asPointer Config
+	asPointer.SwitchPort = 29808 // want `binds the real reply port 29809`
+	_ = &asPointer
+	asPointer.HostPort = freePort()
+
+	// Reading or writing a field is not a use, and the port comes before the call.
+	var early Config
+	early.SwitchPort = 29808
+	_ = early.Host
+	early.Host = "127.0.0.1"
+	early.HostPort = freePort()
+	_ = Dial(early)
+
+	// A literal that sets its port is ported from its start.
+	ported := Config{SwitchPort: 29808, HostPort: freePort()}
+	_ = Dial(ported)
+}
+
+// An assignment of SwitchPort carries the annotation on its line or the line above it.
+func TestAnnotatedAssignment(t *testing.T) {
+	var cfg Config
+	cfg.SwitchPort = 29808 // hostport: this test binds the default on purpose
+	_ = Dial(cfg)
+
+	var above Config
+	// hostport: this one too
+	above.SwitchPort = 29808
+	_ = Dial(above)
+}
+
+// A configuration that only a variable of another function was aimed at is not this one's business.
+func TestNotAimed(t *testing.T) {
+	cfg := make2()
+	_ = Dial(cfg)
+	cfg2 := Config{Host: "x"}
+	_ = Dial(cfg2)
+}
+
+// The right side of a port assignment is evaluated before the port is there: a use in it is a use.
+func TestTheUseIsOnTheRightOfTheAssignment(t *testing.T) {
+	var cfg Config
+	cfg.SwitchPort = 29808 // want `binds the real reply port 29809`
+	cfg.HostPort = portFor(cfg)
+
+	var viaOwner Config // the function that owns the port is the first use, and gives it
+	viaOwner.SwitchPort = 29808
+	viaOwner.HostPort = withPort(viaOwner).cfg.HostPort
+
+	var tuple Config // an assignment of two values from one call
+	tuple.SwitchPort = 29808
+	var err error
+	tuple.HostPort, err = twoInts()
+	_ = err
+	_ = Dial(tuple)
+}
+
+// A configuration that is aimed, given a port and never handed on is fine; the first SwitchPort assignment
+// is where a report goes.
+func TestNeverUsedAndAssignedTwice(t *testing.T) {
+	var kept Config
+	kept.SwitchPort = 29808
+	kept.HostPort = freePort()
+	_ = kept.Host
+
+	var twice Config
+	twice.SwitchPort = 29808 // want `binds the real reply port 29809`
+	twice.SwitchPort = 29809
+	_ = Dial(twice)
+}
+
+// The target of an assignment is not a use, and a second literal does not replace the first.
+func TestReassigned(t *testing.T) {
+	var cfg Config
+	cfg = Config{SwitchPort: 29808, HostPort: freePort()}
+	_ = Dial(cfg)
+
+	first := Config{SwitchPort: 29808} // want `binds the real reply port 29809`
+	_ = Dial(first)
+	first = Config{HostPort: freePort()}
+	_ = Dial(first)
+}
+
+// Another type with the fields is not the configuration, as a variable either, and a function that assigns
+// the port of a parameter that is not one does not own the port of the configuration it is given.
+func TestOtherTypesAndParameters(t *testing.T) {
+	var o Other
+	o.SwitchPort = 29808
+	_ = o
+	_ = shifted(Other{}, Config{SwitchPort: 29808}) // want `binds the real reply port 29809`
+}
