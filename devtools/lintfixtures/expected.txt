@@ -1,0 +1,30 @@
+# The findings `.golangci.yml` must report on this module, one per line: `file: linter: text`, sorted.
+# `make lintfixtures` runs the repository's own configuration over the fixtures and compares: every line
+# here must be reported and nothing else may be. The line numbers are not part of it. Regenerate the
+# list for a new fixture with `build/lintcheck -root . -lint "$(go tool -modfile=devtools/go.mod -n golangci-lint)" -print`
+# and read every line before you commit it: the list is the claim of what each rule catches.
+aliased.go: forbidigo: use of `stdfmt.Println` forbidden because "the library logs through its slog.Logger (Config.Logger), never to stdout"
+aliased.go: forbidigo: use of `stdtime.After` forbidden because "time.After keeps its timer until it fires; use a time.Timer and Stop it"
+deadline.go: forbidigo: use of `conn.SetReadDeadline` forbidden because "only transport.go and discover.go set a read deadline, because a timed read is how absence is decided (DC-L09, DC-C06); a new one is a decision made there"
+deadline.go: forbidigo: use of `udp.SetReadDeadline` forbidden because "only transport.go and discover.go set a read deadline, because a timed read is how absence is decided (DC-L09, DC-C06); a new one is a decision made there"
+discover.go: forbidigo: use of `fmt.Println` forbidden because "the library logs through its slog.Logger (Config.Logger), never to stdout"
+escptest/escptest.go: forbidigo: use of `conn.SetReadDeadline` forbidden because "only transport.go and discover.go set a read deadline, because a timed read is how absence is decided (DC-L09, DC-C06); a new one is a decision made there"
+fakeuse.go: depguard: import 'github.com/davidlukac/escp-go/escptest' is not allowed from list 'no-fake-in-production': the fake switch is for tests; production code never depends on it
+internal/wire/transport.go: forbidigo: use of `conn.WriteToUDP` forbidden because "only transport.go and discover.go write to a socket (the write gate is in request.go)"
+logging.go: forbidigo: use of `log.Fatalf` forbidden because "the library logs through its slog.Logger (Config.Logger), not the log package"
+logging.go: forbidigo: use of `log.Panicln` forbidden because "the library logs through its slog.Logger (Config.Logger), not the log package"
+logging.go: forbidigo: use of `log.Print` forbidden because "the library logs through its slog.Logger (Config.Logger), not the log package"
+model/layering.go: depguard: import 'github.com/davidlukac/escp-go' is not allowed from list 'model-layer'
+printing.go: forbidigo: use of `fmt.Print` forbidden because "the library logs through its slog.Logger (Config.Logger), never to stdout"
+printing.go: forbidigo: use of `fmt.Printf` forbidden because "the library logs through its slog.Logger (Config.Logger), never to stdout"
+printing.go: forbidigo: use of `fmt.Println` forbidden because "the library logs through its slog.Logger (Config.Logger), never to stdout"
+printing.go: forbidigo: use of `print` forbidden because "the library logs through its slog.Logger (Config.Logger), never to stdout"
+printing.go: forbidigo: use of `println` forbidden because "the library logs through its slog.Logger (Config.Logger), never to stdout"
+safety/layering.go: depguard: import 'github.com/davidlukac/escp-go/internal/wire' is not allowed from list 'safety-layer'
+socketwrite.go: forbidigo: use of `conn.WriteMsgUDPAddrPort` forbidden because "only transport.go and discover.go write to a socket (the write gate is in request.go)"
+socketwrite.go: forbidigo: use of `conn.WriteMsgUDP` forbidden because "only transport.go and discover.go write to a socket (the write gate is in request.go)"
+socketwrite.go: forbidigo: use of `conn.WriteToUDPAddrPort` forbidden because "only transport.go and discover.go write to a socket (the write gate is in request.go)"
+socketwrite.go: forbidigo: use of `conn.WriteToUDP` forbidden because "only transport.go and discover.go write to a socket (the write gate is in request.go)"
+socketwrite.go: forbidigo: use of `packet.WriteTo` forbidden because "only transport.go and discover.go write to a socket (the write gate is in request.go)"
+timer.go: forbidigo: use of `time.After` forbidden because "time.After keeps its timer until it fires; use a time.Timer and Stop it"
+transport.go: forbidigo: use of `time.After` forbidden because "time.After keeps its timer until it fires; use a time.Timer and Stop it"
