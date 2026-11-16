@@ -293,7 +293,7 @@ func TestLocalMAC(t *testing.T) {
 // The lookup a client uses is Locate on this host's interfaces. A zero MAC is refused before
 // anything is sent, so the wrapper can be called without touching the network.
 func TestHostLocatorIsLocate(t *testing.T) {
-	_, err := hostLocator(nil, Config{})(context.Background(), MAC{})
+	_, err := hostLocator(nil, Config{}, hostInterfaces)(context.Background(), MAC{})
 	if !errors.Is(err, ErrInvalid) {
 		t.Fatalf("a lookup of the zero MAC = %v, want ErrInvalid", err)
 	}
@@ -308,7 +308,7 @@ func TestTheLookupOfAClientFollowsItsBroadcastAddressAndPorts(t *testing.T) {
 	cfg := Config{BroadcastAddr: escptest.Loopback(), SwitchPort: f.UDPPort(), HostPort: escptest.FreeUDPPort(t)}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	info, err := hostLocator(nil, cfg)(ctx, want)
+	info, err := hostLocator(nil, cfg, hostInterfaces)(ctx, want)
 	if err != nil || info.MAC != want {
 		t.Fatalf("lookup = %+v, %v; want the fake switch %s", info, err, want)
 	}
