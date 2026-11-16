@@ -46,7 +46,8 @@ type DiscoverOptions struct {
 // MAC as the sender, so switches behind a second network card are found too. It is sent
 // again halfway through the window, because UDP is lossy; duplicate replies are dropped.
 // If the context ends early, Discover returns the replies collected so far together with the
-// context's error. A failure to bind the socket, or to send on every interface, is an error.
+// context's error; a context that has ended before the call returns its error and sends nothing.
+// A failure to bind the socket, or to send on every interface, is an error.
 //
 // Switches always reply to UDP port 29809 whatever the sender's port, and they address every
 // reply to the limited broadcast address 255.255.255.255 (captured for the discovery, session-key
@@ -165,7 +166,8 @@ func discoverWith(ctx context.Context, opts DiscoverOptions, env discoverEnv) ([
 // Locate finds the switch with the given MAC address: a discovery probe like Discover's that
 // stops at the first reply from that switch, so it normally returns in well under a second. It returns
 // ErrNotFound when nobody with that MAC answers within the window (two seconds unless opts.Window
-// says otherwise). Read-only and not subject to a WriteGate.
+// says otherwise), and the context's error when the context ends first (before the call: nothing
+// is sent). Read-only and not subject to a WriteGate.
 func Locate(ctx context.Context, mac model.MAC, opts DiscoverOptions) (model.Info, error) {
 	return locateWith(ctx, mac, opts, discoverEnv{interfaces: hostInterfaces, switchPort: defaultSwitchPort, hostPort: defaultHostPort})
 }
@@ -220,6 +222,9 @@ func discoverUntil(ctx context.Context, opts DiscoverOptions, env discoverEnv, d
 
 // collectReplies sends the probes, listens for the window and returns the distinct replies.
 func collectReplies(ctx context.Context, env discoverEnv, probes []probe, window time.Duration, done func(map[string]model.Info) bool) ([]model.Info, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err // nothing is bound or sent for a search that has already ended
+	}
 	conn, err := bindReplyPort(ctx, env.hostPort)
 	if err != nil {
 		return nil, err
