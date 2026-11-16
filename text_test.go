@@ -84,12 +84,16 @@ func grep(t *testing.T, pattern *regexp.Regexp) []string {
 	return hits
 }
 
+// britishSpelling matches the British spellings the text must not contain: the words listed here, and the
+// -ise verbs of britishIseVerbs (stems and suffixes in spelling_stems_test.go).
+//
+//nolint:misspell // the spellings this test forbids
+var britishSpelling = regexp.MustCompile(`(?i)\b(behaviours?|misbehaviours?|colours?|neighbours?|catalogues?|cancell(ed|ing)|modell(ed|ing)|honour\w*|judgement|licence|artefacts?|dialled|dialling|favour\w*|centre|whilst|amongst|` + britishIseVerbs + `)\b`)
+
 // The text is American English, as the Go standard library and godoc write it. The misspell linter
 // checks the Go files; this checks the Markdown, the YAML and the rest too.
 func TestTheTextIsAmericanEnglish(t *testing.T) {
-	//nolint:misspell // the spellings this test forbids
-	british := regexp.MustCompile(`(?i)\b(behaviours?|misbehaviours?|colours?|neighbours?|catalogues?|cancell(ed|ing)|summaris\w+|initialis\w+|serialis\w+|normalis\w+|optimis\w+|recognis\w+|organis\w+|modell(ed|ing)|honour\w*|judgement|licence|artefacts?|dialled|dialling|favour\w*|centre|whilst|amongst)\b`)
-	for _, hit := range grep(t, british) {
+	for _, hit := range grep(t, britishSpelling) {
 		t.Errorf("British spelling (write American English): %s", hit)
 	}
 }
