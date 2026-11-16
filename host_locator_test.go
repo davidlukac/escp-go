@@ -93,3 +93,52 @@ func TestTheLookupOfAClientReportsWhatTheListerCannotGive(t *testing.T) {
 		})
 	}
 }
+
+// Dial gives the lookup of its client the interfaces of the host (client.go, the lister passed to
+// hostLocator): a client with a MAC and no address looks the switch up on what hostInterfaces
+// lists, not on nothing and not on a list of its own. The lookup ends at the bind of the held
+// reply port, after it has said how many interfaces and probes it would have used; on a host with
+// no usable interface it says ErrNoInterface and nothing else.
+func TestDialLooksTheSwitchUpOnTheInterfacesOfTheHost(t *testing.T) {
+	ifs, err := hostInterfaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+	probes := 0
+	for _, i := range ifs {
+		probes += len(i.Broadcasts)
+	}
+	busy, err := net.ListenUDP("udp4", &net.UDPAddr{Port: escptest.FreeUDPPort(t)}) // does not share the port
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer busy.Close()
+	log, rec := newLogRecorder()
+	c, err := Dial(Config{MAC: macOne, Username: "admin", Password: "secret", Timeout: 80 * time.Millisecond, Logger: log,
+		SwitchPort: escptest.FreeUDPPort(t), HostPort: localPort(t, busy)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { c.Close() })
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	_, err = c.Info(ctx)
+
+	lines := rec.named("discovery probes")
+	if len(ifs) == 0 {
+		if !errors.Is(err, ErrNoInterface) || len(lines) != 0 {
+			t.Fatalf("a host with no usable interface: err %v, %d probe line(s); want ErrNoInterface and none", err, len(lines))
+		}
+		return
+	}
+	if len(lines) != 1 {
+		t.Fatalf("%d probe lines (err %v), want 1", len(lines), err)
+	}
+	if got, want := lines[0].attrs["interfaces"], int64(len(ifs)); got != want {
+		t.Errorf("the lookup used %v interfaces, want %d: those of the host", got, want)
+	}
+	if got, want := lines[0].attrs["probes"], int64(probes); got != want {
+		t.Errorf("the lookup sent %v probes, want %d: those of the host", got, want)
+	}
+}
