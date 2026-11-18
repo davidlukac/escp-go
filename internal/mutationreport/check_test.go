@@ -7,7 +7,9 @@ import (
 	"testing"
 )
 
-// reportOf is a gremlins report with the given number of mutants per outcome, in one file.
+// reportOf is a gremlins report with the given number of mutants per outcome, in one file, plus one
+// mutant of each other status gremlins has that is neither killed nor lived (NOT VIABLE, SKIPPED and
+// RUNNABLE): they were not decided, so they are in neither term of the efficacy.
 func reportOf(killed, timedOut, lived, notCovered int) string {
 	var mutants []string
 	add := func(n int, status string) {
@@ -19,6 +21,9 @@ func reportOf(killed, timedOut, lived, notCovered int) string {
 	add(timedOut, "TIMED OUT")
 	add(lived, "LIVED")
 	add(notCovered, "NOT COVERED")
+	add(1, "NOT VIABLE")
+	add(1, "SKIPPED")
+	add(1, "RUNNABLE")
 	return `{"files":[{"file_name":"a.go","mutations":[` + strings.Join(mutants, ",") + `]}]}`
 }
 
@@ -35,20 +40,20 @@ var efficacyCases = []struct {
 	wantText                       string // the efficacy as printed
 	wantDecided                    bool
 }{
-	{"only timeouts remain: gremlins has no figure, this passes", 0, 5, 0, 0, "90", exitOK, "100.0%", true},
-	{"timeouts lift a run over the threshold", 8, 2, 1, 0, "90", exitOK, "90.9%", true},
-	{"lived mutants dominate", 5, 1, 4, 0, "90", exitFailure, "60.0%", true},
-	{"timeouts do not hide survivors", 0, 1, 9, 0, "90", exitFailure, "10.0%", true},
-	{"timeouts alone, gremlins would divide by zero", 0, 3, 0, 2, "90", exitOK, "100.0%", true},
-	{"exactly at the threshold", 80, 10, 10, 0, "90", exitOK, "90.0%", true},
-	{"one mutant below the threshold", 80, 9, 11, 0, "90", exitFailure, "89.0%", true},
-	{"one mutant above the threshold", 80, 11, 9, 0, "90", exitOK, "91.0%", true},
-	{"no timeouts, exactly at the threshold", 9, 0, 1, 0, "90", exitOK, "90.0%", true},
-	{"no timeouts, below the threshold", 89, 0, 11, 0, "90", exitFailure, "89.0%", true},
-	{"a fractional threshold", 9, 0, 1, 0, "90.5", exitFailure, "90.0%", true},
-	{"threshold zero passes any figure", 0, 0, 4, 0, "0", exitOK, "0.0%", true},
-	{"threshold 100 needs every mutant caught", 99, 0, 1, 0, "100", exitFailure, "99.0%", true},
-	{"threshold 100 met", 3, 2, 0, 0, "100", exitOK, "100.0%", true},
+	{"only timeouts remain: gremlins has no figure, this passes", 0, 5, 0, 0, "90", exitOK, "100.00%", true},
+	{"timeouts lift a run over the threshold", 8, 2, 1, 0, "90", exitOK, "90.91%", true},
+	{"lived mutants dominate", 5, 1, 4, 0, "90", exitFailure, "60.00%", true},
+	{"timeouts do not hide survivors", 0, 1, 9, 0, "90", exitFailure, "10.00%", true},
+	{"timeouts alone, gremlins would divide by zero", 0, 3, 0, 2, "90", exitOK, "100.00%", true},
+	{"exactly at the threshold", 80, 10, 10, 0, "90", exitOK, "90.00%", true},
+	{"one mutant below the threshold", 80, 9, 11, 0, "90", exitFailure, "89.00%", true},
+	{"one mutant above the threshold", 80, 11, 9, 0, "90", exitOK, "91.00%", true},
+	{"no timeouts, exactly at the threshold", 9, 0, 1, 0, "90", exitOK, "90.00%", true},
+	{"no timeouts, below the threshold", 89, 0, 11, 0, "90", exitFailure, "89.00%", true},
+	{"a fractional threshold", 9, 0, 1, 0, "90.5", exitFailure, "90.00%", true},
+	{"threshold zero passes any figure", 0, 0, 4, 0, "0", exitOK, "0.00%", true},
+	{"threshold 100 needs every mutant caught", 99, 0, 1, 0, "100", exitFailure, "99.00%", true},
+	{"threshold 100 met", 3, 2, 0, 0, "100", exitOK, "100.00%", true},
 	{"no mutants at all", 0, 0, 0, 0, "90", exitFailure, "n/a", false},
 	{"only not covered mutants", 0, 0, 0, 4, "0", exitFailure, "n/a", false},
 }
@@ -89,7 +94,8 @@ func TestCheckFailsBelowTheThresholdAndPrintsOneLine(t *testing.T) {
 			if strings.Count(out, "\n") != 1 || !strings.HasPrefix(out, "mutation efficacy "+tc.wantText+" (") {
 				t.Errorf("not one line with the efficacy %s: %q", tc.wantText, out)
 			}
-			figures := fmt.Sprintf("killed %d, timed out %d, lived %d", tc.killed, tc.timedOut, tc.lived)
+			figures := fmt.Sprintf("caught %d of %d: killed %d, timed out %d, lived %d",
+				tc.killed+tc.timedOut, tc.killed+tc.timedOut+tc.lived, tc.killed, tc.timedOut, tc.lived)
 			if !strings.Contains(out, figures) || !strings.Contains(out, tc.threshold+"%") {
 				t.Errorf("line lacks %q or the threshold %s: %q", figures, tc.threshold, out)
 			}
@@ -167,7 +173,8 @@ func TestCheckNeedsAReportAndAThreshold(t *testing.T) {
 
 const timedOutReport = `{"files":[
  {"file_name":"a.go","mutations":[{"type":"CONDITIONALS_NEGATION","status":"TIMED OUT","line":3,"column":4},{"type":"ARITHMETIC_BASE","status":"LIVED","line":9,"column":2}]},
- {"file_name":"b.go","mutations":[{"type":"INCREMENT_DECREMENT","status":"TIMED OUT","line":7,"column":1},{"type":"X","status":"KILLED","line":1,"column":1}]}
+ {"file_name":"b.go","mutations":[{"type":"INCREMENT_DECREMENT","status":"TIMED OUT","line":7,"column":1},{"type":"X","status":"KILLED","line":1,"column":1},
+  {"type":"NV","status":"NOT VIABLE","line":5,"column":1},{"type":"SK","status":"SKIPPED","line":6,"column":1},{"type":"RU","status":"RUNNABLE","line":8,"column":1}]}
 ]}`
 
 func TestTheSummariesShowTheTimedOutCountAndTheMutants(t *testing.T) {
@@ -176,14 +183,19 @@ func TestTheSummariesShowTheTimedOutCountAndTheMutants(t *testing.T) {
 		t.Run(fmt.Sprint(command), func(t *testing.T) {
 			_, out, _ := runWith(t, append(command, writeReport(t, timedOutReport))...)
 			for _, want := range []string{ // subtests: the fragments are checks of one output, not cases
-				"KILLED: 1, LIVED: 1, TIMED OUT: 2",
-				"**Survivors: 1.** Efficacy: 75.0% (killed 1 and timed out 2 of the 4 that were run and decided).",
+				"KILLED: 1, LIVED: 1, NOT VIABLE: 1, RUNNABLE: 1, SKIPPED: 1, TIMED OUT: 2",
+				"**Survivors: 1.** Efficacy: 75.00% (killed 1 and timed out 2 of the 4 that were run and decided).",
 				fmt.Sprintf(timedOutLine, 2),
 				timedOutHeading + "\n\n- `a.go:3:4` CONDITIONALS_NEGATION\n- `b.go:7:1` INCREMENT_DECREMENT\n",
 				"Surviving mutants (a behavior no test pins; an equivalent mutant is not a reason to bend a test):\n\n- `a.go:9:2` ARITHMETIC_BASE\n",
 			} {
 				if !strings.Contains(out, want) {
 					t.Errorf("summary lacks %q:\n%s", want, out)
+				}
+			}
+			for _, other := range []string{"b.go:5:1", "b.go:6:1", "b.go:8:1"} { // subtests: three fragments of one output
+				if strings.Contains(out, other) {
+					t.Errorf("a mutant that was neither killed, lived nor timed out is listed (%s):\n%s", other, out)
 				}
 			}
 			if strings.Index(out, timedOutHeading) > strings.Index(out, "Surviving mutants") {
@@ -201,5 +213,45 @@ func TestTheSummariesListNoTimedOutMutantsWhenThereAreNone(t *testing.T) {
 				t.Errorf("want the count of zero and no list:\n%s", out)
 			}
 		})
+	}
+}
+
+// 1799 of 1999 is 89.995%: below 90, so the check fails, and the line must not read like a pass: two
+// decimals and the exact counts.
+func TestACheckBelowTheThresholdByLessThanAHundredthShowsTheExactCounts(t *testing.T) {
+	code, out, _ := runWith(t, "check", writeReport(t, reportOf(1799, 0, 200, 0)), "90")
+	if code != exitFailure || !strings.Contains(out, "caught 1799 of 1999") || !strings.HasSuffix(out, "is below the threshold 90%: FAIL\n") {
+		t.Errorf("code %d, output %q", code, out)
+	}
+	if code, out, _ := runWith(t, "check", writeReport(t, reportOf(1800, 0, 199, 0)), "90"); code != exitOK || !strings.Contains(out, "caught 1800 of 1999") {
+		t.Errorf("one mutant more: code %d, output %q", code, out)
+	}
+}
+
+func TestACheckOfAReportWithoutMutantsFails(t *testing.T) {
+	code, out, _ := runWith(t, "check", writeReport(t, `{"files":[]}`), "0")
+	if code != exitFailure || !strings.Contains(out, "nothing to judge") {
+		t.Errorf("code %d, output %q", code, out)
+	}
+}
+
+func TestTheThresholdCommandValidatesWithoutAReport(t *testing.T) {
+	tests := []struct {
+		threshold string
+		want      int
+	}{
+		{"90", exitOK}, {"0", exitOK}, {"100", exitOK}, {"92.5", exitOK},
+		{"", exitUsage}, {"90%", exitUsage}, {"-1", exitUsage}, {"101", exitUsage}, {"NaN", exitUsage},
+	}
+	for _, tt := range tests {
+		t.Run(tt.threshold, func(t *testing.T) {
+			code, out, errOut := runWith(t, "threshold", tt.threshold)
+			if code != tt.want || out != "" || (tt.want != exitOK) != strings.Contains(errOut, "not a percentage from 0 to 100") {
+				t.Errorf("code %d (want %d), stdout %q, stderr %q", code, tt.want, out, errOut)
+			}
+		})
+	}
+	if code, _, errOut := runWith(t, "threshold"); code != exitUsage || !strings.Contains(errOut, "usage") {
+		t.Errorf("without an argument: code %d, stderr %q", code, errOut)
 	}
 }
