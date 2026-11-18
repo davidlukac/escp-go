@@ -57,8 +57,10 @@ actionlint:
 # The security of the workflow files, with zizmor at its default severity and persona (what a workflow
 # may do and how untrusted input reaches it; CONTRIBUTING.md). It is a Python program, not a Go tool, so
 # it is not in devtools/go.mod: the version is pinned, with hashes, in devtools/zizmor/requirements.txt, which
-# CI installs and Dependabot bumps. It runs online (the audits that look up an action's history)
-# when a GitHub token is in GH_TOKEN or GITHUB_TOKEN, offline otherwise. Not part of the pre-commit hook.
+# CI installs and Dependabot bumps. scripts/zizmor.sh builds the command line, with fixed options so that
+# the result does not depend on files in the checked-out tree: it runs online (the audits that look up
+# an action's history) when a GitHub token is in GH_TOKEN or GITHUB_TOKEN, offline otherwise. Not part
+# of the pre-commit hook.
 .PHONY: zizmor
 zizmor:
 	@command -v zizmor >/dev/null 2>&1 || { \
@@ -69,7 +71,7 @@ zizmor:
 	@pin="$$(sed -n 's/^zizmor==\([0-9][0-9.]*\).*/\1/p' devtools/zizmor/requirements.txt)"; \
 	have="$$(zizmor --version | awk '{print $$2}')"; \
 	[ "$$have" = "$$pin" ] || echo "warning: zizmor $$have is installed, devtools/zizmor/requirements.txt pins $$pin"
-	@if [ -n "$$GH_TOKEN$$GITHUB_TOKEN" ]; then zizmor --no-progress .github/; else echo "no GH_TOKEN: offline audits only"; zizmor --offline --no-progress .github/; fi
+	@scripts/zizmor.sh
 
 # Records GitHub's own rendering of the descriptions in internal/mergereadiness/readiness/testdata/oracle
 # (NN-name.md -> NN-name.html), the ground truth the tests of the "Merge readiness" check compare the
