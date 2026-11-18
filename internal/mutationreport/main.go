@@ -11,6 +11,7 @@
 //	go run ./internal/mutationreport badge build/mutation.json > mutation.json
 //	go run ./internal/mutationreport check build/mutation.json 90
 //	go run ./internal/mutationreport threshold 90
+//	go run ./internal/mutationreport coefficient 10
 //	go run ./internal/mutationreport extended build/mutation-extended.json >> "$GITHUB_STEP_SUMMARY"
 package main
 
@@ -58,7 +59,7 @@ func main() { os.Exit(run(os.Args[1:], os.Stdout, os.Stderr)) }
 
 // usage is what the command prints for a command line it does not understand.
 const usage = "usage: mutationreport REPORT.json | mutationreport badge REPORT.json | " +
-	"mutationreport check REPORT.json THRESHOLD | mutationreport threshold THRESHOLD | mutationreport extended REPORT.json"
+	"mutationreport check REPORT.json THRESHOLD | mutationreport threshold THRESHOLD | mutationreport coefficient N | mutationreport extended REPORT.json"
 
 // run is the whole command: args are the command line without the program name.
 func run(args []string, stdout, stderr io.Writer) int {
@@ -69,6 +70,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return writeExtended(args[1], stdout)
 	case len(args) == 2 && args[0] == "threshold":
 		return writeThreshold(args[1], stderr)
+	case len(args) == 2 && args[0] == "coefficient":
+		return writeCoefficient(args[1], stderr)
 	case len(args) == 3 && args[0] == "check":
 		return writeCheck(args[1], args[2], stdout, stderr)
 	case len(args) == 1 && !isCommand(args[0]):
@@ -81,7 +84,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 // isCommand says whether word is the name of a subcommand: a lone one is a command line missing its
 // arguments, not the path of a report.
 func isCommand(word string) bool {
-	return word == "badge" || word == "check" || word == "extended" || word == "threshold"
+	return word == "badge" || word == "check" || word == "extended" || word == "threshold" || word == "coefficient"
 }
 
 // writeSummary prints the job summary of a run of `make mutation`. A report that cannot be read is

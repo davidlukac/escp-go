@@ -108,3 +108,17 @@ func writeCheck(path, threshold string, stdout, stderr io.Writer) int {
 	_, _ = fmt.Fprintf(stdout, "mutation efficacy %s (%s) reaches the threshold %s%%: ok\n", t.efficacyText(), figures, threshold)
 	return exitOK
 }
+
+// writeCoefficient is the `coefficient` command: it exits 0 when text is a positive integer and says
+// why on stderr, with exit code 2, when it is not. gremlins multiplies the time of its coverage run
+// by it to get the time each mutant has, and a mutant that outlives that time is TIMED OUT, which the
+// efficacy counts as killed: a negative value makes every mutant time out at once and the gate pass on
+// no evidence, and gremlins takes 0 for its default 3. `make` runs it before gremlins, as it runs
+// `threshold`.
+func writeCoefficient(text string, stderr io.Writer) int {
+	if n, err := strconv.Atoi(text); err != nil || n < 1 {
+		_, _ = fmt.Fprintf(stderr, "mutationreport: the timeout coefficient %q is not a positive integer\n", text)
+		return exitUsage
+	}
+	return exitOK
+}
