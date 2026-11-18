@@ -5,7 +5,7 @@
 # Dependabot bumps them there. `go tool` builds the pinned version on first use (cached afterwards).
 DEVTOOL := go tool -modfile=devtools/go.mod
 
-.PHONY: test lint spell actionlint modcheck vuln cover cover-html apidiff fuzz mutation mutation-diff mutation-extended pkgdoc pkgdoc-serve compat-table settings-docs soak soak-idle soak-single soak-loaded hooks pre-commit
+.PHONY: test lint spell actionlint modcheck vuln cover cover-html apidiff fuzz mutation mutation-diff mutation-extended pkgdoc pkgdoc-serve compat-table settings-docs soak soak-idle soak-single soak-loaded hooks pre-commit mergereadiness
 
 # Unit tests against the fake switch. No hardware is touched.
 test:
@@ -88,7 +88,7 @@ modcheck:
 #                 and nothing else (devtools/lintcheck; about a second). A rule whose pattern stops
 #                 matching, an exclusion that swallows a fixture or a rule that was relaxed fails here.
 .PHONY: catalogcheck guarantee lintfixtures
-lint: catalogcheck guarantee lintfixtures
+lint: catalogcheck guarantee lintfixtures mergereadiness
 
 catalogcheck:
 	go -C devtools build -o $(CURDIR)/build/catalogcheck ./catalogcheck
@@ -101,6 +101,12 @@ guarantee:
 lintfixtures:
 	go -C devtools build -o $(CURDIR)/build/lintcheck ./lintcheck
 	build/lintcheck -root . -lint "$$($(DEVTOOL) -n golangci-lint)"
+
+# The parser of the "Merge readiness" section of a pull request description (scripts/merge-readiness.py,
+# run by .github/workflows/merge-readiness.yml; python3 and its standard library only) and its tests,
+# a prerequisite of `lint` like the checks above.
+mergereadiness:
+	PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts -p '*_test.py'
 
 # Known vulnerabilities in the code and its dependencies.
 vuln:

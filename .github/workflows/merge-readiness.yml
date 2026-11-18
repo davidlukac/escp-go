@@ -1,0 +1,43 @@
+# The "Merge readiness" check: a pull request whose description has a "Merge readiness" section
+# (the pull request template ends with one) is red while a box of that section is unticked, and
+# the job output lists the boxes. A description without the section (an outside contributor's,
+# Dependabot's, an older pull request's) passes with a message. Making this a required check is a
+# repository setting, not something this file can do.
+#
+# It is its own workflow and not a job of test.yml because it must run when the description is
+# edited (`edited`), which the default triggers of a pull request do not include. It is cheap:
+# python3 is on the runner, the parser (scripts/merge-readiness.py, tested by `make mergereadiness`)
+# uses its standard library only, and no setup action runs.
+#
+# The description is untrusted input: it reaches the script through an environment variable and is
+# never interpolated into a `run:` text. The job needs no secret and only reads the repository, so a
+# pull request from a fork runs it with the same read-only token.
+name: Merge readiness
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, ready_for_review, converted_to_draft]
+
+# One run per pull request: an edit while the previous run is queued or running supersedes it.
+concurrency:
+  group: merge-readiness-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  merge-readiness:
+    name: Merge readiness
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Boxes of the merge readiness section are ticked
+        run: python3 scripts/merge-readiness.py
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
