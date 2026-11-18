@@ -113,7 +113,15 @@ fuzz:
 # survives is a behavior no test pins. `make mutation` runs them all (about 15 minutes with 8 workers;
 # EFFICACY=90 fails below that share of caught mutants, WORKERS=n sets the parallelism, default 4);
 # `make mutation-diff` only the lines changed since BASE (default origin/main), which is what a pull
-# request runs. The report is build/mutation.json. Left out: the fake switch (escptest, judged by the
+# request runs. The report is build/mutation.json.
+# The efficacy is (killed + timed out) / (killed + timed out + lived): a mutant that makes the tests hang
+# is noticed by the test run, which is a kill (PIT and Stryker count it so), whereas gremlins leaves a
+# timed-out mutant out of its own figure. So gremlins runs without --threshold-efficacy, and with
+# EFFICACY set `make mutation` then runs `internal/mutationreport check` on the report, which applies
+# that definition (the summary and the badge use the same function). The timed-out count is reported on
+# a line of its own, with the mutants, and an unexplained rise is investigated: a slow test, a cached
+# baseline (see GOFLAGS below), or a real infinite loop. A report with no mutant that was run and
+# decided has no efficacy, and the check fails on it. Left out: the fake switch (escptest, judged by the
 # tests of the code that uses it) and the programs (the coverage tool, the report tool, the release, fuzz and documentation tools, the example, and the
 # devtools module, whose analyzer has fixtures of its own and no test in this module that gremlins could attribute to it):
 # gremlins reports every mutant in a `package main` as surviving whatever the tests do (a mutant applied
@@ -126,7 +134,7 @@ PKG_DIRS := $(patsubst ./%,%,$(sort $(shell find . -name '*.go' -not -path './bu
 PKG_EXCLUDES := $(if $(PKG),$(foreach d,$(filter-out $(PKG),$(PKG_DIRS)),-E '^$(if $(filter .,$(d)),,$(d)/)[^/]+$$'))
 GREMLINS := GOFLAGS=-count=1 $(DEVTOOL) gremlins unleash . --workers $(or $(WORKERS),4) --coverpkg ./... $(PKG_EXCLUDES) \
 	-E '^escptest/' -E '^internal/coverpolicy/' -E '^internal/mutationreport/' -E '^internal/release/' -E '^internal/seams/' -E '^internal/fuzzrun/' -E '^internal/soak/' -E '^internal/pkgdoc/' -E '^devtools/' -E '^examples/'
-MUTATE := $(GREMLINS) --output build/mutation.json $(if $(EFFICACY),--threshold-efficacy $(EFFICACY))
+MUTATE := $(GREMLINS) --output build/mutation.json
 
 # The extended operators: the ones gremlins ships and leaves off (invert-logical swaps && and ||,
 # invert-assignments turns += into -=, invert-bitwise swaps & | ^ << >>, invert-bwassign the same for
@@ -135,7 +143,8 @@ MUTATE := $(GREMLINS) --output build/mutation.json $(if $(EFFICACY),--threshold-
 # are two disjoint sets and their numbers add up. `make mutation-extended` runs them over the module
 # (a quarter of an hour or more with 4 workers) into build/mutation-extended.json; PKG=model limits a
 # run to one directory (the quick way to look at one area; PKG works for the other mutation targets too). Informational: there is no efficacy threshold on
-# purpose, the weekly workflow runs it with continue-on-error and prints the survivors in its summary.
+# purpose, the weekly workflow runs it with continue-on-error and prints the survivors and the timed-out
+# mutants in its summary.
 EXTENDED_ON := --invert-assignments --invert-bitwise --invert-bwassign --invert-logical --invert-loopctrl --remove-self-assignments
 DEFAULTS_OFF := --arithmetic-base=false --conditionals-boundary=false --conditionals-negation=false --increment-decrement=false --invert-negatives=false
 MUTATE_EXTENDED := $(GREMLINS) --output build/mutation-extended.json $(DEFAULTS_OFF) $(EXTENDED_ON)
@@ -145,6 +154,9 @@ MUTATE_EXTENDED := $(GREMLINS) --output build/mutation-extended.json $(DEFAULTS_
 mutation:
 	@mkdir -p build
 	$(MUTATE)
+ifneq ($(EFFICACY),)
+	go run ./internal/mutationreport check build/mutation.json $(EFFICACY)
+endif
 
 mutation-diff:
 	@mkdir -p build
