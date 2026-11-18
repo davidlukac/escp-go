@@ -1,10 +1,11 @@
 #!/bin/sh
 # Runs zizmor over a whole repository (the root given, default: the current directory: the workflows,
-# every composite action wherever it is, the Dependabot configuration) with fixed options, so that the result does not depend on files in the checked-out tree: no
-# configuration file is read (--no-config), every workflow is collected, whatever an ignore file
-# says (--collect=all), and a file that cannot be loaded fails the run instead of being skipped with a
-# warning (--strict-collection). It is the one place the command line is built: `make zizmor` calls
-# it, and so do the probes of scripts/check-zizmor-options.sh.
+# every composite action wherever it is, the Dependabot configuration) with fixed options, so that
+# the result does not depend on files in the checked-out tree: no configuration file is read
+# (--no-config), every workflow is collected, whatever an ignore file says (--collect=all), and a
+# file that cannot be loaded fails the run instead of being skipped with a warning
+# (--strict-collection). It is the one place the command line is built: `make zizmor` calls it, and
+# so do the probes of scripts/check-zizmor-options.sh.
 #
 # The findings are judged against an exact expectation, not against zizmor's own exit status: zizmor is
 # run with --no-ignores, so an ignore comment in a workflow changes nothing, and the run passes only
@@ -16,11 +17,20 @@
 #
 # It audits online (the audits that look up an action's history) when a GitHub token is in GH_TOKEN
 # or GITHUB_TOKEN, offline otherwise. An empty variable counts as no token. It needs python3, which
-# zizmor's own installation already needs (it is a PyPI package), to read zizmor's JSON.
+# zizmor's own installation already needs (it is a PyPI package), to read zizmor's JSON; the reader
+# runs isolated (-I), so a file of the audited tree that is named like a module it imports is not
+# picked up.
 set -eu
 
 root=${1:-.}
 expected=${ZIZMOR_SELF_REPOSITORY_FINDINGS:?set it to the number of self-repository findings the workflows may carry}
+case $expected in
+'' | *[!0-9]*)
+	echo "ZIZMOR_SELF_REPOSITORY_FINDINGS must be a plain non-negative integer, not '$expected'" >&2
+	exit 1
+	;;
+*) ;;
+esac
 cd "$root"
 
 links=$(find .github -type l)
@@ -71,7 +81,9 @@ audit() {
 findings=$(mktemp)
 trap 'rm -f "$findings"' EXIT
 # --no-exit-codes: a finding is not a failure here, the verdict is below; a tool failure still is.
-audit --no-ignores --no-exit-codes --format json >"$findings"
+# The format is named (json-v1, which is also what `json` means in 1.32.0), so that a change of the
+# default is not read as a different answer.
+audit --no-ignores --no-exit-codes --format json-v1 >"$findings"
 
 verdict=$(cat <<'PY'
 import json
@@ -80,6 +92,10 @@ import sys
 expected = int(sys.argv[1])
 with open(sys.argv[2], encoding="utf-8") as handle:
     findings = json.load(handle)
+
+if not isinstance(findings, list):
+    print("zizmor printed %s, not a list of findings" % type(findings).__name__, file=sys.stderr)
+    sys.exit(1)
 
 def place(finding):
     for location in finding["locations"]:

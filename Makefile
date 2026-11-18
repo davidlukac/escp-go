@@ -64,9 +64,10 @@ actionlint:
 #
 # The findings are an exact allow-list: zizmor is run with --no-ignores (an ignore comment changes
 # nothing) and the run passes only when it reports this many `self-repository` findings (one per use of
-# the local setup action, which the workflows write as `./.github/actions/setup`) and nothing else. A new
-# finding, a new use or a removed one is a deliberate edit of this number in the same pull request. The
-# number goes away, with the comments on those uses, when actionlint accepts the `$/` form of a local
+# the local setup action, which the workflows write as `./.github/actions/setup`) and nothing else. The
+# rule is counted, not located: a use of another local action that the rule also reports counts the same,
+# and is audited itself because the whole repository is the input. A new finding, a new use or a
+# removed one is a deliberate edit of this number in the same pull request. The number goes away, with the comments on those uses, when actionlint accepts the `$/` form of a local
 # action (rhysd/actionlint#711).
 ZIZMOR_SELF_REPOSITORY_FINDINGS := 13
 

@@ -303,21 +303,25 @@ cat >"$stubs/zizmor" <<'SH'
 #!/bin/sh
 printf '%s\n' "$@" >"$STUB_OUT/args"
 env >"$STUB_OUT/env"
-echo '[]'
+echo "${STUB_JSON:-[]}"
 SH
 chmod +x "$stubs/zizmor"
 
-# stub_run NAME [VAR=value ...]: scripts/zizmor.sh with the stub first on the PATH, in an otherwise empty
+# stub_call [VAR=value ...]: scripts/zizmor.sh with the stub first on the PATH, in an otherwise empty
 # environment, with the variables of the arguments and with those that must be removed.
+stub_call() {
+	status=0
+	env -i PATH="$stubs:$PATH" STUB_OUT="$scratch" ZIZMOR_SELF_REPOSITORY_FINDINGS=0 \
+		ZIZMOR_OFFLINE=true ZIZMOR_NO_ONLINE_AUDITS=true ZIZMOR_CONFIG=/nonexistent GH_HOST=example.invalid \
+		ZIZMOR_GITHUB_TOKEN=z "$@" "$repo/scripts/zizmor.sh" "$dir" >"$scratch/out" 2>&1 || status=$?
+}
+# stub_run NAME [VAR=value ...]: stub_call, which must pass.
 stub_run() {
 	stub_name=$1
 	shift
 	fresh
 	rm -f "$scratch/args" "$scratch/env"
-	status=0
-	env -i PATH="$stubs:$PATH" STUB_OUT="$scratch" ZIZMOR_SELF_REPOSITORY_FINDINGS=0 \
-		ZIZMOR_OFFLINE=true ZIZMOR_NO_ONLINE_AUDITS=true ZIZMOR_CONFIG=/nonexistent GH_HOST=example.invalid \
-		ZIZMOR_GITHUB_TOKEN=z "$@" "$repo/scripts/zizmor.sh" "$dir" >"$scratch/out" 2>&1 || status=$?
+	stub_call "$@"
 	if [ "$status" -ne 0 ]; then
 		echo "FAIL  $stub_name: the script failed with exit $status"
 		stub_ok=0
@@ -342,7 +346,7 @@ fixed_options() {
 	for arg in --no-config --collect=all --strict-collection --no-progress --no-ignores --no-exit-codes .; do
 		check has_arg "$arg"
 	done
-	check has_arg json
+	check has_arg json-v1
 }
 no_audit_variable() {
 	for name in ZIZMOR_OFFLINE ZIZMOR_NO_ONLINE_AUDITS ZIZMOR_CONFIG GH_HOST ZIZMOR_GITHUB_TOKEN; do
@@ -385,6 +389,42 @@ check lacks_arg --offline
 check has_env GH_TOKEN=second
 check lacks_env GITHUB_TOKEN
 [ "$stub_ok" = 1 ] && echo "ok    GITHUB_TOKEN alone is passed on as GH_TOKEN"
+
+# stub_refuse NAME [VAR=value ...]: stub_call, which must fail, and the stub must not have been the reason
+# (an answer or an expectation that cannot be trusted is refused, not read as no findings).
+stub_refuse() {
+	stub_name=$1
+	shift
+	fresh
+	stub_call "$@"
+	if [ "$status" -ne 0 ]; then
+		echo "ok    $stub_name is refused"
+		return
+	fi
+	echo "FAIL  $stub_name: wanted a refusal, the script passed"
+	failures=$((failures + 1))
+}
+stub_refuse "an answer that is an object and not a list" 'STUB_JSON={}'
+stub_refuse "an answer that is null" 'STUB_JSON=null'
+stub_refuse "an expected count with a leading space" 'ZIZMOR_SELF_REPOSITORY_FINDINGS= 0'
+stub_refuse "an expected count with a trailing space" 'ZIZMOR_SELF_REPOSITORY_FINDINGS=0 '
+stub_refuse "a negative expected count" 'ZIZMOR_SELF_REPOSITORY_FINDINGS=-1'
+stub_refuse "an expected count that is not a number" 'ZIZMOR_SELF_REPOSITORY_FINDINGS=1x'
+stub_refuse "an empty expected count" 'ZIZMOR_SELF_REPOSITORY_FINDINGS='
+
+# The reader of zizmor's answer runs isolated from the audited tree: a module of the name it imports
+# at the root of the repository, next to a real finding, must not change the verdict.
+shadow_the_reader() {
+	cat >"$1/json.py" <<'PY'
+def load(handle):
+    return []
+PY
+}
+fresh
+add_finding "$dir"
+shadow_the_reader "$dir"
+run "$dir"
+expect_fail "a module named json in the audited tree" "$finding_rule"
 
 if [ "$failures" -ne 0 ]; then
 	echo "check-zizmor-options: $failures probe(s) failed" >&2

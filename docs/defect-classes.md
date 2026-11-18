@@ -165,7 +165,7 @@ AUTOMATION names each check by kind and name, so that a test can verify that the
 
 **Why.** Running the release workflow again for a tag from before an example program existed failed (#176), and its fresh-module check called a function that had moved (#131). A burst of merges canceled the runs on `main` and the badge read as failing (#94).
 
-**Design question.** What runs on a tag, with which secrets, triggered by whom, and can it be run again? Which inputs does a gate read from the tree it checks, and what does each one switch off?
+**Design question.** What runs on a tag, with which secrets, triggered by whom, and can it be run again? Which inputs does a gate read from the tree it checks, and what does each one switch off? A gate that parses a tool's output also isolates its own interpreter from the audited tree and probes that.
 
 **Test requirement.** A dry run in CI for every publishing step (a snapshot build, an install check); every workflow linted. One probe per off-switch of a gate that reads its own configuration from the tree it checks: a copy of the tree with a deliberate finding and that input must still fail. Enumerate every flag and every environment variable of the tool, and for each state why it is fixed or why it cannot matter; a stub of the tool that records its arguments and environment proves the ones that only change the command line.
 
