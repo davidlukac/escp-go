@@ -6,8 +6,9 @@
 #     Dependabot keeps the SHAs current.
 #   * Steps call the Makefile, so a local `make <target>` reproduces CI.
 #   * Shared setup lives in .github/actions/setup. It is referenced as `./.github/actions/setup` with
-#     `# zizmor: ignore[self-repository]`: the `$/` form zizmor prefers is not yet accepted by the
-#     pinned actionlint (rhysd/actionlint#711), so each use carries the ignore until it is.
+#     an inline zizmor ignore comment for the `self-repository` rule: the `$/` form zizmor prefers is
+#     not yet accepted by the pinned actionlint (rhysd/actionlint#711), so each use carries the
+#     ignore until it is. They are the only ones allowed, counted by `make zizmor`.
 #   * Every workflow is checked by actionlint (syntax) and zizmor (security): `make actionlint zizmor`.
 name: Tests
 
