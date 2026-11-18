@@ -25,7 +25,11 @@
 set -eu
 cd "$(dirname "$0")/.."
 
-make=${MAKE:-make}
+# mk ARGUMENT...: make, as a fresh run: GNU make 4 prints "Entering directory" lines when it runs
+# inside another make (`make lint`), and the command-line variables of the outer one travel in MAKEFLAGS.
+mk() {
+	env -u MAKEFLAGS -u MFLAGS -u MAKELEVEL "${MAKE:-make}" --no-print-directory "$@"
+}
 out=$(mktemp)
 want=$(mktemp)
 got=$(mktemp)
@@ -89,7 +93,7 @@ gremlins_has() {
 
 # recipe_of ARGUMENT...: what `make -n` prints for the arguments, into $out.
 recipe_of() {
-	"$make" -n "$@" >"$out"
+	mk -n "$@" >"$out"
 }
 
 for coefficient in 10 20; do
@@ -100,7 +104,7 @@ for coefficient in 10 20; do
 			if [ "$how" = command ]; then
 				recipe_of "$target" TIMEOUT_COEFFICIENT=$coefficient
 			else
-				env TIMEOUT_COEFFICIENT=$coefficient "$make" -n "$target" >"$out"
+				(TIMEOUT_COEFFICIENT=$coefficient && export TIMEOUT_COEFFICIENT && mk -n "$target" >"$out")
 			fi
 			case $target in
 			mutation)
@@ -124,8 +128,8 @@ done
 
 # EFFICACY set: to two values (so that a hardcoded one fails), empty and of spaces (an error, never a
 # skip), and from the environment (the workflow's way is the command line).
-# efficacy_case GIVEN SEEN: EFFICACY=GIVEN on the command line; make hands the recipe SEEN (it strips a
-# value of spaces to nothing, so both are an explicit empty value).
+# efficacy_case GIVEN SEEN: EFFICACY=GIVEN on the command line; make hands the recipe SEEN. A value of
+# spaces is only tried by its exit code below: make 3.81 strips it to nothing and make 4 keeps it.
 efficacy_case() {
 	value=$2
 	for target in mutation mutation-diff; do
@@ -140,18 +144,17 @@ efficacy_case() {
 }
 efficacy_case 90 90
 efficacy_case 85.5 85.5
-efficacy_case ' ' ''
 efficacy_case '' ''
 
-env EFFICACY=90 "$make" -n mutation >"$out"
+(EFFICACY=90 && export EFFICACY && mk -n mutation >"$out")
 expect "mutation with EFFICACY=90 in the environment" 'mkdir -p build' "rm -f $report" "go run $check threshold \"90\"" "go run $check coefficient \"10\"" GREMLINS "go run $check check $report \"90\""
 
 # the extended run is informational: never a threshold, never a check, whatever EFFICACY says.
-"$make" -n mutation-extended EFFICACY=90 >"$out"
+mk -n mutation-extended EFFICACY=90 >"$out"
 expect "mutation-extended with EFFICACY=90" 'mkdir -p build' "go run $check coefficient \"10\"" GREMLINS
 
 # --diff takes BASE.
-"$make" -n mutation-diff BASE=v1.2.3 >"$out"
+mk -n mutation-diff BASE=v1.2.3 >"$out"
 grep -F -e 'gremlins unleash' "$out" >"$gremlins" || true
 gremlins_has "mutation-diff with BASE" " --output $report --diff v1.2.3" "--timeout-coefficient 10"
 
@@ -199,7 +202,7 @@ exits() {
 	want_zero=$1
 	label=$2
 	shift 2
-	if "$make" "$@" >/dev/null 2>&1; then
+	if mk "$@" >/dev/null 2>&1; then
 		[ "$want_zero" = 0 ] || fail "$label: make succeeded and must fail"
 	else
 		[ "$want_zero" = 1 ] || fail "$label: make failed and must succeed"
@@ -211,7 +214,7 @@ refuses() {
 	label=$1
 	shift
 	: >"$standin_log"
-	if "$make" "$@" >/dev/null 2>&1; then
+	if mk "$@" >/dev/null 2>&1; then
 		fail "$label: make succeeded and must fail"
 	elif [ -s "$standin_log" ]; then
 		fail "$label: make failed, but only after gremlins was started"
@@ -231,6 +234,7 @@ for target in mutation mutation-diff; do
 	use_report "$good_report"
 	refuses "$target with a bad threshold" "$target" EFFICACY=90% MUTATE="sh $standin"
 	refuses "$target with an empty threshold" "$target" EFFICACY= MUTATE="sh $standin"
+	refuses "$target with a threshold of spaces" "$target" EFFICACY=" " MUTATE="sh $standin"
 	exits 0 "$target without a threshold" "$target" MUTATE="sh $standin"
 	for coefficient in -1 0 abc 1.5 ''; do
 		refuses "$target with the coefficient '$coefficient'" "$target" TIMEOUT_COEFFICIENT="$coefficient" MUTATE="sh $standin"
@@ -243,7 +247,7 @@ done
 exits 0 "mutation-extended" mutation-extended MUTATE_EXTENDED=true
 
 # the recipe is part of what `make lint` runs.
-"$make" -n lint >"$out"
+mk -n lint >"$out"
 grep -q -x -F 'scripts/check-mutation-recipe.sh' "$out" || fail "make lint does not run this script"
 
 exit "$failed"
