@@ -93,6 +93,10 @@ jobs:
         run: make zizmor
         env:
           GH_TOKEN: ${{ github.token }}
+      - name: Prove that the options hold
+        run: make zizmorcheck
+        env:
+          ZIZMOR_REQUIRED: "1"
 
   # Go matrix: "go.mod" is the minimum the module declares (the supported floor),
   # "stable" is the newest release and catches toolchain regressions early.

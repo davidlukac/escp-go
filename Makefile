@@ -101,7 +101,7 @@ modcheck:
 	go mod verify
 	go -C devtools mod verify
 
-# Three checks of the project's own, run by `make lint` (they are prerequisites of it, so a change to the
+# Four checks of the project's own, run by `make lint` (they are prerequisites of it, so a change to the
 # lint recipe does not touch them):
 #   catalogcheck  every name the defect catalog gives to a check resolves: a renamed test or a removed
 #                 target fails here (devtools/catalogcheck; it exits 1 with one line per problem);
@@ -113,9 +113,14 @@ modcheck:
 #                 violation of each rule and, in the places a rule leaves out, code that must stay clean,
 #                 and the findings are compared with devtools/lintfixtures/expected.txt, every one present
 #                 and nothing else (devtools/lintcheck; about a second). A rule whose pattern stops
-#                 matching, an exclusion that swallows a fixture or a rule that was relaxed fails here.
-.PHONY: catalogcheck guarantee lintfixtures mutationrecipe recipemutants
-lint: catalogcheck guarantee lintfixtures mutationrecipe
+#                 matching, an exclusion that swallows a fixture or a rule that was relaxed fails here;
+#   zizmorcheck   scripts/zizmor.sh, the command `make zizmor` runs, still reports a deliberate finding
+#                 next to each input the audited tree can carry (a configuration file, an ignore file, an
+#                 extra inline suppression; scripts/check-zizmor-options.sh, offline). It needs the pinned
+#                 zizmor: without it the check says so and passes, and the `zizmor` jobs of CI, which
+#                 install it, set ZIZMOR_REQUIRED so that it cannot be skipped there.
+.PHONY: catalogcheck guarantee lintfixtures mutationrecipe recipemutants zizmorcheck
+lint: catalogcheck guarantee lintfixtures mutationrecipe zizmorcheck
 
 # The mutation recipes (devtools/recipecheck): `make -n` of the three mutation targets with the
 # variables the jobs use, every recipe line compared whole, and make run with a stand-in for gremlins to
@@ -162,6 +167,9 @@ lint: deadcode
 deadcode:
 	$(DEVTOOL) golangci-lint run --config .golangci-deadcode.yml ./...
 	$(DEVTOOL) golangci-lint run --config .golangci-deadcode.yml --build-tags live ./...
+
+zizmorcheck:
+	@ZIZMOR_SELF_REPOSITORY_IGNORES=$(ZIZMOR_SELF_REPOSITORY_IGNORES) scripts/check-zizmor-options.sh
 
 # Known vulnerabilities in the code and its dependencies.
 vuln:
