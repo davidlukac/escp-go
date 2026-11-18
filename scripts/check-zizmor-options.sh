@@ -137,6 +137,25 @@ link_a_directory() {
 	add_action_outside_github "$1"
 	ln -s ../../ci "$1/.github/actions/linked"
 }
+# write_clean_workflow FILE: a workflow without a finding, for a link whose target is fine in itself.
+write_clean_workflow() {
+	cat >"$1" <<'YAML'
+name: Clean
+on: pull_request
+permissions: {}
+jobs:
+  clean:
+    runs-on: ubuntu-24.04
+    permissions: {}
+    steps:
+      - run: echo clean
+YAML
+}
+link_a_clean_workflow() {
+	mkdir "$1/elsewhere"
+	write_clean_workflow "$1/elsewhere/clean.yml"
+	ln -s ../../elsewhere/clean.yml "$1/.github/workflows/clean.yml"
+}
 link_an_action() {
 	mkdir "$1/elsewhere" "$1/.github/actions/linked"
 	write_action "$1/elsewhere/action.yml"
@@ -233,6 +252,11 @@ run "$dir"
 expect_fail "a symbolic link to a workflow" "symbolic links"
 
 fresh
+link_a_clean_workflow "$dir"
+run "$dir"
+expect_fail "a symbolic link to a workflow without a finding" "symbolic links"
+
+fresh
 link_an_action "$dir"
 run "$dir"
 expect_fail "a symbolic link to an action" "symbolic links"
@@ -268,6 +292,99 @@ fresh
 name_another_rule_on_a_setup_use "$dir"
 run "$dir"
 expect_pass "the rule named in an ignore comment is not read: the findings are what counts"
+
+# The command line and the environment of the call: a stub zizmor records its arguments and
+# environment, and scripts/zizmor.sh is run with every variable that could change the audit set, with
+# a token (GH_TOKEN, or GITHUB_TOKEN alone) and without (unset, or set and empty). The stub answers
+# an empty list of findings, so the script is run with an expectation of none.
+stubs="$scratch/stub"
+mkdir "$stubs"
+cat >"$stubs/zizmor" <<'SH'
+#!/bin/sh
+printf '%s\n' "$@" >"$STUB_OUT/args"
+env >"$STUB_OUT/env"
+echo '[]'
+SH
+chmod +x "$stubs/zizmor"
+
+# stub_run NAME [VAR=value ...]: scripts/zizmor.sh with the stub first on the PATH, in an otherwise empty
+# environment, with the variables of the arguments and with those that must be removed.
+stub_run() {
+	stub_name=$1
+	shift
+	fresh
+	rm -f "$scratch/args" "$scratch/env"
+	status=0
+	env -i PATH="$stubs:$PATH" STUB_OUT="$scratch" ZIZMOR_SELF_REPOSITORY_FINDINGS=0 \
+		ZIZMOR_OFFLINE=true ZIZMOR_NO_ONLINE_AUDITS=true ZIZMOR_CONFIG=/nonexistent GH_HOST=example.invalid \
+		ZIZMOR_GITHUB_TOKEN=z "$@" "$repo/scripts/zizmor.sh" "$dir" >"$scratch/out" 2>&1 || status=$?
+	if [ "$status" -ne 0 ]; then
+		echo "FAIL  $stub_name: the script failed with exit $status"
+		stub_ok=0
+		sed 's/^/        /' "$scratch/out"
+		failures=$((failures + 1))
+	fi
+}
+# check ASSERTION...: one assertion on what the stub recorded (has_arg ARG, lacks_arg ARG, has_env LINE,
+# lacks_env NAME).
+check() {
+	if ! "$@"; then
+		echo "FAIL  $stub_name: $*"
+		failures=$((failures + 1))
+		stub_ok=0
+	fi
+}
+has_arg() { grep -Fxq -- "$1" "$scratch/args"; }
+lacks_arg() { ! has_arg "$1"; }
+has_env() { grep -Fxq -- "$1" "$scratch/env"; }
+lacks_env() { ! grep -q "^$1=" "$scratch/env"; }
+fixed_options() {
+	for arg in --no-config --collect=all --strict-collection --no-progress --no-ignores --no-exit-codes .; do
+		check has_arg "$arg"
+	done
+	check has_arg json
+}
+no_audit_variable() {
+	for name in ZIZMOR_OFFLINE ZIZMOR_NO_ONLINE_AUDITS ZIZMOR_CONFIG GH_HOST ZIZMOR_GITHUB_TOKEN; do
+		check lacks_env "$name"
+	done
+}
+
+stub_ok=1
+stub_run "offline without a token"
+fixed_options
+no_audit_variable
+check has_arg --offline
+check lacks_env GH_TOKEN
+check lacks_env GITHUB_TOKEN
+[ "$stub_ok" = 1 ] && echo "ok    no token: offline, the fixed options, no variable that changes the audit"
+
+stub_ok=1
+stub_run "offline with empty token variables" GH_TOKEN= GITHUB_TOKEN=
+fixed_options
+no_audit_variable
+check has_arg --offline
+check lacks_env GH_TOKEN
+check lacks_env GITHUB_TOKEN
+[ "$stub_ok" = 1 ] && echo "ok    empty token variables count as no token"
+
+stub_ok=1
+stub_run "online with GH_TOKEN" GH_TOKEN=first
+fixed_options
+no_audit_variable
+check lacks_arg --offline
+check has_env GH_TOKEN=first
+check lacks_env GITHUB_TOKEN
+[ "$stub_ok" = 1 ] && echo "ok    GH_TOKEN: online, the fixed options, no variable that changes the audit"
+
+stub_ok=1
+stub_run "online with GITHUB_TOKEN only" GITHUB_TOKEN=second
+fixed_options
+no_audit_variable
+check lacks_arg --offline
+check has_env GH_TOKEN=second
+check lacks_env GITHUB_TOKEN
+[ "$stub_ok" = 1 ] && echo "ok    GITHUB_TOKEN alone is passed on as GH_TOKEN"
 
 if [ "$failures" -ne 0 ]; then
 	echo "check-zizmor-options: $failures probe(s) failed" >&2
