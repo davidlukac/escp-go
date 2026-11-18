@@ -22,7 +22,6 @@ func splitLines(body string) []line {
 
 // structure is what the structured reading found.
 type structure struct {
-	sections int      // the merge readiness sections
 	unticked []string // the text of each unticked box in them
 	ticked   int      // the number of ticked boxes in them
 }
@@ -60,7 +59,7 @@ func visibleLines(lines []line, visit func(line)) {
 		pos := 0
 		if comments.open {
 			end := indexFrom(l, 0, commentClose)
-			if end < 0 {
+			if end == notFound {
 				continue
 			}
 			pos = end + len(commentClose)
@@ -88,7 +87,7 @@ func skipLeadingComments(l line, pos int, closesLater bool) (next int, open bool
 			return pos, false
 		}
 		end := indexFrom(l, start+len(commentOpen), commentClose)
-		if end < 0 {
+		if end == notFound {
 			if closesLater {
 				return len(l), true
 			}
@@ -105,9 +104,6 @@ func structuredPass(lines []line) structure {
 	visibleLines(lines, func(l line) {
 		if level, title, ok := headingOf(l); ok && level <= sectionLevel {
 			inside = level == sectionLevel && title == sectionTitle
-			if inside {
-				found.sections++
-			}
 			return
 		}
 		if !inside {

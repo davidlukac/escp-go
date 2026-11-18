@@ -229,6 +229,7 @@ func TestTheStructuredReadingFollowsFencesAndComments(t *testing.T) {
 		{"a comment that starts inside a line hides nothing", "text <!-- a\n- [ ] x\n--> y\n", 1},
 		{"a comment marker in inline code hides nothing", "Use `<!--` here.\n- [ ] x\n", 1},
 		{"an unclosed comment after a closed one hides nothing", "<!-- a --> <!-- b\n- [ ] x\n", 1},
+		{"what follows a comment on its line counts", "<!-- a --> - [ ] x\n", 1},
 		{"a comment and then a fence on the same line is no fence", "<!-- c --> ```\n- [ ] x\n", 1},
 		{"what follows a comment that ends a line counts", "<!-- a\nb --> - [ ] visible\n", 1},
 		{"a fence in a comment is no fence", "<!--\n```\n-->\n- [ ] x\n", 1},
@@ -255,8 +256,8 @@ func TestAHeadingInACommentOrAFenceStartsNoStructuredSection(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := structuredPass(splitLines(tt.body)); got.sections != 0 {
-				t.Errorf("%d sections, want none", got.sections)
+			if got := structuredPass(splitLines(tt.body)); len(got.unticked) != 0 || got.ticked != 0 {
+				t.Errorf("the structured reading found a section: %q", got.unticked)
 			}
 		})
 	}

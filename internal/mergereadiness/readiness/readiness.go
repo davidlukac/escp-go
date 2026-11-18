@@ -51,7 +51,7 @@ func Judge(body string) Verdict {
 		return red(heading, naive)
 	case len(structured.unticked) > 0:
 		return red(fmt.Sprintf("merge readiness: %d box(es) not ticked:", len(structured.unticked)), structured.unticked)
-	case structured.sections == 0 && !found:
+	case !found:
 		return Verdict{Pass: true, Lines: []string{msgNoSection}}
 	case structured.ticked == 0:
 		return Verdict{Lines: []string{msgNoBoxes}}

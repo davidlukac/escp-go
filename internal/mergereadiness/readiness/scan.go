@@ -64,14 +64,17 @@ func hasAt(l line, pos int, s string) bool {
 	return true
 }
 
-// indexFrom is the position of the first occurrence of s in l at or after from, or -1.
+// notFound is what indexFrom returns for a text that is not there.
+const notFound = -1
+
+// indexFrom is the position of the first occurrence of s in l at or after from, or notFound.
 func indexFrom(l line, from int, s string) int {
 	for pos := from; pos < len(l); pos++ {
 		if hasAt(l, pos, s) {
 			return pos
 		}
 	}
-	return -1
+	return notFound
 }
 
 // headingOf returns the level and the normalized title of an ATX heading line, and whether l is one.
@@ -96,12 +99,12 @@ func headingOf(l line) (level int, title string, ok bool) {
 func titleOf(rest line) string {
 	title := strings.Trim(string(rest), " \t")
 	if strings.HasSuffix(title, "#") {
-		stripped := strings.TrimRight(title, "#")
+		stripped := []rune(strings.TrimRight(title, "#"))
 		switch {
-		case stripped == "":
+		case len(stripped) == 0:
 			title = ""
-		case stripped[len(stripped)-1] == ' ' || stripped[len(stripped)-1] == '\t':
-			title = stripped
+		case isSpaceOrTab(stripped[len(stripped)-1]):
+			title = string(stripped)
 		}
 	}
 	return strings.ToLower(strings.Join(strings.Fields(title), " "))
@@ -194,7 +197,7 @@ func skipBlanksAndQuotes(l line, pos int) int {
 // character and "]".
 func naiveBox(l line) (string, bool) {
 	pos := skipBlanksAndQuotes(l, 0)
-	markers := 0
+	listed := false
 	for {
 		after := listMarkerEnd(l, pos)
 		if after == pos {
@@ -203,10 +206,10 @@ func naiveBox(l line) (string, bool) {
 		if after >= len(l) || !isBlank(l[after]) {
 			return "", false
 		}
-		markers++
+		listed = true
 		pos = skipBlanksAndQuotes(l, after)
 	}
-	if markers == 0 || len(l) < pos+taskBoxLen || l[pos] != '[' || l[pos+2] != ']' || !unicode.IsSpace(l[pos+1]) {
+	if !listed || len(l) < pos+taskBoxLen || l[pos] != '[' || l[pos+2] != ']' || !unicode.IsSpace(l[pos+1]) {
 		return "", false
 	}
 	return strings.Trim(string(l[pos+taskBoxLen:]), " \t"), true
