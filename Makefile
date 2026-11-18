@@ -57,15 +57,21 @@ modcheck:
 	go mod verify
 	go -C devtools mod verify
 
-# Two checks of the project's own, run by `make lint` (they are prerequisites of it, so a change to the
+# Three checks of the project's own, run by `make lint` (they are prerequisites of it, so a change to the
 # lint recipe does not touch them):
 #   catalogcheck  every name the defect catalog gives to a check resolves: a renamed test or a removed
 #                 target fails here (devtools/catalogcheck; it exits 1 with one line per problem);
 #   guarantee     the exported identifiers whose doc comment states a guarantee and that no test names
 #                 with a `// guarantee: <Name>` marker (devtools/guarantee, run with -strict: it lists
-#                 them and fails; without the flag it only reports).
-.PHONY: catalogcheck guarantee
-lint: catalogcheck guarantee
+#                 them and fails; without the flag it only reports);
+#   lintfixtures  the layering (depguard) and forbidigo rules of .golangci.yml still fire: the repository's
+#                 own configuration is run over the fixture module devtools/lintfixtures, which holds one
+#                 violation of each rule and, in the places a rule leaves out, code that must stay clean,
+#                 and the findings are compared with devtools/lintfixtures/expected.txt, every one present
+#                 and nothing else (devtools/lintcheck; about a second). A rule whose pattern stops
+#                 matching, an exclusion that swallows a fixture or a rule that was relaxed fails here.
+.PHONY: catalogcheck guarantee lintfixtures
+lint: catalogcheck guarantee lintfixtures
 
 catalogcheck:
 	go -C devtools build -o $(CURDIR)/build/catalogcheck ./catalogcheck
@@ -74,6 +80,10 @@ catalogcheck:
 guarantee:
 	go -C devtools build -o $(CURDIR)/build/guarantee ./guarantee
 	build/guarantee -strict -root .
+
+lintfixtures:
+	go -C devtools build -o $(CURDIR)/build/lintcheck ./lintcheck
+	build/lintcheck -root . -lint "$$($(DEVTOOL) -n golangci-lint)"
 
 # Known vulnerabilities in the code and its dependencies.
 vuln:
