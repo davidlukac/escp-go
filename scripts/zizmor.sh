@@ -1,8 +1,9 @@
 #!/bin/sh
 # Runs zizmor over the .github/ directory of a repository root (default: the current directory) with
 # fixed options, so that the result does not depend on files in the checked-out tree: no
-# configuration file is read (--no-config) and every workflow is collected, whatever an ignore file
-# says (--collect=all). It is the one place the command line is built: `make zizmor` calls it, and so
+# configuration file is read (--no-config), every workflow is collected, whatever an ignore file
+# says (--collect=all), and a file that cannot be loaded fails the run instead of being skipped with a
+# warning (--strict-collection). It is the one place the command line is built: `make zizmor` calls it, and so
 # do the probes of scripts/check-zizmor-options.sh.
 #
 # Inline suppressions are an allow-list: the workflows may carry exactly
@@ -38,7 +39,7 @@ if [ "$total" != "$known" ] || [ "$known" != "$allowed" ]; then
 	exit 1
 fi
 
-set -- --no-config --collect=all --no-progress
+set -- --no-config --collect=all --strict-collection --no-progress
 token=${GH_TOKEN:-${GITHUB_TOKEN:-}}
 if [ -n "$token" ]; then
 	GH_TOKEN=$token exec zizmor "$@" .github/

@@ -1,7 +1,7 @@
 #!/bin/sh
 # Proves that scripts/zizmor.sh (what `make zizmor` runs) reports a deliberate finding whatever the
 # checked-out tree says about the check itself. zizmor reads inputs from the tree it audits: a
-# configuration file, an ignore file, an inline suppression comment. For each of those inputs this
+# configuration file, an ignore file, an inline suppression comment, and the files it can load. For each of those inputs this
 # script copies the repository's .github/ into a scratch git repository, adds a workflow with a
 # template injection (the finding) and the input, runs scripts/zizmor.sh offline, and requires a
 # failing exit with the finding (or the allow-list message) in the output. Two controls come first:
@@ -58,6 +58,22 @@ YAML
 }
 ignore_the_finding_file() {
 	echo "zz-probe.yml" >"$1/$2"
+}
+# Variants of the finding workflow that zizmor cannot load: each must fail the run, not be skipped.
+break_with_bom() {
+	{ printf '\357\273\277'; cat "$1/$finding_file"; } >"$1/$finding_file.new"
+	mv "$1/$finding_file.new" "$1/$finding_file"
+}
+break_with_second_document() {
+	{ cat "$1/$finding_file"; echo '---'; cat "$1/$finding_file"; } >"$1/$finding_file.new"
+	mv "$1/$finding_file.new" "$1/$finding_file"
+}
+break_with_duplicate_key() {
+	echo 'permissions: {}' >>"$1/$finding_file"
+}
+break_with_schema_error() {
+	sed 's/ubuntu-24.04/5/' "$1/$finding_file" >"$1/$finding_file.new"
+	mv "$1/$finding_file.new" "$1/$finding_file"
 }
 suppress_inline() {
 	sed 's/echo "\${{ github.head_ref }}"/& # zizmor: ignore[template-injection] probe/' "$1/$finding_file" >"$1/$finding_file.new"
@@ -121,6 +137,14 @@ for name in .gitignore .ignore .github/.gitignore .github/.ignore .github/workfl
 	ignore_the_finding_file "$dir" "$name"
 	run "$dir"
 	expect_fail "ignore file $name" "$finding_rule"
+done
+
+for variant in bom second_document duplicate_key schema_error; do
+	fresh
+	add_finding "$dir"
+	"break_with_$variant" "$dir"
+	run "$dir"
+	expect_fail "workflow zizmor cannot load ($variant)" "failed to load"
 done
 
 fresh
