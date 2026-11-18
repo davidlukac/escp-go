@@ -1,0 +1,55 @@
+package readiness
+
+import (
+	"strings"
+	"testing"
+	"unicode"
+)
+
+// checkOutput fails the test for a verdict whose output holds a control character or a line that
+// would be read as a workflow command.
+func checkOutput(t *testing.T, v Verdict) {
+	t.Helper()
+	for _, l := range v.Lines {
+		if strings.HasPrefix(strings.TrimLeftFunc(l, unicode.IsSpace), "::") {
+			t.Fatalf("a workflow command in the output: %q", l)
+		}
+		for _, r := range l {
+			if unicode.IsControl(r) || r == '\u2028' || r == '\u2029' {
+				t.Fatalf("a control character %U in the output line %q", r, l)
+			}
+		}
+	}
+}
+
+// injected returns the ticked template with an unticked box inserted after the heading of its section,
+// at a line chosen by at, between a prefix and a suffix that the fuzzer supplies.
+func injected(prefix, suffix string, at uint) string {
+	lines := strings.Split(strings.TrimSuffix(ticked, "\n"), "\n")
+	at = 1 + at%uint(len(lines))
+	withBox := append(append(append([]string{}, lines[:at]...), "- [ ] injected"), lines[at:]...)
+	return prefix + "\n" + strings.Join(withBox, "\n") + "\n" + suffix
+}
+
+// FuzzJudge: whatever the description holds, the judgment ends, its output holds no control character
+// and no line that starts a workflow command, and an unticked box inserted inside the section of an
+// otherwise ticked template is never green, whatever stands before and after the section.
+func FuzzJudge(f *testing.F) {
+	for _, seed := range []string{
+		"", section, ticked, heading + "- [ ] a\n", "```\n" + section + "```\n", "<!--\n" + section, "- a\n  ```\n" + section,
+		"> ## Merge readiness\n> - [ ] a\n", "## Merge readiness\n1. [ ] a\n", "<!-- c --> ```\n" + heading,
+		"## a" + strings.Repeat(" ", 100) + "b", "::error::x\n" + heading + "- [ ] ::error::y\n", "\r\n\r\r\n", "\xff\xfe",
+	} {
+		f.Add(seed, "", uint(0))
+	}
+	f.Add("<!--", "-->", uint(3))
+	f.Add("```", "```", uint(5))
+	f.Add("<div>\n```", "</div>", uint(1))
+	f.Add("[ ]: x\n", "\n## Merge readiness\n", uint(2))
+	f.Fuzz(func(t *testing.T, body, suffix string, at uint) {
+		checkOutput(t, Judge(body))
+		if v := Judge(injected(body, suffix, at)); v.Pass {
+			t.Fatalf("green with an unticked box injected (prefix %q, suffix %q, line %d): %q", body, suffix, at, v.Lines)
+		}
+	})
+}

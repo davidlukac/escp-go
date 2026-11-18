@@ -5,7 +5,7 @@
 # Dependabot bumps them there. `go tool` builds the pinned version on first use (cached afterwards).
 DEVTOOL := go tool -modfile=devtools/go.mod
 
-.PHONY: test lint spell actionlint modcheck vuln cover cover-html apidiff fuzz mutation mutation-diff mutation-extended pkgdoc pkgdoc-serve compat-table settings-docs soak soak-idle soak-single soak-loaded hooks pre-commit mergereadiness
+.PHONY: test lint spell actionlint modcheck vuln cover cover-html apidiff fuzz mutation mutation-diff mutation-extended pkgdoc pkgdoc-serve compat-table settings-docs soak soak-idle soak-single soak-loaded hooks pre-commit
 
 # Unit tests against the fake switch. No hardware is touched.
 test:
@@ -66,6 +66,17 @@ zizmor:
 	[ "$$have" = "$$pin" ] || echo "warning: zizmor $$have is installed, devtools/zizmor/requirements.txt pins $$pin"
 	@if [ -n "$$GH_TOKEN$$GITHUB_TOKEN" ]; then zizmor --no-progress .github/; else echo "no GH_TOKEN: offline audits only"; zizmor --offline --no-progress .github/; fi
 
+# Records GitHub's own rendering of the descriptions in internal/mergereadiness/readiness/testdata/oracle
+# (NN-name.md -> NN-name.html), the ground truth the tests of the "Merge readiness" check compare the
+# parser with (it must report at least as many unticked boxes as the renderer shows). It needs `gh auth`
+# and the network, posts nothing (the markdown endpoint only renders), and is not run in CI: run it when
+# a description is added or GitHub's renderer changes, and commit the HTML that changed.
+.PHONY: oracle-refresh
+oracle-refresh:
+	@for f in internal/mergereadiness/readiness/testdata/oracle/*.md; do \
+		gh api -X POST /markdown -F text=@"$$f" -f mode=gfm > "$${f%.md}.html" || exit 1; \
+	done
+
 # The module files: tidy would change nothing (this module and devtools), and every downloaded
 # dependency matches go.sum.
 modcheck:
@@ -88,7 +99,7 @@ modcheck:
 #                 and nothing else (devtools/lintcheck; about a second). A rule whose pattern stops
 #                 matching, an exclusion that swallows a fixture or a rule that was relaxed fails here.
 .PHONY: catalogcheck guarantee lintfixtures
-lint: catalogcheck guarantee lintfixtures mergereadiness
+lint: catalogcheck guarantee lintfixtures
 
 catalogcheck:
 	go -C devtools build -o $(CURDIR)/build/catalogcheck ./catalogcheck
@@ -101,12 +112,6 @@ guarantee:
 lintfixtures:
 	go -C devtools build -o $(CURDIR)/build/lintcheck ./lintcheck
 	build/lintcheck -root . -lint "$$($(DEVTOOL) -n golangci-lint)"
-
-# The parser of the "Merge readiness" section of a pull request description (scripts/merge-readiness.py,
-# run by .github/workflows/merge-readiness.yml; python3 and its standard library only) and its tests,
-# a prerequisite of `lint` like the checks above.
-mergereadiness:
-	PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts -p '*_test.py'
 
 # Known vulnerabilities in the code and its dependencies.
 vuln:

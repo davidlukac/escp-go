@@ -1,17 +1,26 @@
 # The "Merge readiness" check: a pull request whose description has a "Merge readiness" section
 # (the pull request template ends with one) is red while a box of that section is unticked, and
 # the job output lists the boxes. A description without the section (an outside contributor's,
-# Dependabot's, an older pull request's) passes with a message. Making this a required check is a
-# repository setting, not something this file can do.
+# Dependabot's, an older pull request's) passes with a message. The rules of the check, and why it
+# is stricter than the renderer, are in the documentation of internal/mergereadiness/readiness.
 #
-# It is its own workflow and not a job of test.yml because it must run when the description is
-# edited (`edited`), which the default triggers of a pull request do not include. It is cheap:
-# python3 is on the runner, the parser (scripts/merge-readiness.py, tested by `make mergereadiness`)
-# uses its standard library only, and no setup action runs.
-#
-# The description is untrusted input: it reaches the script through an environment variable and is
-# never interpolated into a `run:` text. The job needs no secret and only reads the repository, so a
-# pull request from a fork runs it with the same read-only token.
+# What this file does and does not do:
+#   * It is its own workflow and not a job of test.yml because it must run when the description is
+#     edited (`edited`), which the default triggers of a pull request do not include.
+#   * The job reads the CURRENT description of the pull request through the API, not the one in the
+#     event payload: a re-run of an older run would otherwise publish a verdict for a description
+#     that has changed since. When the description cannot be read the job is red.
+#   * The description is untrusted input: it reaches the program through an environment variable and
+#     is never interpolated into a `run:` text. The token the job has only reads pull requests and
+#     the repository, and only the step that fetches the description gets it, so the program (and
+#     what a pull request changes in it) runs without it. No secret is used, so a pull request from
+#     a fork runs the same job.
+#   * The job runs the pull request's own copy of the program and of this workflow, so a pull
+#     request that changes them is judged by the changed version: that is read in the diff, like any
+#     change to a workflow. Red blocks a merge only when the check is a required status check, which
+#     is a repository setting and not something this file can do.
+#   * Go is installed with actions/setup-go directly (pinned, as in .github/actions/setup, which
+#     is not used here), without a cache: the program has no dependency but the standard library.
 name: Merge readiness
 
 on:
@@ -32,12 +41,24 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
-      contents: read
+      contents: read # the checkout, which holds the program
+      pull-requests: read # the current description of the pull request
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Boxes of the merge readiness section are ticked
-        run: python3 scripts/merge-readiness.py
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      # The current description, into a file: a failed request is a red job, never a pass.
+      - name: Read the current description
+        run: |
+          gh api "repos/${REPOSITORY}/pulls/${NUMBER}" --jq '.body // ""' > "$RUNNER_TEMP/description.txt" \
+            || { echo "::error::the pull request description could not be read"; exit 1; }
         env:
-          PR_BODY: ${{ github.event.pull_request.body }}
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          NUMBER: ${{ github.event.pull_request.number }}
+      - name: Boxes of the merge readiness section are ticked
+        run: PR_BODY="$(cat "$RUNNER_TEMP/description.txt")" go run ./internal/mergereadiness
