@@ -10,8 +10,12 @@
 #     18000 runs). The conditions are defined once, in internal/soak, which `make soak` runs too.
 #   * vulnerabilities: govulncheck on the code and its dependencies. An advisory appears without any
 #     change of ours, so the check that runs on a push would not see it until the next one.
+#   * zizmor: the workflow security check of test.yml again, because its online audits (an action with a
+#     known vulnerability, a pinned SHA that is not in the action's history) can change with nothing of
+#     ours changing.
 #
-# `make soak` (or `make soak-idle`, `soak-single`, `soak-loaded`) and `make vuln` reproduce both locally.
+# `make soak` (or `make soak-idle`, `soak-single`, `soak-loaded`), `make vuln` and `make zizmor`
+# reproduce the three locally.
 name: Weekly checks
 
 on:
@@ -39,7 +43,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup
+      - uses: ./.github/actions/setup # zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)
         with:
           go-version: stable
       # `go run ./internal/soak <leg>` is what `make soak-<leg>` runs; the steps do not rely on make
@@ -63,7 +67,26 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup
+      - uses: ./.github/actions/setup # zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)
         with:
           go-version: stable
       - run: make vuln
+
+  # The same pinned zizmor and the same steps as the `zizmor` job of test.yml.
+  zizmor:
+    name: Workflow security (zizmor)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install the pinned zizmor
+        run: |
+          python3 -m venv "$RUNNER_TEMP/zizmor"
+          "$RUNNER_TEMP/zizmor/bin/pip" install --require-hashes --quiet -r devtools/zizmor/requirements.txt
+          echo "$RUNNER_TEMP/zizmor/bin" >> "$GITHUB_PATH"
+      - name: Audit the workflows
+        run: make zizmor
+        env:
+          GH_TOKEN: ${{ github.token }}
