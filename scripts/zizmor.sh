@@ -35,11 +35,36 @@ if [ -z "$token" ]; then
 	echo "no GH_TOKEN: offline audits only"
 fi
 
+# Every environment variable that can change what zizmor 1.32.0 audits or how it reaches GitHub is
+# removed, so that a variable set by a workflow step or by the machine cannot narrow the audit. From
+# `zizmor --help` and the binary:
+#   ZIZMOR_OFFLINE, ZIZMOR_NO_ONLINE_AUDITS  would turn the online audits off silently: removed.
+#   ZIZMOR_CONFIG                            would name a configuration file (it conflicts with
+#                                            --no-config, which is passed): removed.
+#   GH_HOST                                  would point the API calls, and the token, at another
+#                                            host: removed.
+#   GH_TOKEN, GITHUB_TOKEN, ZIZMOR_GITHUB_TOKEN  the token: removed, then GH_TOKEN is set from the
+#                                            variables above (online) or the run is --offline.
+#   ZIZMOR_RENDER_LINKS, ZIZMOR_SHOW_AUDIT_URLS, RUST_LOG, NO_COLOR and the other color variables
+#                                            shape the plain output and the log only; the verdict
+#                                            reads --format json: they cannot matter.
+#   HOME, XDG_CACHE_HOME, XDG_CONFIG_HOME, GIT_CONFIG_*  where the HTTP cache and the git
+#                                            configuration are: the ignore files are not honored
+#                                            (--collect=all) and a stale cache entry is the same
+#                                            answer GitHub gave before: they cannot matter.
+# Options that are not passed keep their default: --persona, --min-severity and --min-confidence
+# have no environment variable and no configuration file to change them (--no-config); --fix, --lsp,
+# --completions, --thanks and --cache-dir do not change what is audited.
+clean_env() {
+	env -u ZIZMOR_OFFLINE -u ZIZMOR_NO_ONLINE_AUDITS -u ZIZMOR_CONFIG -u GH_HOST \
+		-u ZIZMOR_GITHUB_TOKEN -u GH_TOKEN -u GITHUB_TOKEN "$@"
+}
+
 audit() {
 	if [ -n "$token" ]; then
-		env -u GH_TOKEN -u GITHUB_TOKEN GH_TOKEN="$token" zizmor --no-config --collect=all --strict-collection --no-progress "$@" .
+		clean_env GH_TOKEN="$token" zizmor --no-config --collect=all --strict-collection --no-progress "$@" .
 	else
-		env -u GH_TOKEN -u GITHUB_TOKEN zizmor --offline --no-config --collect=all --strict-collection --no-progress "$@" .
+		clean_env zizmor --offline --no-config --collect=all --strict-collection --no-progress "$@" .
 	fi
 }
 
