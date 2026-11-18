@@ -44,7 +44,7 @@ jobs:
           case "$TAG" in v[0-9]*.[0-9]*.[0-9]*) ;; *) echo "not a version tag: $TAG"; exit 1;; esac
           git fetch origin main
           git merge-base --is-ancestor "$TAG" origin/main || { echo "$TAG is not on main"; exit 1; }
-      - uses: ./.github/actions/setup
+      - uses: ./.github/actions/setup # zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)
         with:
           go-version: stable
       - name: Tests and checks of the tagged tree

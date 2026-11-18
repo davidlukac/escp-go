@@ -50,7 +50,7 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
-      - uses: ./.github/actions/setup
+      - uses: ./.github/actions/setup # zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)
         with:
           go-version: stable
       - name: Mutate the lines this pull request changes
@@ -71,7 +71,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup
+      - uses: ./.github/actions/setup # zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)
         with:
           go-version: stable
       - name: Mutate with the operators that are off by default
@@ -97,7 +97,9 @@ jobs:
     steps:
       # The one checkout that keeps its credentials: the badges branch is pushed below.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: ./.github/actions/setup
+        with:
+          persist-credentials: true
+      - uses: ./.github/actions/setup # zizmor: ignore[self-repository] actionlint, pinned here, rejects `$/` (rhysd/actionlint#711)
         with:
           go-version: stable
       - name: Mutate every covered operator
