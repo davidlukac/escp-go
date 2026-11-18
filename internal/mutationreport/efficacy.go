@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"regexp"
 	"strconv"
 )
 
@@ -109,15 +110,24 @@ func writeCheck(path, threshold string, stdout, stderr io.Writer) int {
 	return exitOK
 }
 
-// writeCoefficient is the `coefficient` command: it exits 0 when text is a positive integer and says
-// why on stderr, with exit code 2, when it is not. gremlins multiplies the time of its coverage run
-// by it to get the time each mutant has, and a mutant that outlives that time is TIMED OUT, which the
-// efficacy counts as killed: a negative value makes every mutant time out at once and the gate pass on
-// no evidence, and gremlins takes 0 for its default 3. `make` runs it before gremlins, as it runs
+// coefficientForm is what a timeout coefficient looks like: one to four digits, the first not zero, 1
+// to 9999. The bound is what keeps gremlins' budget honest: it multiplies the elapsed time of its
+// coverage run by the value as a duration of nanoseconds, which overflows to a negative budget from
+// about 3e8 for a run of half a minute, so every mutant would time out at once and the check, which
+// counts a timeout as killed, would pass on no evidence. The plain decimal form also keeps what the
+// check validates and what gremlins reads the same: it reads the flag with base 0, where `010` is
+// octal 8, and takes `+5`, `0x10` and `1_0`.
+var coefficientForm = regexp.MustCompile(`^[1-9][0-9]{0,3}$`)
+
+// writeCoefficient is the `coefficient` command: it exits 0 when text is a timeout coefficient in
+// that form and says why on stderr, with exit code 2, when it is not. gremlins multiplies the time of
+// its coverage run by it to get the time each mutant has, and a mutant that outlives that time is
+// TIMED OUT, which the efficacy counts as killed: a negative value makes every mutant time out at
+// once, and gremlins takes 0 for its default 3. `make` runs it before gremlins, as it runs
 // `threshold`.
 func writeCoefficient(text string, stderr io.Writer) int {
-	if n, err := strconv.Atoi(text); err != nil || n < 1 {
-		_, _ = fmt.Fprintf(stderr, "mutationreport: the timeout coefficient %q is not a positive integer\n", text)
+	if !coefficientForm.MatchString(text) {
+		_, _ = fmt.Fprintf(stderr, "mutationreport: the timeout coefficient %q is not a plain integer from 1 to 9999\n", text)
 		return exitUsage
 	}
 	return exitOK

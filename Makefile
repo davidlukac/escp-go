@@ -163,7 +163,9 @@ fuzz:
 # result takes no time, so without it every mutant of a package whose tests ran before "times out".
 # PKG=<directory> (model, safety, or . for the root package) limits a run to the files of that directory:
 # gremlins takes only the module root as its path, so every other directory with Go files is excluded.
-PKG_DIRS := $(patsubst ./%,%,$(sort $(shell find . -name '*.go' -not -path './build/*' -not -path './.git/*' -not -path './devtools/*' -not -path '*/testdata/*' -exec dirname {} \;)))
+# PKG_DIRS is lazy (`=`): the `find` runs only when PKG is set, not at every start of make (0.45 s, which the
+# recipe self-check would pay about 55 times).
+PKG_DIRS = $(patsubst ./%,%,$(sort $(shell find . -name '*.go' -not -path './build/*' -not -path './.git/*' -not -path './devtools/*' -not -path '*/testdata/*' -exec dirname {} \;)))
 PKG_EXCLUDES := $(if $(PKG),$(foreach d,$(filter-out $(PKG),$(PKG_DIRS)),-E '^$(if $(filter .,$(d)),,$(d)/)[^/]+$$'))
 # TIMEOUT_COEFFICIENT: gremlins gives every mutant the same time, the elapsed time of its one coverage run
 # of the whole module (30 to 39 s in the CI logs; not of the tests of the mutant's package) x this
@@ -173,8 +175,11 @@ PKG_EXCLUDES := $(if $(PKG),$(foreach d,$(filter-out $(PKG),$(PKG_DIRS)),-E '^$(
 # counted kill. A hang therefore costs about 10 x 33 s, roughly 5.5 minutes (1.65 with 3). The weekly job
 # (90-minute limit, about 19 minutes without hangs) tolerates about 50 hangs; the pull request job
 # (timeout-minutes 30, about one minute) about 20 hangs in one diff. The last weekly run had one.
-# It is validated before the run (`internal/mutationreport coefficient`: a positive integer; a negative
-# one makes every mutant time out at once and the gate pass on nothing, and 0 is gremlins' default 3).
+# It is validated before the run (`internal/mutationreport coefficient`: a plain integer from 1 to 9999). A
+# negative one makes every mutant time out at once and the gate pass on nothing, 0 is gremlins' default 3,
+# and a huge one overflows its budget (the elapsed time times the value, as nanoseconds, goes negative from
+# about 3e8) with the same result; `010` is octal 8 to gremlins and 10 to a decimal parser, so only the
+# plain form is taken.
 # Override like WORKERS, on the command line or in the environment: `make mutation TIMEOUT_COEFFICIENT=20`.
 TIMEOUT_COEFFICIENT ?= 10
 GREMLINS := GOFLAGS=-count=1 $(DEVTOOL) gremlins unleash . --workers $(or $(WORKERS),4) --timeout-coefficient $(TIMEOUT_COEFFICIENT) --coverpkg ./... $(PKG_EXCLUDES) \

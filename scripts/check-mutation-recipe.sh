@@ -35,6 +35,9 @@ want=$(mktemp)
 got=$(mktemp)
 gremlins=$(mktemp)
 trap 'rm -f "$out" "$want" "$got" "$gremlins"' EXIT
+# A signal ends the script through its EXIT trap too (a `timeout` wrapper sends TERM to this pid only):
+# the working tree's report is restored and the temporary files removed.
+trap 'exit 1' INT TERM HUP
 good_report=
 bad_report=
 standin=
@@ -164,14 +167,14 @@ gremlins_has "mutation-diff with BASE" " --output $report --diff v1.2.3" "--time
 saved=
 if [ -e "$report" ]; then
 	saved=$(mktemp)
-	cp "$report" "$saved"
+	cp -p "$report" "$saved"
 fi
 # shellcheck disable=SC2329 # run by the trap
 restore() {
 	rm -f "$out" "$want" "$got" "$gremlins" "$good_report" "$bad_report" "$standin" "$standin_log"
 	if [ -n "$saved" ]; then
 		mkdir -p build
-		cp "$saved" "$report"
+		cp -p "$saved" "$report"
 		rm -f "$saved"
 	else
 		rm -f "$report"
@@ -197,12 +200,14 @@ printf '%s' '{"files":[{"file_name":"a.go","mutations":[{"type":"X","status":"KI
 printf '%s' '{"files":[{"file_name":"a.go","mutations":[{"type":"X","status":"KILLED","line":1,"column":1},{"type":"X","status":"LIVED","line":2,"column":1}]}]}' >"$bad_report"
 mkdir -p build
 
-# exits WANT LABEL ARGUMENT...: make with the arguments exits zero (WANT=0) or not (WANT=1).
+# exits WANT LABEL ARGUMENT...: make with the arguments exits zero (WANT=0) or not (WANT=1). The
+# runs with a stand-in also set GREMLINS=false, so that a recipe which stops using the stand-in hook
+# (MUTATE, MUTATE_EXTENDED) and expands $(GREMLINS) fails at once and never starts the real tool.
 exits() {
 	want_zero=$1
 	label=$2
 	shift 2
-	if mk "$@" >/dev/null 2>&1; then
+	if mk "$@" GREMLINS=false >/dev/null 2>&1; then
 		[ "$want_zero" = 0 ] || fail "$label: make succeeded and must fail"
 	else
 		[ "$want_zero" = 1 ] || fail "$label: make failed and must succeed"
@@ -214,7 +219,7 @@ refuses() {
 	label=$1
 	shift
 	: >"$standin_log"
-	if mk "$@" >/dev/null 2>&1; then
+	if mk "$@" GREMLINS=false >/dev/null 2>&1; then
 		fail "$label: make succeeded and must fail"
 	elif [ -s "$standin_log" ]; then
 		fail "$label: make failed, but only after gremlins was started"
@@ -245,6 +250,26 @@ for coefficient in -1 0 abc 1.5 ''; do
 	refuses "mutation-extended with the coefficient '$coefficient'" mutation-extended TIMEOUT_COEFFICIENT="$coefficient" MUTATE_EXTENDED="sh $standin"
 done
 exits 0 "mutation-extended" mutation-extended MUTATE_EXTENDED=true
+
+# --workers (WORKERS, default 4) and the PKG filter are part of the gremlins line.
+recipe_of mutation
+grep -F -e 'gremlins unleash' "$out" >"$gremlins" || true
+gremlins_has "mutation default workers" " --output $report" "--workers 4"
+case " $(cat "$gremlins") " in
+*"^safety/[^/]+\$'"*) fail "mutation without PKG: the line excludes the directories of a PKG filter" ;;
+esac
+recipe_of mutation WORKERS=7
+grep -F -e 'gremlins unleash' "$out" >"$gremlins" || true
+gremlins_has "mutation with WORKERS=7" " --output $report" "--workers 7"
+recipe_of mutation PKG=model
+grep -F -e 'gremlins unleash' "$out" >"$gremlins" || true
+gremlins_has "mutation with PKG=model" " --output $report" "-E '^safety/[^/]+\$'" "-E '^internal/udp/[^/]+\$'"
+case " $(cat "$gremlins") " in
+*"-E '^model/[^/]+\$'"*) fail "mutation with PKG=model: the filter excludes model itself" ;;
+esac
+recipe_of mutation-diff PKG=.
+grep -F -e 'gremlins unleash' "$out" >"$gremlins" || true
+gremlins_has "mutation-diff with PKG=." " --output $report --diff origin/main" "-E '^model/[^/]+\$'"
 
 # the recipe is part of what `make lint` runs.
 mk -n lint >"$out"
