@@ -87,16 +87,25 @@ modcheck:
 #                 and the findings are compared with devtools/lintfixtures/expected.txt, every one present
 #                 and nothing else (devtools/lintcheck; about a second). A rule whose pattern stops
 #                 matching, an exclusion that swallows a fixture or a rule that was relaxed fails here.
-.PHONY: catalogcheck guarantee lintfixtures mutationrecipe
+.PHONY: catalogcheck guarantee lintfixtures mutationrecipe recipemutants
 lint: catalogcheck guarantee lintfixtures mutationrecipe
 
-# The mutation recipes, as `make -n` prints them (scripts/check-mutation-recipe.sh): the old report is
-# deleted before the run, and with EFFICACY set the threshold is validated first and the check runs
-# after gremlins, for `mutation` and for `mutation-diff`; without it no check runs; every gremlins run,
-# `mutation-extended` too, gets the timeout coefficient. A deleted `ifneq` block, check call or
-# coefficient fails here.
+# The mutation recipes (devtools/recipecheck): `make -n` of the three mutation targets with the
+# variables the jobs use, every recipe line compared whole, and make run with a stand-in for gremlins to
+# see the exit codes (a `-` prefix on a step is invisible to `make -n`): the old report is deleted before
+# the run, with EFFICACY set (an explicitly empty one too) the threshold is validated first and the check
+# runs after gremlins, the timeout coefficient is validated before it, no `--threshold-efficacy`, and so
+# on; the working tree's build/mutation.json is put aside and back. A deleted `ifneq` block, a check
+# made non-fatal or a coefficient dropped fails here.
 mutationrecipe:
-	scripts/check-mutation-recipe.sh
+	go -C devtools run ./recipecheck -root $(CURDIR)
+
+# The same check, held to the mutants of the Makefile it must catch (devtools/recipecheck/testdata/
+# makefile_mutants.json): every mutant is applied to a copy of the Makefile and the check must fail on
+# it, except the ones listed as equivalent with their reason. About a minute (the mutants run in
+# parallel), so it is not part of `make lint`; CI runs it as a step of the lint job.
+recipemutants:
+	go -C devtools test -tags mutants -count=1 -timeout 15m -run TestMakefileMutants ./recipecheck
 
 catalogcheck:
 	go -C devtools build -o $(CURDIR)/build/catalogcheck ./catalogcheck
