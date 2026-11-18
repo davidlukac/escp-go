@@ -70,7 +70,7 @@ jobs:
   # What a workflow may do and how untrusted input reaches it (template injection, token
   # permissions, persisted credentials, dangerous triggers, impostor or unpinned actions): the
   # pinned zizmor (devtools/zizmor/requirements.txt, installed with its hashes), at the default
-  # severity and persona, over everything in .github/. Console output and a red exit, no code
+  # severity and persona, over the whole repository (the workflows and every composite action). Console output and a red exit, no code
   # scanning upload. It is installed from PyPI and not through its own action, so that no further
   # third-party action runs in a job that reads the workflows; the token it is given only reads
   # public data (the online audits look up whether a pinned SHA belongs to the action's history).

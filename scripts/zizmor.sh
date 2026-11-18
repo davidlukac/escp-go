@@ -1,6 +1,6 @@
 #!/bin/sh
-# Runs zizmor over the .github/ directory of a repository root (default: the current directory) with
-# fixed options, so that the result does not depend on files in the checked-out tree: no
+# Runs zizmor over a whole repository (the root given, default: the current directory: the workflows,
+# every composite action wherever it is, the Dependabot configuration) with fixed options, so that the result does not depend on files in the checked-out tree: no
 # configuration file is read (--no-config), every workflow is collected, whatever an ignore file
 # says (--collect=all), and a file that cannot be loaded fails the run instead of being skipped with a
 # warning (--strict-collection). It is the one place the command line is built: `make zizmor` calls
@@ -37,9 +37,9 @@ fi
 
 audit() {
 	if [ -n "$token" ]; then
-		env -u GH_TOKEN -u GITHUB_TOKEN GH_TOKEN="$token" zizmor --no-config --collect=all --strict-collection --no-progress "$@" .github/
+		env -u GH_TOKEN -u GITHUB_TOKEN GH_TOKEN="$token" zizmor --no-config --collect=all --strict-collection --no-progress "$@" .
 	else
-		env -u GH_TOKEN -u GITHUB_TOKEN zizmor --offline --no-config --collect=all --strict-collection --no-progress "$@" .github/
+		env -u GH_TOKEN -u GITHUB_TOKEN zizmor --offline --no-config --collect=all --strict-collection --no-progress "$@" .
 	fi
 }
 

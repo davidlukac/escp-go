@@ -2,8 +2,8 @@
 # Proves that scripts/zizmor.sh (what `make zizmor` runs) reports a deliberate finding whatever the
 # checked-out tree says about the check itself. zizmor reads inputs from the tree it audits: a
 # configuration file, an ignore file, an inline suppression comment, the files it can load, and the
-# files that links lead to. For each of those inputs this script copies the repository's .github/
-# into a scratch git repository, adds a workflow with a template injection (the finding) and the
+# files that links lead to, and where the files are. For each of those inputs this script copies the
+# repository's .github/ into a scratch git repository, adds a workflow with a template injection (the finding) and the
 # input, runs scripts/zizmor.sh offline, and requires a failing exit with the finding (or the
 # reason the script gives) in the output. Two controls come first: the copy alone is clean, and the
 # finding alone is reported, so a probe that passes cannot be a probe that never ran. The
@@ -116,10 +116,30 @@ link_a_workflow() {
 	suppress_inline_in "$1/elsewhere/zz.yml"
 	ln -s ../../elsewhere/zz.yml "$1/.github/workflows/zz.yml"
 }
+# write_action FILE: a composite action with the same template injection.
+write_action() {
+	cat >"$1" <<'YAML'
+name: Probe
+description: Probe
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: echo "${{ github.head_ref }}"
+YAML
+}
+# A composite action outside .github/, which a workflow can use with `uses: ./ci`, and one behind a link.
+add_action_outside_github() {
+	mkdir "$1/ci"
+	write_action "$1/ci/action.yml"
+}
+link_a_directory() {
+	add_action_outside_github "$1"
+	ln -s ../../ci "$1/.github/actions/linked"
+}
 link_an_action() {
 	mkdir "$1/elsewhere" "$1/.github/actions/linked"
-	add_finding "$1"
-	mv "$1/$finding_file" "$1/elsewhere/action.yml"
+	write_action "$1/elsewhere/action.yml"
 	ln -s ../../../elsewhere/action.yml "$1/.github/actions/linked/action.yml"
 }
 
@@ -216,6 +236,16 @@ fresh
 link_an_action "$dir"
 run "$dir"
 expect_fail "a symbolic link to an action" "symbolic links"
+
+fresh
+add_action_outside_github "$dir"
+run "$dir"
+expect_fail "a composite action outside .github/" "$finding_rule"
+
+fresh
+link_a_directory "$dir"
+run "$dir"
+expect_fail "a composite action behind a linked directory" "symbolic links"
 
 fresh
 remove_one_setup_use "$dir"
