@@ -3,47 +3,74 @@
 # fixed options, so that the result does not depend on files in the checked-out tree: no
 # configuration file is read (--no-config), every workflow is collected, whatever an ignore file
 # says (--collect=all), and a file that cannot be loaded fails the run instead of being skipped with a
-# warning (--strict-collection). It is the one place the command line is built: `make zizmor` calls it, and so
-# do the probes of scripts/check-zizmor-options.sh.
+# warning (--strict-collection). It is the one place the command line is built: `make zizmor` calls
+# it, and so do the probes of scripts/check-zizmor-options.sh.
 #
-# Inline suppressions are an allow-list: the workflows may carry exactly
-# ZIZMOR_SELF_REPOSITORY_IGNORES comments of the form `# zizmor: ignore[self-repository]` on a
-# `uses: ./.github/actions/setup` line (the Makefile holds the number), and no other zizmor ignore
-# comment anywhere in .github/, so a new suppression is a deliberate edit of that number in the same
-# pull request. A suppression hides a finding from the check and from a reviewer reading only the
-# diff of the findings.
+# The findings are judged against an exact expectation, not against zizmor's own exit status: zizmor is
+# run with --no-ignores, so an ignore comment in a workflow changes nothing, and the run passes only
+# when its findings are exactly ZIZMOR_SELF_REPOSITORY_FINDINGS findings of the `self-repository` rule
+# and nothing else (the Makefile holds the number and says why). A new suppression, a removed use, or
+# a finding of any other rule is therefore a deliberate edit of that number in the same pull request,
+# or a failure. The comments on those uses stay for the reader: they say why the form is used.
+# A symbolic link under .github/ is refused: it would make the files audited depend on where it points.
 #
 # It audits online (the audits that look up an action's history) when a GitHub token is in GH_TOKEN
-# or GITHUB_TOKEN, offline otherwise. An empty variable counts as no token.
+# or GITHUB_TOKEN, offline otherwise. An empty variable counts as no token. It needs python3, which
+# zizmor's own installation already needs (it is a PyPI package), to read zizmor's JSON.
 set -eu
 
 root=${1:-.}
-allowed=${ZIZMOR_SELF_REPOSITORY_IGNORES:?set it to the number of self-repository ignores the workflows may carry}
+expected=${ZIZMOR_SELF_REPOSITORY_FINDINGS:?set it to the number of self-repository findings the workflows may carry}
 cd "$root"
 
-# Every line that mentions a zizmor ignore, in any spelling zizmor would read, and the ones that are
-# allowed.
-mention='zizmor:[[:space:]]*ignore'
-allowed_form='^[^:]*:[0-9]*:[[:space:]]*(- )?uses: \./\.github/actions/setup # zizmor: ignore\[self-repository\]( |$)'
-found=$(grep -rniE "$mention" .github || true)
-if [ -n "$found" ]; then
-	total=$(printf '%s\n' "$found" | wc -l | tr -d ' ')
-	known=$(printf '%s\n' "$found" | grep -cE "$allowed_form" || true)
-else
-	total=0
-	known=0
-fi
-if [ "$total" != "$known" ] || [ "$known" != "$allowed" ]; then
-	echo "zizmor ignore comments: found $total, of the allowed form $known, allowed $allowed (ZIZMOR_SELF_REPOSITORY_IGNORES in the Makefile)." >&2
-	printf '%s\n' "$found" | grep -vE "$allowed_form" >&2 || true
+links=$(find .github -type l)
+if [ -n "$links" ]; then
+	echo "symbolic links under .github/ are not allowed:" >&2
+	echo "$links" >&2
 	exit 1
 fi
 
-set -- --no-config --collect=all --strict-collection --no-progress
 token=${GH_TOKEN:-${GITHUB_TOKEN:-}}
-if [ -n "$token" ]; then
-	GH_TOKEN=$token exec zizmor "$@" .github/
+if [ -z "$token" ]; then
+	echo "no GH_TOKEN: offline audits only"
 fi
-echo "no GH_TOKEN: offline audits only"
-# zizmor reads GH_TOKEN itself and rejects an empty value, so the variables are removed.
-exec env -u GH_TOKEN -u GITHUB_TOKEN zizmor --offline "$@" .github/
+
+audit() {
+	if [ -n "$token" ]; then
+		env -u GH_TOKEN -u GITHUB_TOKEN GH_TOKEN="$token" zizmor --no-config --collect=all --strict-collection --no-progress "$@" .github/
+	else
+		env -u GH_TOKEN -u GITHUB_TOKEN zizmor --offline --no-config --collect=all --strict-collection --no-progress "$@" .github/
+	fi
+}
+
+findings=$(mktemp)
+trap 'rm -f "$findings"' EXIT
+# --no-exit-codes: a finding is not a failure here, the verdict is below; a tool failure still is.
+audit --no-ignores --no-exit-codes --format json >"$findings"
+
+verdict=$(cat <<'PY'
+import json
+import sys
+
+expected = int(sys.argv[1])
+with open(sys.argv[2], encoding="utf-8") as handle:
+    findings = json.load(handle)
+
+def place(finding):
+    for location in finding["locations"]:
+        path = location["symbolic"]["key"]["Local"]["verbatim_path"]
+        row = location["concrete"]["location"]["start_point"]["row"] + 1
+        return "%s:%d" % (path, row)
+    return "?"
+
+allowed = [f for f in findings if f["ident"] == "self-repository"]
+others = [f for f in findings if f["ident"] != "self-repository"]
+for finding in others:
+    print("%s: %s (%s)" % (place(finding), finding["desc"], finding["ident"]), file=sys.stderr)
+if others or len(allowed) != expected:
+    print("zizmor findings: %d of the allowed rule (self-repository), %d of other rules; allowed exactly %d of the first and none of the second (ZIZMOR_SELF_REPOSITORY_FINDINGS in the Makefile)" % (len(allowed), len(others), expected), file=sys.stderr)
+    sys.exit(1)
+print("zizmor: no findings but the %d allowed ones" % expected)
+PY
+)
+python3 -I -c "$verdict" "$expected" "$findings"

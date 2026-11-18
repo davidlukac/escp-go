@@ -62,11 +62,13 @@ actionlint:
 # an action's history) when a GitHub token is in GH_TOKEN or GITHUB_TOKEN, offline otherwise. Not part
 # of the pre-commit hook.
 #
-# The inline suppressions are an allow-list: the workflows carry this many `self-repository` ignores
-# (one per use of the local setup action) and no other zizmor ignore comment; a new suppression is a
-# deliberate edit of this number in the same pull request. The number goes away, with the ignores,
-# when actionlint accepts the `$/` form of a local action (rhysd/actionlint#711).
-ZIZMOR_SELF_REPOSITORY_IGNORES := 13
+# The findings are an exact allow-list: zizmor is run with --no-ignores (an ignore comment changes
+# nothing) and the run passes only when it reports this many `self-repository` findings (one per use of
+# the local setup action, which the workflows write as `./.github/actions/setup`) and nothing else. A new
+# finding, a new use or a removed one is a deliberate edit of this number in the same pull request. The
+# number goes away, with the comments on those uses, when actionlint accepts the `$/` form of a local
+# action (rhysd/actionlint#711).
+ZIZMOR_SELF_REPOSITORY_FINDINGS := 13
 
 .PHONY: zizmor
 zizmor:
@@ -78,7 +80,7 @@ zizmor:
 	@pin="$$(sed -n 's/^zizmor==\([0-9][0-9.]*\).*/\1/p' devtools/zizmor/requirements.txt)"; \
 	have="$$(zizmor --version | awk '{print $$2}')"; \
 	[ "$$have" = "$$pin" ] || echo "warning: zizmor $$have is installed, devtools/zizmor/requirements.txt pins $$pin"
-	@ZIZMOR_SELF_REPOSITORY_IGNORES=$(ZIZMOR_SELF_REPOSITORY_IGNORES) scripts/zizmor.sh
+	@ZIZMOR_SELF_REPOSITORY_FINDINGS=$(ZIZMOR_SELF_REPOSITORY_FINDINGS) scripts/zizmor.sh
 
 # Records GitHub's own rendering of the descriptions in internal/mergereadiness/readiness/testdata/oracle
 # (NN-name.md -> NN-name.html), the ground truth the tests of the "Merge readiness" check compare the
@@ -169,7 +171,7 @@ deadcode:
 	$(DEVTOOL) golangci-lint run --config .golangci-deadcode.yml --build-tags live ./...
 
 zizmorcheck:
-	@ZIZMOR_SELF_REPOSITORY_IGNORES=$(ZIZMOR_SELF_REPOSITORY_IGNORES) scripts/check-zizmor-options.sh
+	@ZIZMOR_SELF_REPOSITORY_FINDINGS=$(ZIZMOR_SELF_REPOSITORY_FINDINGS) scripts/check-zizmor-options.sh
 
 # Known vulnerabilities in the code and its dependencies.
 vuln:
