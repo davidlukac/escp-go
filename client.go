@@ -186,7 +186,7 @@ func dial(ctx context.Context, r ipLookuper, cfg Config, opts ...dialOption) (*C
 	}
 	base := clientLogger(cfg)
 	c := &Client{cfg: cfg, log: identified(base), ident: identity{pin: cfg.MAC}, seams: seams{shared: !claimsByDefault}, stop: make(chan struct{})}
-	c.locator = hostLocator(base, cfg) // Locate identifies itself
+	c.locator = hostLocator(base, cfg, hostInterfaces) // Locate identifies itself
 	if cfg.Host == "" && !cfg.MAC.IsZero() {
 		// no address yet: the first request finds the switch by its MAC address
 		c.dest = &net.UDPAddr{Port: cfg.SwitchPort}
@@ -311,9 +311,10 @@ func macHolding(addr net.IP, ifs []net.Interface, addrs func(net.Interface) ([]n
 // client's logger (before it is identified: Locate does that). It probes the interfaces of this
 // host, except for a client whose Config.BroadcastAddr is not the limited broadcast: that client was
 // pointed at one address (a fake switch on loopback, or one subnet), and its lookup goes there only,
-// never to the real network on the default ports.
-func hostLocator(log *slog.Logger, cfg Config) func(ctx context.Context, mac model.MAC) (model.Info, error) {
-	env := discoverEnv{interfaces: hostInterfaces, switchPort: cfg.SwitchPort, hostPort: cfg.HostPort}
+// never to the real network on the default ports. interfaces lists the interfaces of the host
+// (hostInterfaces, or a list of a test's own).
+func hostLocator(log *slog.Logger, cfg Config, interfaces func() ([]netInterface, error)) func(ctx context.Context, mac model.MAC) (model.Info, error) {
+	env := discoverEnv{interfaces: interfaces, switchPort: cfg.SwitchPort, hostPort: cfg.HostPort}
 	if b := cfg.BroadcastAddr; b.IsValid() && b != limitedBroadcast {
 		env.interfaces = func() ([]netInterface, error) {
 			return []netInterface{{Name: "configured", MAC: localMAC(net.IP(b.AsSlice())), Broadcasts: []netip.Addr{b}}}, nil

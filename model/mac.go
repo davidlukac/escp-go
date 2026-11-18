@@ -22,6 +22,7 @@ type MAC [macLen]byte
 func ParseMAC(s string) (MAC, error) {
 	hw, err := net.ParseMAC(s)
 	// net.ParseMAC also reads dotted and unseparated forms and longer addresses; only this form is documented.
+	// Equivalent mutant ("err != nil && len(hw) != macLen"): a failed parse returns no bytes, and the text checks that follow already leave only six.
 	if err != nil || len(hw) != macLen || len(s) != macTextLen || strings.Count(s, ":")+strings.Count(s, "-") != macLen-1 {
 		return MAC{}, invalidf("escp: %q is not a MAC address; write it as aa:bb:cc:dd:ee:ff (colons or hyphens)", s)
 	}

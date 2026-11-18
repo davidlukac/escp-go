@@ -3,13 +3,11 @@ package escp
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net"
 	"net/netip"
 	"reflect"
 	"testing"
-	"time"
 
 	"github.com/davidlukac/escp-go/escptest"
 	"github.com/davidlukac/escp-go/internal/wire"
@@ -264,61 +262,6 @@ func TestSubnetBroadcastRefusesAMaskThatDoesNotFitTheAddress(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := subnetBroadcast(tc.addr); got.IsValid() {
 				t.Fatalf("subnetBroadcast = %v, want none", got)
-			}
-		})
-	}
-}
-
-// The lookup of a client that was not pointed at one address probes the interfaces of this host, as
-// Locate does; only a client with a broadcast address of its own is pointed at that address. So a
-// client with the limited broadcast (the default Dial fills in) or none at all probes what the host
-// lists, and the lookup of a host with no usable interface says so. The probe never leaves: the
-// reply port is held exclusively, so the lookup ends at the bind, after it has said what it would
-// have probed. Held by the `&&` of hostLocator in client.go.
-func TestTheLookupOfAClientWithTheDefaultBroadcastAddressProbesTheHostsInterfaces(t *testing.T) {
-	ifs, err := hostInterfaces()
-	if err != nil {
-		t.Skipf("this host cannot list its interfaces: %v", err)
-	}
-	probes := 0
-	for _, i := range ifs {
-		probes += len(i.Broadcasts)
-	}
-	if len(ifs) == 1 && probes == 1 {
-		t.Skip("this host has one interface with one broadcast address, which the configured one cannot be told from")
-	}
-	tests := []struct {
-		name string
-		addr netip.Addr
-	}{
-		{"the limited broadcast", limitedBroadcast},
-		{"no broadcast address", netip.Addr{}},
-	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			busy, err := net.ListenUDP("udp4", &net.UDPAddr{Port: escptest.FreeUDPPort(t)}) // does not share the port
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer busy.Close()
-			log, rec := newLogRecorder()
-			cfg := Config{BroadcastAddr: tc.addr, SwitchPort: escptest.FreeUDPPort(t), HostPort: localPort(t, busy)}
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			_, err = hostLocator(log, cfg)(ctx, wantMAC)
-			lines := rec.named("discovery probes")
-			if len(ifs) == 0 {
-				if !errors.Is(err, ErrNoInterface) || len(lines) != 0 {
-					t.Fatalf("a host with no usable interface: err %v, %d probe line(s); want ErrNoInterface and none", err, len(lines))
-				}
-				return
-			}
-			if len(lines) != 1 {
-				t.Fatalf("%d probe lines (err %v), want 1", len(lines), err)
-			}
-			got := fmt.Sprintf("%v interfaces, %v probes", lines[0].attrs["interfaces"], lines[0].attrs["probes"])
-			if want := fmt.Sprintf("%d interfaces, %d probes", len(ifs), probes); got != want {
-				t.Fatalf("the lookup would probe %s, want %s: the interfaces of this host", got, want)
 			}
 		})
 	}

@@ -36,7 +36,7 @@ func (c *Client) discover(ctx context.Context) (model.Info, error) {
 			return model.Info{}, err
 		}
 	}
-	if c.cfg.MAC.IsZero() || c.ident.known() || !c.mayRelocate() {
+	if c.ident.known() || !c.mayRelocate() { // mayRelocate is false without a MAC
 		return c.discoverOnce(ctx)
 	}
 	// First contact with a switch that is pinned by MAC: the address gets a short budget (a switch

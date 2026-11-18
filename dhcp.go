@@ -61,6 +61,15 @@ func (c *Client) EnableDHCP(ctx context.Context) error {
 	if err != nil && (!sent || errors.As(err, &refused)) {
 		return err // nothing was applied: the gate or the switch refused, or the request was not sent
 	}
+	return c.finishDHCP(ctx, before, err)
+}
+
+// finishDHCP settles the outcome of the write of EnableDHCP. A write that failed on a client whose
+// Close has begun settles nothing: the cut-short error. Any other outcome, an answered write
+// included, waits for the lease and points the client at it, so an answered write that Close
+// overtook before the lock still follows a lease that is found at once. wrote is what the write
+// returned (nil when it was answered). It takes c.mu itself.
+func (c *Client) finishDHCP(ctx context.Context, before model.IPConfig, wrote error) error {
 	// Applied, or possibly applied: the answer is what discovery shows, even if ctx is done.
 	if ctx.Err() != nil {
 		var cancel context.CancelFunc
@@ -70,12 +79,13 @@ func (c *Client) EnableDHCP(ctx context.Context) error {
 	// lockwait: the lock is held across the wait for the lease on purpose (the outcome of a write that may have been applied is settled before another call uses the client); the wait ends after leaseWait, or with Close (withStop)
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if err != nil && (errors.Is(err, ErrClosed) || c.closing()) {
+	// errors.Is(wrote, ErrClosed) is belt and braces: every ErrClosed of the client implies closing(), but the helper may be handed any error (equivalent mutant).
+	if wrote != nil && (errors.Is(wrote, ErrClosed) || c.closing()) {
 		return cutShort() // Close ended the write: nothing is settled on a closed client
 	}
 	ctx, release := c.withStop(ctx) // the lease wait ends when Close begins
 	defer release()
-	return c.cutShortBy(c.awaitLease(ctx, before, plainNoReply(err)))
+	return c.cutShortBy(c.awaitLease(ctx, before, plainNoReply(wrote)))
 }
 
 // awaitLease polls for the switch by MAC until it reports DHCP on with a usable address, then points

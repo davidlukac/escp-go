@@ -89,7 +89,10 @@ func maskAt(v []byte, off int) PortSet {
 func (s PortSet) Mask() []byte { return binary.BigEndian.AppendUint32(nil, uint32(s)) }
 
 // Has reports whether p is in the set.
-func (s PortSet) Has(p PortID) bool { return p >= 1 && p <= MaxPort && s&(1<<uint(p-1)) != 0 }
+func (s PortSet) Has(p PortID) bool {
+	// Equivalent mutant ("p >= 1 || p <= MaxPort"): a shift count of 32 or more gives 0 in Go, so the bit test is false wherever the range test is.
+	return p >= 1 && p <= MaxPort && s&(1<<uint(p-1)) != 0
+}
 
 // Len is the number of ports in the set.
 func (s PortSet) Len() int { return bits.OnesCount32(uint32(s)) }
