@@ -34,7 +34,7 @@ func writeReport(t *testing.T, text string) string {
 func TestTheSummaryCountsEachOutcomeAndListsTheSurvivors(t *testing.T) {
 	code, out, errOut := runWith(t, writeReport(t, sample))
 	want := "### Mutation testing\n\nKILLED: 2, LIVED: 2, NOT COVERED: 1\n\n" +
-		"**Survivors: 2.** Efficacy: 50.0% (killed 2 and timed out 0 of the 4 that were run and decided).\n\n" +
+		"**Survivors: 2.** Efficacy: 50.00% (killed 2 and timed out 0 of the 4 that were run and decided).\n\n" +
 		"**Timed out: 0** (counted as killed; an unexplained rise is investigated: a slow test, a cached baseline, a real infinite loop).\n\n" +
 		"Surviving mutants (a behavior no test pins; an equivalent mutant is not a reason to bend a test):\n\n" +
 		"- `a.go:9:2` ARITHMETIC_BASE\n- `b.go:1:1` CONDITIONALS_BOUNDARY\n"
@@ -82,7 +82,7 @@ func TestWrongArgumentsAreAUsageError(t *testing.T) {
 func TestTheBadgeIsTheEfficacyOfTheRun(t *testing.T) {
 	// 2 killed and 2 survived: 50%, red; the not covered mutant is not counted
 	code, out, errOut := runWith(t, "badge", writeReport(t, sample))
-	want := `{"schemaVersion":1,"label":"mutation score","message":"50.0%","color":"red"}` + "\n"
+	want := `{"schemaVersion":1,"label":"mutation score","message":"50.00%","color":"red"}` + "\n"
 	if code != exitOK || errOut != "" || out != want {
 		t.Fatalf("code %d, stderr %q, stdout %q, want %q", code, errOut, out, want)
 	}
@@ -93,16 +93,16 @@ func TestTheBadgeColorFollowsTheBands(t *testing.T) {
 		killed, lived  int
 		message, color string
 	}{
-		{100, 0, "100.0%", "brightgreen"},
-		{95, 5, "95.0%", "brightgreen"},
-		{94, 6, "94.0%", "green"},
-		{90, 10, "90.0%", "green"},
-		{89, 11, "89.0%", "yellowgreen"},
-		{80, 20, "80.0%", "yellowgreen"},
-		{70, 30, "70.0%", "yellow"},
-		{60, 40, "60.0%", "orange"},
-		{59, 41, "59.0%", "red"},
-		{0, 3, "0.0%", "red"},
+		{100, 0, "100.00%", "brightgreen"},
+		{95, 5, "95.00%", "brightgreen"},
+		{94, 6, "94.00%", "green"},
+		{90, 10, "90.00%", "green"},
+		{89, 11, "89.00%", "yellowgreen"},
+		{80, 20, "80.00%", "yellowgreen"},
+		{70, 30, "70.00%", "yellow"},
+		{60, 40, "60.00%", "orange"},
+		{59, 41, "59.00%", "red"},
+		{0, 3, "0.00%", "red"},
 	} {
 		t.Run(tc.message, func(t *testing.T) {
 			var r report

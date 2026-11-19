@@ -1,0 +1,688 @@
+[
+ {
+  "name": "mutation: the check made non-fatal with || true",
+  "old": "\tgo run ./internal/mutationreport check build/mutation.json \"$(EFFICACY)\"\n",
+  "new": "\tgo run ./internal/mutationreport check build/mutation.json \"$(EFFICACY)\" || true\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation: the check made non-fatal with a - prefix",
+  "old": "\tgo run ./internal/mutationreport check build/mutation.json \"$(EFFICACY)\"\n",
+  "new": "\t-go run ./internal/mutationreport check build/mutation.json \"$(EFFICACY)\"\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation: the threshold validation made non-fatal with a - prefix",
+  "old": "\tgo run ./internal/mutationreport threshold \"$(EFFICACY)\"\n",
+  "new": "\t-go run ./internal/mutationreport threshold \"$(EFFICACY)\"\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation: the check given a hardcoded threshold",
+  "old": "\tgo run ./internal/mutationreport check build/mutation.json \"$(EFFICACY)\"\n",
+  "new": "\tgo run ./internal/mutationreport check build/mutation.json 90\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation: the threshold validation given a hardcoded threshold",
+  "old": "\tgo run ./internal/mutationreport threshold \"$(EFFICACY)\"\n",
+  "new": "\tgo run ./internal/mutationreport threshold 90\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation: the old report removed from the wrong file",
+  "old": "\trm -f build/mutation.json\n",
+  "new": "\trm -f build/mutation.jsonx\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation: the old report removal made non-fatal with a - prefix",
+  "old": "\trm -f build/mutation.json\n",
+  "new": "\t-rm -f build/mutation.json\n",
+  "occurrence": 0,
+  "equivalent": "rm -f never fails, so a - prefix changes nothing observable: the recipe prints and exits the same"
+ },
+ {
+  "name": "mutation: everything removed instead of the old report",
+  "old": "\trm -f build/mutation.json\n",
+  "new": "\trm -rf build\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation: the check duplicated",
+  "old": "\tgo run ./internal/mutationreport check build/mutation.json \"$(EFFICACY)\"\n",
+  "new": "\tgo run ./internal/mutationreport check build/mutation.json \"$(EFFICACY)\"\n\tgo run ./internal/mutationreport check build/mutation.json \"$(EFFICACY)\"\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation: the check block deleted",
+  "old": "ifneq ($(origin EFFICACY),undefined)\n\tgo run ./internal/mutationreport check build/mutation.json \"$(EFFICACY)\"\nendif\n",
+  "new": "",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation: the threshold block deleted",
+  "old": "ifneq ($(origin EFFICACY),undefined)\n\tgo run ./internal/mutationreport threshold \"$(EFFICACY)\"\nendif\n",
+  "new": "",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation: the check tested by value of EFFICACY",
+  "old": "ifneq ($(origin EFFICACY),undefined)\n\tgo run ./internal/mutationreport check build/mutation.json \"$(EFFICACY)\"\n",
+  "new": "ifneq ($(EFFICACY),)\n\tgo run ./internal/mutationreport check build/mutation.json \"$(EFFICACY)\"\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation: the threshold tested by value of EFFICACY",
+  "old": "ifneq ($(origin EFFICACY),undefined)\n\tgo run ./internal/mutationreport threshold \"$(EFFICACY)\"\n",
+  "new": "ifneq ($(EFFICACY),)\n\tgo run ./internal/mutationreport threshold \"$(EFFICACY)\"\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation: the check tested with ifdef",
+  "old": "ifneq ($(origin EFFICACY),undefined)\n\tgo run ./internal/mutationreport check build/mutation.json \"$(EFFICACY)\"\n",
+  "new": "ifdef EFFICACY\n\tgo run ./internal/mutationreport check build/mutation.json \"$(EFFICACY)\"\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation: the check tested for the command line only",
+  "old": "ifneq ($(origin EFFICACY),undefined)\n\tgo run ./internal/mutationreport check build/mutation.json \"$(EFFICACY)\"\n",
+  "new": "ifeq ($(origin EFFICACY),command line)\n\tgo run ./internal/mutationreport check build/mutation.json \"$(EFFICACY)\"\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation: the check run when EFFICACY is not given",
+  "old": "ifneq ($(origin EFFICACY),undefined)\n\tgo run ./internal/mutationreport check build/mutation.json \"$(EFFICACY)\"\n",
+  "new": "ifeq ($(origin EFFICACY),undefined)\n\tgo run ./internal/mutationreport check build/mutation.json \"$(EFFICACY)\"\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation: the check reading the report of the extended run",
+  "old": "\tgo run ./internal/mutationreport check build/mutation.json \"$(EFFICACY)\"\n",
+  "new": "\tgo run ./internal/mutationreport check build/mutation-extended.json \"$(EFFICACY)\"\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation: the check given WORKERS as the threshold",
+  "old": "\tgo run ./internal/mutationreport check build/mutation.json \"$(EFFICACY)\"\n",
+  "new": "\tgo run ./internal/mutationreport check build/mutation.json \"$(WORKERS)\"\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation: the threshold validation given the coefficient",
+  "old": "\tgo run ./internal/mutationreport threshold \"$(EFFICACY)\"\n",
+  "new": "\tgo run ./internal/mutationreport threshold \"$(TIMEOUT_COEFFICIENT)\"\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation: the coefficient validation made non-fatal with a - prefix",
+  "old": "\tgo run ./internal/mutationreport coefficient \"$(TIMEOUT_COEFFICIENT)\"\n",
+  "new": "\t-go run ./internal/mutationreport coefficient \"$(TIMEOUT_COEFFICIENT)\"\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation: the coefficient validation deleted",
+  "old": "\tgo run ./internal/mutationreport coefficient \"$(TIMEOUT_COEFFICIENT)\"\n",
+  "new": "",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation: the coefficient validation given an unquoted value",
+  "old": "\tgo run ./internal/mutationreport coefficient \"$(TIMEOUT_COEFFICIENT)\"\n",
+  "new": "\tgo run ./internal/mutationreport coefficient $(TIMEOUT_COEFFICIENT)\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation: the coefficient validation given another variable",
+  "old": "\tgo run ./internal/mutationreport coefficient \"$(TIMEOUT_COEFFICIENT)\"\n",
+  "new": "\tgo run ./internal/mutationreport coefficient \"$(WORKERS)\"\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation-diff: the check made non-fatal with || true",
+  "old": "\tgo run ./internal/mutationreport check build/mutation.json \"$(EFFICACY)\"\n",
+  "new": "\tgo run ./internal/mutationreport check build/mutation.json \"$(EFFICACY)\" || true\n",
+  "occurrence": 1,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation-diff: the check made non-fatal with a - prefix",
+  "old": "\tgo run ./internal/mutationreport check build/mutation.json \"$(EFFICACY)\"\n",
+  "new": "\t-go run ./internal/mutationreport check build/mutation.json \"$(EFFICACY)\"\n",
+  "occurrence": 1,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation-diff: the threshold validation made non-fatal with a - prefix",
+  "old": "\tgo run ./internal/mutationreport threshold \"$(EFFICACY)\"\n",
+  "new": "\t-go run ./internal/mutationreport threshold \"$(EFFICACY)\"\n",
+  "occurrence": 1,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation-diff: the check given a hardcoded threshold",
+  "old": "\tgo run ./internal/mutationreport check build/mutation.json \"$(EFFICACY)\"\n",
+  "new": "\tgo run ./internal/mutationreport check build/mutation.json 90\n",
+  "occurrence": 1,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation-diff: the threshold validation given a hardcoded threshold",
+  "old": "\tgo run ./internal/mutationreport threshold \"$(EFFICACY)\"\n",
+  "new": "\tgo run ./internal/mutationreport threshold 90\n",
+  "occurrence": 1,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation-diff: the old report removed from the wrong file",
+  "old": "\trm -f build/mutation.json\n",
+  "new": "\trm -f build/mutation.jsonx\n",
+  "occurrence": 1,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation-diff: the old report removal made non-fatal with a - prefix",
+  "old": "\trm -f build/mutation.json\n",
+  "new": "\t-rm -f build/mutation.json\n",
+  "occurrence": 1,
+  "equivalent": "rm -f never fails, so a - prefix changes nothing observable: the recipe prints and exits the same"
+ },
+ {
+  "name": "mutation-diff: everything removed instead of the old report",
+  "old": "\trm -f build/mutation.json\n",
+  "new": "\trm -rf build\n",
+  "occurrence": 1,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation-diff: the check duplicated",
+  "old": "\tgo run ./internal/mutationreport check build/mutation.json \"$(EFFICACY)\"\n",
+  "new": "\tgo run ./internal/mutationreport check build/mutation.json \"$(EFFICACY)\"\n\tgo run ./internal/mutationreport check build/mutation.json \"$(EFFICACY)\"\n",
+  "occurrence": 1,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation-diff: the check block deleted",
+  "old": "ifneq ($(origin EFFICACY),undefined)\n\tgo run ./internal/mutationreport check build/mutation.json \"$(EFFICACY)\"\nendif\n",
+  "new": "",
+  "occurrence": 1,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation-diff: the threshold block deleted",
+  "old": "ifneq ($(origin EFFICACY),undefined)\n\tgo run ./internal/mutationreport threshold \"$(EFFICACY)\"\nendif\n",
+  "new": "",
+  "occurrence": 1,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation-diff: the check tested by value of EFFICACY",
+  "old": "ifneq ($(origin EFFICACY),undefined)\n\tgo run ./internal/mutationreport check build/mutation.json \"$(EFFICACY)\"\n",
+  "new": "ifneq ($(EFFICACY),)\n\tgo run ./internal/mutationreport check build/mutation.json \"$(EFFICACY)\"\n",
+  "occurrence": 1,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation-diff: the threshold tested by value of EFFICACY",
+  "old": "ifneq ($(origin EFFICACY),undefined)\n\tgo run ./internal/mutationreport threshold \"$(EFFICACY)\"\n",
+  "new": "ifneq ($(EFFICACY),)\n\tgo run ./internal/mutationreport threshold \"$(EFFICACY)\"\n",
+  "occurrence": 1,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation-diff: the check tested with ifdef",
+  "old": "ifneq ($(origin EFFICACY),undefined)\n\tgo run ./internal/mutationreport check build/mutation.json \"$(EFFICACY)\"\n",
+  "new": "ifdef EFFICACY\n\tgo run ./internal/mutationreport check build/mutation.json \"$(EFFICACY)\"\n",
+  "occurrence": 1,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation-diff: the check tested for the command line only",
+  "old": "ifneq ($(origin EFFICACY),undefined)\n\tgo run ./internal/mutationreport check build/mutation.json \"$(EFFICACY)\"\n",
+  "new": "ifeq ($(origin EFFICACY),command line)\n\tgo run ./internal/mutationreport check build/mutation.json \"$(EFFICACY)\"\n",
+  "occurrence": 1,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation-diff: the check run when EFFICACY is not given",
+  "old": "ifneq ($(origin EFFICACY),undefined)\n\tgo run ./internal/mutationreport check build/mutation.json \"$(EFFICACY)\"\n",
+  "new": "ifeq ($(origin EFFICACY),undefined)\n\tgo run ./internal/mutationreport check build/mutation.json \"$(EFFICACY)\"\n",
+  "occurrence": 1,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation-diff: the check reading the report of the extended run",
+  "old": "\tgo run ./internal/mutationreport check build/mutation.json \"$(EFFICACY)\"\n",
+  "new": "\tgo run ./internal/mutationreport check build/mutation-extended.json \"$(EFFICACY)\"\n",
+  "occurrence": 1,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation-diff: the check given WORKERS as the threshold",
+  "old": "\tgo run ./internal/mutationreport check build/mutation.json \"$(EFFICACY)\"\n",
+  "new": "\tgo run ./internal/mutationreport check build/mutation.json \"$(WORKERS)\"\n",
+  "occurrence": 1,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation-diff: the threshold validation given the coefficient",
+  "old": "\tgo run ./internal/mutationreport threshold \"$(EFFICACY)\"\n",
+  "new": "\tgo run ./internal/mutationreport threshold \"$(TIMEOUT_COEFFICIENT)\"\n",
+  "occurrence": 1,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation-diff: the coefficient validation made non-fatal with a - prefix",
+  "old": "\tgo run ./internal/mutationreport coefficient \"$(TIMEOUT_COEFFICIENT)\"\n",
+  "new": "\t-go run ./internal/mutationreport coefficient \"$(TIMEOUT_COEFFICIENT)\"\n",
+  "occurrence": 1,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation-diff: the coefficient validation deleted",
+  "old": "\tgo run ./internal/mutationreport coefficient \"$(TIMEOUT_COEFFICIENT)\"\n",
+  "new": "",
+  "occurrence": 1,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation-diff: the coefficient validation given an unquoted value",
+  "old": "\tgo run ./internal/mutationreport coefficient \"$(TIMEOUT_COEFFICIENT)\"\n",
+  "new": "\tgo run ./internal/mutationreport coefficient $(TIMEOUT_COEFFICIENT)\n",
+  "occurrence": 1,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation-diff: the coefficient validation given another variable",
+  "old": "\tgo run ./internal/mutationreport coefficient \"$(TIMEOUT_COEFFICIENT)\"\n",
+  "new": "\tgo run ./internal/mutationreport coefficient \"$(WORKERS)\"\n",
+  "occurrence": 1,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation: the old report removed after gremlins",
+  "old": "\trm -f build/mutation.json\nifneq ($(origin EFFICACY),undefined)\n\tgo run ./internal/mutationreport threshold \"$(EFFICACY)\"\nendif\n\tgo run ./internal/mutationreport coefficient \"$(TIMEOUT_COEFFICIENT)\"\n\t$(MUTATE)\n",
+  "new": "\t$(MUTATE)\n\trm -f build/mutation.json\nifneq ($(origin EFFICACY),undefined)\n\tgo run ./internal/mutationreport threshold \"$(EFFICACY)\"\nendif\n\tgo run ./internal/mutationreport coefficient \"$(TIMEOUT_COEFFICIENT)\"\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation-diff: the old report removed after gremlins",
+  "old": "\trm -f build/mutation.json\nifneq ($(origin EFFICACY),undefined)\n\tgo run ./internal/mutationreport threshold \"$(EFFICACY)\"\nendif\n\tgo run ./internal/mutationreport coefficient \"$(TIMEOUT_COEFFICIENT)\"\n\t$(MUTATE) --diff $(or $(BASE),origin/main)\n",
+  "new": "\t$(MUTATE) --diff $(or $(BASE),origin/main)\n\trm -f build/mutation.json\nifneq ($(origin EFFICACY),undefined)\n\tgo run ./internal/mutationreport threshold \"$(EFFICACY)\"\nendif\n\tgo run ./internal/mutationreport coefficient \"$(TIMEOUT_COEFFICIENT)\"\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation: the check run before gremlins",
+  "old": "\t$(MUTATE)\nifneq ($(origin EFFICACY),undefined)\n\tgo run ./internal/mutationreport check build/mutation.json \"$(EFFICACY)\"\nendif\n",
+  "new": "ifneq ($(origin EFFICACY),undefined)\n\tgo run ./internal/mutationreport check build/mutation.json \"$(EFFICACY)\"\nendif\n\t$(MUTATE)\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation: the coefficient validated after gremlins",
+  "old": "\tgo run ./internal/mutationreport coefficient \"$(TIMEOUT_COEFFICIENT)\"\n\t$(MUTATE)\n",
+  "new": "\t$(MUTATE)\n\tgo run ./internal/mutationreport coefficient \"$(TIMEOUT_COEFFICIENT)\"\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation: an extra step",
+  "old": "\trm -f build/mutation.json\n",
+  "new": "\trm -f build/mutation.json\n\techo done\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation: gremlins inlined instead of the stand-in hook",
+  "old": "\t$(MUTATE)\n",
+  "new": "\t$(GREMLINS) --output build/mutation.json\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation-diff: gremlins inlined instead of the stand-in hook",
+  "old": "\t$(MUTATE) --diff",
+  "new": "\t$(GREMLINS) --output build/mutation.json --diff",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation-extended: gremlins inlined instead of the stand-in hook",
+  "old": "\t$(MUTATE_EXTENDED)\n",
+  "new": "\t$(GREMLINS) --output build/mutation-extended.json\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation: the extended run instead of the mutation run",
+  "old": "\t$(MUTATE)\n",
+  "new": "\t$(MUTATE_EXTENDED)\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation-diff: the extended run instead of the mutation run",
+  "old": "\t$(MUTATE) --diff",
+  "new": "\t$(MUTATE_EXTENDED) --diff",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation-extended: run twice",
+  "old": "\t$(MUTATE_EXTENDED)\n",
+  "new": "\t$(MUTATE_EXTENDED)\n\t$(MUTATE_EXTENDED)\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation-extended: a check added",
+  "old": "\t$(MUTATE_EXTENDED)\n",
+  "new": "\t$(MUTATE_EXTENDED)\n\tgo run ./internal/mutationreport check build/mutation.json \"$(EFFICACY)\"\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation-extended: the report of the run removed",
+  "old": "\t@mkdir -p build\n\tgo run ./internal/mutationreport coefficient \"$(TIMEOUT_COEFFICIENT)\"\n\t$(MUTATE_EXTENDED)",
+  "new": "\t@mkdir -p build\n\trm -f build/mutation.json\n\tgo run ./internal/mutationreport coefficient \"$(TIMEOUT_COEFFICIENT)\"\n\t$(MUTATE_EXTENDED)",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation-extended: the coefficient validation deleted",
+  "old": "\tgo run ./internal/mutationreport coefficient \"$(TIMEOUT_COEFFICIENT)\"\n\t$(MUTATE_EXTENDED)",
+  "new": "\t$(MUTATE_EXTENDED)",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation-extended: the coefficient validation made non-fatal with a - prefix",
+  "old": "\tgo run ./internal/mutationreport coefficient \"$(TIMEOUT_COEFFICIENT)\"\n\t$(MUTATE_EXTENDED)",
+  "new": "\t-go run ./internal/mutationreport coefficient \"$(TIMEOUT_COEFFICIENT)\"\n\t$(MUTATE_EXTENDED)",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation-extended: build/ not made",
+  "old": "\t@mkdir -p build\n\tgo run ./internal/mutationreport coefficient \"$(TIMEOUT_COEFFICIENT)\"\n\t$(MUTATE_EXTENDED)",
+  "new": "\tgo run ./internal/mutationreport coefficient \"$(TIMEOUT_COEFFICIENT)\"\n\t$(MUTATE_EXTENDED)",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "the report of the run named build/mutation2.json",
+  "old": "MUTATE := $(GREMLINS) --output build/mutation.json",
+  "new": "MUTATE := $(GREMLINS) --output build/mutation2.json",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "gremlins run without GOFLAGS=-count=1",
+  "old": "GREMLINS := GOFLAGS=-count=1 ",
+  "new": "GREMLINS := ",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation: gremlins given --threshold-efficacy",
+  "old": "MUTATE := $(GREMLINS) ",
+  "new": "MUTATE := $(GREMLINS) --threshold-efficacy 90 ",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation-extended: gremlins given --threshold-efficacy",
+  "old": "MUTATE_EXTENDED := $(GREMLINS) ",
+  "new": "MUTATE_EXTENDED := $(GREMLINS) --threshold-efficacy 90 ",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "TIMEOUT_COEFFICIENT set with = (the environment cannot override it)",
+  "old": "TIMEOUT_COEFFICIENT ?= 10",
+  "new": "TIMEOUT_COEFFICIENT = 10",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "the coefficient hardcoded in the gremlins line",
+  "old": "--timeout-coefficient $(TIMEOUT_COEFFICIENT)",
+  "new": "--timeout-coefficient 10",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "the coefficient dropped from the gremlins line",
+  "old": " --timeout-coefficient $(TIMEOUT_COEFFICIENT)",
+  "new": "",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "the default coefficient 3",
+  "old": "TIMEOUT_COEFFICIENT ?= 10",
+  "new": "TIMEOUT_COEFFICIENT ?= 3",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "the coefficient of the gremlins line taken from WORKERS",
+  "old": "--timeout-coefficient $(TIMEOUT_COEFFICIENT)",
+  "new": "--timeout-coefficient $(or $(WORKERS),4)",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "--workers hardcoded",
+  "old": "--workers $(or $(WORKERS),4)",
+  "new": "--workers 4",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "the PKG filter dropped from gremlins",
+  "old": " $(PKG_EXCLUDES)",
+  "new": "",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "the PKG filter excluding the directory asked for",
+  "old": "$(filter-out $(PKG),$(PKG_DIRS))",
+  "new": "$(PKG_DIRS)",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation-diff: the diff dropped",
+  "old": " --diff $(or $(BASE),origin/main)",
+  "new": "",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation-diff: BASE ignored",
+  "old": "$(or $(BASE),origin/main)",
+  "new": "origin/main",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation-diff: the base hardcoded to main",
+  "old": "$(or $(BASE),origin/main)",
+  "new": "main",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "make lint without the recipe check",
+  "old": "lint: catalogcheck guarantee lintfixtures mutationrecipe",
+  "new": "lint: catalogcheck guarantee lintfixtures",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "PKG_DIRS expanded at every start of make",
+  "old": "PKG_DIRS = ",
+  "new": "PKG_DIRS := ",
+  "occurrence": 0,
+  "equivalent": "the list is only ever read when PKG is set, so expanding it eagerly changes the time make takes and nothing it prints or does"
+ },
+ {
+  "name": "mutationrecipe: the check made non-fatal with || true",
+  "old": "-root $(CURDIR)\n",
+  "new": "-root $(CURDIR) || true\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutationrecipe: an extra flag after the root",
+  "old": "-root $(CURDIR)\n",
+  "new": "-root $(CURDIR) -make true\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutationrecipe: another root",
+  "old": "-root $(CURDIR)\n",
+  "new": "-root /tmp\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutationrecipe: the check made non-fatal with a - prefix",
+  "old": "mutationrecipe:\n\tgo -C",
+  "new": "mutationrecipe:\n\t-go -C",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutationrecipe: the check hidden with an @ prefix",
+  "old": "mutationrecipe:\n\tgo -C",
+  "new": "mutationrecipe:\n\t@go -C",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutationrecipe: a second step after the check",
+  "old": "-root $(CURDIR)\n",
+  "new": "-root $(CURDIR)\n\ttrue\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation: gremlins made non-fatal with || true",
+  "old": "\t$(MUTATE)\n",
+  "new": "\t$(MUTATE) || true\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation: a word added after gremlins",
+  "old": "\t$(MUTATE)\n",
+  "new": "\t$(MUTATE) --verbose\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation-diff: gremlins made non-fatal with || true",
+  "old": "--diff $(or $(BASE),origin/main)\n",
+  "new": "--diff $(or $(BASE),origin/main) || true\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation-diff: a word added after the diff",
+  "old": "--diff $(or $(BASE),origin/main)\n",
+  "new": "--diff $(or $(BASE),origin/main) --verbose\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation-extended: gremlins made non-fatal with || true",
+  "old": "\t$(MUTATE_EXTENDED)\n",
+  "new": "\t$(MUTATE_EXTENDED) || true\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation-extended: a word added after the operators",
+  "old": "\t$(MUTATE_EXTENDED)\n",
+  "new": "\t$(MUTATE_EXTENDED) --verbose\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "the report path glued to another word",
+  "old": "MUTATE := $(GREMLINS) --output build/mutation.json",
+  "new": "MUTATE := $(GREMLINS) --output build/mutation.json.bak",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "the coefficient word glued to a digit",
+  "old": "--timeout-coefficient $(TIMEOUT_COEFFICIENT)",
+  "new": "--timeout-coefficient $(TIMEOUT_COEFFICIENT)0",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "the workers word glued to a digit",
+  "old": "--workers $(or $(WORKERS),4)",
+  "new": "--workers $(or $(WORKERS),4)0",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "GOFLAGS glued to a digit",
+  "old": "GREMLINS := GOFLAGS=-count=1 ",
+  "new": "GREMLINS := GOFLAGS=-count=10 ",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation: the coefficient 010 let through",
+  "old": "coefficient \"$(TIMEOUT_COEFFICIENT)\"",
+  "new": "coefficient \"$(subst 010,10,$(TIMEOUT_COEFFICIENT))\"",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation: the coefficient 10000 let through",
+  "old": "coefficient \"$(TIMEOUT_COEFFICIENT)\"",
+  "new": "coefficient \"$(subst 10000,1000,$(TIMEOUT_COEFFICIENT))\"",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation: a threshold that is not a percentage let through",
+  "old": "threshold \"$(EFFICACY)\"",
+  "new": "threshold \"$(subst 90%,90,$(EFFICACY))\"",
+  "occurrence": 0,
+  "equivalent": ""
+ }
+]

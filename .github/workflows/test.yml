@@ -52,6 +52,10 @@ jobs:
       # `make pre-commit` runs locally.
       - name: Lint
         run: make lint
+      # The recipe check of `make lint` held to the mutants of the Makefile it must notice
+      # (devtools/recipecheck/testdata/makefile_mutants.json); about a minute and a half, so not in lint.
+      - name: The recipe check notices every mutant of the Makefile
+        run: make recipemutants
       - name: Known vulnerabilities
         run: make vuln
       # The pinned actionlint (devtools/go.mod), the same one the pre-commit hook runs.

@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"regexp"
 	"strconv"
 )
 
@@ -45,24 +46,47 @@ func (t tally) efficacy() (pct float64, ok bool) {
 	return 100 * float64(t.killed+t.timedOut) / float64(t.decided()), true
 }
 
-// efficacyText is the efficacy as a percentage with one decimal, "n/a" when there is none.
+// efficacyText is the efficacy as a percentage with two decimals, "n/a" when there is none. Two, and
+// the exact counts beside it in the check line, because the verdict compares the unrounded value: 1799
+// of 1999 is 89.995%, below 90, and one decimal would print it as 90.0%.
 func (t tally) efficacyText() string {
 	pct, ok := t.efficacy()
 	if !ok {
 		return "n/a"
 	}
-	return fmt.Sprintf("%.1f%%", pct)
+	return fmt.Sprintf("%.2f%%", pct)
+}
+
+// parseThreshold reads a threshold, a percentage from 0 to 100.
+func parseThreshold(text string) (float64, error) {
+	limit, err := strconv.ParseFloat(text, 64)
+	if err != nil || !(limit >= 0 && limit <= 100) { // written so that NaN is refused too
+		return 0, fmt.Errorf("the threshold %q is not a percentage from 0 to 100", text)
+	}
+	return limit, nil
+}
+
+// writeThreshold is the `threshold` command: it exits 0 when text is a valid threshold and says why
+// on stderr, with exit code 2, when it is not. `make mutation` runs it before the quarter of an hour
+// of mutation, so that a typo in EFFICACY fails at once and not after the run.
+func writeThreshold(text string, stderr io.Writer) int {
+	if _, err := parseThreshold(text); err != nil {
+		_, _ = fmt.Fprintf(stderr, "mutationreport: %v\n", err)
+		return exitUsage
+	}
+	return exitOK
 }
 
 // writeCheck is the `check` command: it prints one line with the figures of the report and returns
-// exitOK when the efficacy reaches the threshold (a percentage from 0 to 100). It fails when the
+// exitOK when the efficacy reaches the threshold (a percentage from 0 to 100): it passes AT the
+// threshold, where gremlins' own gate failed at equality. It fails when the
 // efficacy is below it, when there is none (a report that was read but holds no mutant that was run
 // and decided has nothing to judge, and a scope that went empty must not pass silently), and when the
 // report or the threshold cannot be read.
 func writeCheck(path, threshold string, stdout, stderr io.Writer) int {
-	limit, err := strconv.ParseFloat(threshold, 64)
-	if err != nil || !(limit >= 0 && limit <= 100) { // written so that NaN is refused too
-		_, _ = fmt.Fprintf(stderr, "mutationreport: the threshold %q is not a percentage from 0 to 100\n", threshold)
+	limit, err := parseThreshold(threshold)
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "mutationreport: %v\n", err)
 		return exitUsage
 	}
 	r, err := readReport(path)
@@ -71,7 +95,8 @@ func writeCheck(path, threshold string, stdout, stderr io.Writer) int {
 		return exitFailure
 	}
 	t := tallyOf(r)
-	figures := fmt.Sprintf("killed %d, timed out %d, lived %d", t.killed, t.timedOut, t.lived)
+	figures := fmt.Sprintf("caught %d of %d: killed %d, timed out %d, lived %d",
+		t.killed+t.timedOut, t.decided(), t.killed, t.timedOut, t.lived)
 	pct, ok := t.efficacy()
 	switch {
 	case !ok:
@@ -82,5 +107,28 @@ func writeCheck(path, threshold string, stdout, stderr io.Writer) int {
 		return exitFailure
 	}
 	_, _ = fmt.Fprintf(stdout, "mutation efficacy %s (%s) reaches the threshold %s%%: ok\n", t.efficacyText(), figures, threshold)
+	return exitOK
+}
+
+// coefficientForm is what a timeout coefficient looks like: one to four digits, the first not zero, 1
+// to 9999. The bound is what keeps gremlins' budget honest: it multiplies the elapsed time of its
+// coverage run by the value as a duration of nanoseconds, which overflows to a negative budget from
+// about 3e8 for a run of half a minute, so every mutant would time out at once and the check, which
+// counts a timeout as killed, would pass on no evidence. The plain decimal form also keeps what the
+// check validates and what gremlins reads the same: it reads the flag with base 0, where `010` is
+// octal 8, and takes `+5`, `0x10` and `1_0`.
+var coefficientForm = regexp.MustCompile(`^[1-9][0-9]{0,3}$`)
+
+// writeCoefficient is the `coefficient` command: it exits 0 when text is a timeout coefficient in
+// that form and says why on stderr, with exit code 2, when it is not. gremlins multiplies the time of
+// its coverage run by it to get the time each mutant has, and a mutant that outlives that time is
+// TIMED OUT, which the efficacy counts as killed: a negative value makes every mutant time out at
+// once, and gremlins takes 0 for its default 3. `make` runs it before gremlins, as it runs
+// `threshold`.
+func writeCoefficient(text string, stderr io.Writer) int {
+	if !coefficientForm.MatchString(text) {
+		_, _ = fmt.Fprintf(stderr, "mutationreport: the timeout coefficient %q is not a plain integer from 1 to 9999\n", text)
+		return exitUsage
+	}
 	return exitOK
 }

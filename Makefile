@@ -32,12 +32,17 @@ spell:
 # `Validate` method and does not call it, and `nosleep`, a sleep or a guess-wait on the clock without a
 # `// nosleep: <reason>`, run a second time with the `live` tag, and `hostport`, a test client aimed at the fake
 # that is left the real reply port without a `// hostport: <reason>`), after the tests of the checks themselves; then golangci-lint, for
-# every build tag and operating system.
+# every build tag and operating system. The same configuration and the `subtests` check also run over
+# devtools/recipecheck, which is Go like the rest (devtools is a module of its own, so `./...` above
+# does not reach it); the other devtools packages have findings of their own and are not linted yet.
 lint: spell
 	go -C devtools build -o $(CURDIR)/build/subtests ./subtests
 	go -C devtools build -o $(CURDIR)/build/analyzers ./analyzers
 	go -C devtools test -count=1 ./...
 	build/subtests ./...
+	go -C devtools tool golangci-lint run --config ../.golangci.yml ./recipecheck/...
+	go -C devtools tool golangci-lint run --config ../.golangci.yml --build-tags mutants ./recipecheck/...
+	cd devtools && ../build/subtests ./recipecheck/...
 	build/analyzers ./...
 	GOFLAGS=-tags=live build/analyzers -nosleep ./...
 	$(DEVTOOL) golangci-lint run ./...
@@ -100,8 +105,29 @@ modcheck:
 #                 and the findings are compared with devtools/lintfixtures/expected.txt, every one present
 #                 and nothing else (devtools/lintcheck; about a second). A rule whose pattern stops
 #                 matching, an exclusion that swallows a fixture or a rule that was relaxed fails here.
-.PHONY: catalogcheck guarantee lintfixtures
-lint: catalogcheck guarantee lintfixtures
+.PHONY: catalogcheck guarantee lintfixtures mutationrecipe recipemutants
+lint: catalogcheck guarantee lintfixtures mutationrecipe
+
+# The mutation recipes (devtools/recipecheck): `make -n` of the three mutation targets with the
+# variables the jobs use, every recipe line compared whole, and make run with a stand-in for gremlins to
+# see the exit codes (a `-` prefix on a step is invisible to `make -n`): the old report is deleted before
+# the run, with EFFICACY set (an explicitly empty one too) the threshold is validated first and the check
+# runs after gremlins, the timeout coefficient is validated before it, no `--threshold-efficacy`, and so
+# on; the working tree's build/mutation.json is put aside and back. A deleted `ifneq` block, a check
+# made non-fatal or a coefficient dropped fails here.
+mutationrecipe:
+	go -C devtools run ./recipecheck -root $(CURDIR)
+
+# The same check, held to the mutants of the Makefile it must catch (devtools/recipecheck/testdata/
+# makefile_mutants.json): every mutant is applied to a copy of the Makefile and the check must fail on
+# it, except the ones listed as equivalent with their reason. About a minute (the mutants run in
+# parallel), so it is not part of `make lint`; CI runs it as a step of the lint job. The target passes the
+# tag itself and fails unless the log has the PASS line of the test (`go test` exits 0 with "no tests to
+# run" when a tag or a name is wrong), and `make mutationrecipe` pins both lines as written.
+recipemutants:
+	@mkdir -p build
+	go -C devtools test -tags mutants -count=1 -v -timeout 15m -run '^TestMakefileMutants$$' ./recipecheck > build/recipemutants.log || { cat build/recipemutants.log; exit 1; }
+	grep -e '^--- PASS: TestMakefileMutants ' build/recipemutants.log
 
 catalogcheck:
 	go -C devtools build -o $(CURDIR)/build/catalogcheck ./catalogcheck
@@ -147,11 +173,19 @@ fuzz:
 # The efficacy is (killed + timed out) / (killed + timed out + lived): a mutant that makes the tests hang
 # is noticed by the test run, which is a kill (PIT and Stryker count it so), whereas gremlins leaves a
 # timed-out mutant out of its own figure. So gremlins runs without --threshold-efficacy, and with
-# EFFICACY set `make mutation` then runs `internal/mutationreport check` on the report, which applies
-# that definition (the summary and the badge use the same function). The timed-out count is reported on
-# a line of its own, with the mutants, and an unexplained rise is investigated: a slow test, a cached
-# baseline (see GOFLAGS below), or a real infinite loop. A report with no mutant that was run and
-# decided has no efficacy, and the check fails on it. Left out: the fake switch (escptest, judged by the
+# EFFICACY set (`make mutation` and `make mutation-diff` both honor it) the target validates the number
+# first (`internal/mutationreport threshold`, so that a typo fails at once and not after the run) and
+# then runs `internal/mutationreport check` on the report, which applies that definition (the summary
+# and the badge use the same function). The check passes AT the threshold (gremlins' own gate failed
+# at equality). EFFICACY is tested by its origin, not its value: an explicitly empty EFFICACY (or one of
+# spaces, which make 3.81 strips to nothing) is an error from `threshold`, never a silent skip; leave it
+# unset for no check. The timed-out count is reported on a line of its own, with the mutants, and an
+# unexplained rise is investigated: a slow test, a cached baseline (see GOFLAGS below), or a real
+# infinite loop. A report with no mutant that was run and decided has no efficacy, and the check fails
+# on it. gremlins exits 0 and writes no report when it has nothing to report (an empty scope, a canceled
+# run), so the recipes delete the old report first: a stale one must never be judged in place of the
+# run. `make mutationrecipe` (part of `make lint`) pins these recipes line by line.
+# Left out: the fake switch (escptest, judged by the
 # tests of the code that uses it) and the programs (the coverage tool, the report tool, the release, fuzz and documentation tools, the example, and the
 # devtools module, whose analyzer has fixtures of its own and no test in this module that gremlins could attribute to it):
 # gremlins reports every mutant in a `package main` as surviving whatever the tests do (a mutant applied
@@ -160,9 +194,26 @@ fuzz:
 # result takes no time, so without it every mutant of a package whose tests ran before "times out".
 # PKG=<directory> (model, safety, or . for the root package) limits a run to the files of that directory:
 # gremlins takes only the module root as its path, so every other directory with Go files is excluded.
-PKG_DIRS := $(patsubst ./%,%,$(sort $(shell find . -name '*.go' -not -path './build/*' -not -path './.git/*' -not -path './devtools/*' -not -path '*/testdata/*' -exec dirname {} \;)))
+# PKG_DIRS is lazy (`=`): the `find` runs only when PKG is set, not at every start of make (0.45 s, which the
+# recipe self-check would pay about 55 times).
+PKG_DIRS = $(patsubst ./%,%,$(sort $(shell find . -name '*.go' -not -path './build/*' -not -path './.git/*' -not -path './devtools/*' -not -path '*/testdata/*' -exec dirname {} \;)))
 PKG_EXCLUDES := $(if $(PKG),$(foreach d,$(filter-out $(PKG),$(PKG_DIRS)),-E '^$(if $(filter .,$(d)),,$(d)/)[^/]+$$'))
-GREMLINS := GOFLAGS=-count=1 $(DEVTOOL) gremlins unleash . --workers $(or $(WORKERS),4) --coverpkg ./... $(PKG_EXCLUDES) \
+# TIMEOUT_COEFFICIENT: gremlins gives every mutant the same time, the elapsed time of its one coverage run
+# of the whole module (30 to 39 s in the CI logs; not of the tests of the mutant's package) x this
+# coefficient (its default is 3), and marks a mutant that outlives it TIMED OUT, a status of time and not
+# of what the tests said. A timeout counts as killed (see the efficacy above), so it has to mean "the
+# tests hung" and not "the runner was slow": a loaded runner must not turn a surviving mutant into a
+# counted kill. A hang therefore costs about 10 x 33 s, roughly 5.5 minutes (1.65 with 3). The weekly job
+# (90-minute limit, about 19 minutes without hangs) tolerates about 50 hangs; the pull request job
+# (timeout-minutes 30, about one minute) about 20 hangs in one diff. The last weekly run had one.
+# It is validated before the run (`internal/mutationreport coefficient`: a plain integer from 1 to 9999). A
+# negative one makes every mutant time out at once and the gate pass on nothing, 0 is gremlins' default 3,
+# and a huge one overflows its budget (the elapsed time times the value, as nanoseconds, goes negative from
+# about 3e8) with the same result; `010` is octal 8 to gremlins and 10 to a decimal parser, so only the
+# plain form is taken.
+# Override like WORKERS, on the command line or in the environment: `make mutation TIMEOUT_COEFFICIENT=20`.
+TIMEOUT_COEFFICIENT ?= 10
+GREMLINS := GOFLAGS=-count=1 $(DEVTOOL) gremlins unleash . --workers $(or $(WORKERS),4) --timeout-coefficient $(TIMEOUT_COEFFICIENT) --coverpkg ./... $(PKG_EXCLUDES) \
 	-E '^escptest/' -E '^internal/coverpolicy/' -E '^internal/mutationreport/' -E '^internal/release/' -E '^internal/seams/' -E '^internal/fuzzrun/' -E '^internal/soak/' -E '^internal/pkgdoc/' -E '^devtools/' -E '^examples/'
 MUTATE := $(GREMLINS) --output build/mutation.json
 
@@ -183,17 +234,31 @@ MUTATE_EXTENDED := $(GREMLINS) --output build/mutation-extended.json $(DEFAULTS_
 # write file" and the job summary says there was no report.
 mutation:
 	@mkdir -p build
+	rm -f build/mutation.json
+ifneq ($(origin EFFICACY),undefined)
+	go run ./internal/mutationreport threshold "$(EFFICACY)"
+endif
+	go run ./internal/mutationreport coefficient "$(TIMEOUT_COEFFICIENT)"
 	$(MUTATE)
-ifneq ($(EFFICACY),)
-	go run ./internal/mutationreport check build/mutation.json $(EFFICACY)
+ifneq ($(origin EFFICACY),undefined)
+	go run ./internal/mutationreport check build/mutation.json "$(EFFICACY)"
 endif
 
 mutation-diff:
 	@mkdir -p build
+	rm -f build/mutation.json
+ifneq ($(origin EFFICACY),undefined)
+	go run ./internal/mutationreport threshold "$(EFFICACY)"
+endif
+	go run ./internal/mutationreport coefficient "$(TIMEOUT_COEFFICIENT)"
 	$(MUTATE) --diff $(or $(BASE),origin/main)
+ifneq ($(origin EFFICACY),undefined)
+	go run ./internal/mutationreport check build/mutation.json "$(EFFICACY)"
+endif
 
 mutation-extended:
 	@mkdir -p build
+	go run ./internal/mutationreport coefficient "$(TIMEOUT_COEFFICIENT)"
 	$(MUTATE_EXTENDED)
 
 # The package documentation as pkg.go.dev renders it, from the working tree: HTML and plain text

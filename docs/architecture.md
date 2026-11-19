@@ -14,7 +14,7 @@ For people who work on the library. Users want the [guides](README.md); the chec
 | `internal/wire` | the packet codec, the session crypto and every TLV type number, which no caller needs |
 | `internal/udp` | sharing the reply port between sockets, per operating system |
 | `internal/coverpolicy` | the coverage policy checker and the badge (a build tool, not part of the API) |
-| `internal/mutationreport` | the job summary of a mutation run (a build tool) |
+| `internal/mutationreport` | the job summary, the badge and the efficacy check of a mutation run (a build tool) |
 | `internal/release` | cutting a version: the CHANGELOG entry, the checks, the tag (a build tool, `scripts/release.sh`) |
 | `internal/seams` | the exported symbols a release range changed, and which of them a consumer uses (a build tool, `scripts/seams`, run before a tag) |
 | `internal/soak` | the weekly soak of the suite in three conditions: idle, `GOMAXPROCS=1`, and busy goroutines on every CPU (a build tool, `make soak`, called by `weekly.yml` too) |
