@@ -286,6 +286,7 @@ func TestTheStructuredReadingFollowsFencesAndComments(t *testing.T) {
 		{"a comment of three lines hides each of them", "<!--\n- [ ] x\n- [ ] y\n-->\n- [x] z\n", 0},
 		{"the form <!--> is a complete comment", "<!-->\n- [ ] x\n", 1},
 		{"the form <!---> is a complete comment", "<!--->\n- [ ] x\n", 1},
+		{"the form <!---> hides what follows it on the line", "<!---> - [ ] x\n- [x] y\n", 1},
 		{"the form <!--> hides what follows it on the line", "<!--> - [ ] x\n- [x] y\n", 1},
 		{"a comment opened after another closes", "<!-- a\n--> <!-- b\n- [ ] x\n-->\n- [x] y\n", 0},
 	}
