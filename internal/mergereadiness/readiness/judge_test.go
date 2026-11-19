@@ -167,8 +167,10 @@ func TestNothingBetweenTheHeadingAndABoxMakesItGreen(t *testing.T) {
 		{"a heading line in indented code", "    # x\n"},
 		{"a heading of level 1", "# x\n"},
 		{"a Setext heading", "Notes\n---\n"},
+		{"a table", "| a | b |\n|---|---|\n| - [ ] x | y |\n"},
+		{"a footnote reference and a footnote definition", "text[^1]\n\n[^1]: a note\n"},
 	}
-	boxes := []string{"- [ ] b", "1. [ ] b", "> - [ ] b", "- - [ ] b", "- [\u00a0] b"}
+	boxes := []string{"- [ ] b", "1. [ ] b", "> - [ ] b", "- - [ ] b", "- [\u00a0] b", "[^1]: - [ ] b", "> [^note]: 1. [ ] b", "   [^1]: - - [ ] b"}
 	for _, m := range middles {
 		for _, b := range boxes {
 			t.Run(m.name+" then "+b, func(t *testing.T) {

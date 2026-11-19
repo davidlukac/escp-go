@@ -224,12 +224,27 @@ func skipBlanksAndQuotes(l line, pos int) int {
 	return skip(l, pos, func(r rune) bool { return isBlank(r) || r == quote })
 }
 
+// skipFootnoteLabel is the position after the label of a footnote definition ("[^label]:", the label being
+// any characters up to the closing bracket) and the blanks after it, when one starts at pos; otherwise pos.
+// The renderer shows a task item in the text of a footnote at the end of the page.
+func skipFootnoteLabel(l line, pos int) int {
+	const labelOpen, labelClose = "[^", "]:"
+	if !hasAt(l, pos, labelOpen) {
+		return pos
+	}
+	end := indexFrom(l, pos+len(labelOpen), labelClose)
+	if end == notFound {
+		return pos
+	}
+	return skipBlanksAndQuotes(l, end+len(labelClose))
+}
+
 // naiveBox returns the text of the box and true when l has the shape of an unticked task list item,
 // whatever is in front of it: a quote prefix, any list marker (bullets, numbers), nested markers, tabs
-// and no-break spaces. At least one marker and a blank after each, then "[", one whitespace
+// and no-break spaces, after a footnote label as well. At least one marker and a blank after each, then "[", one whitespace
 // character and "]".
 func naiveBox(l line) (string, bool) {
-	pos := skipBlanksAndQuotes(l, 0)
+	pos := skipFootnoteLabel(l, skipBlanksAndQuotes(l, 0))
 	listed := false
 	for {
 		after := listMarkerEnd(l, pos)

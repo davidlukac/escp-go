@@ -36,6 +36,11 @@ func injected(prefix, middle, suffix string, at uint) string {
 // line that starts a workflow command, and an unticked box inserted inside the section of an otherwise
 // ticked template is never green, whatever stands before and after the section and whatever stands between
 // the heading and the box (heading-like lines of every kind, fences, comments, HTML blocks, quotes).
+//
+// What this proves, and what it does not: the naive reading knows no structure and never ends the section,
+// so it counts the injected line whatever stands around it, and that is what the target exercises (a
+// weakening of it, such as an end-of-section rule, is found at once). A regression of the structured
+// reading is masked by the naive one: it is covered by the unit tests and by the oracle, not by this target.
 func FuzzJudge(f *testing.F) {
 	for _, seed := range []string{
 		"", section, ticked, heading + "- [ ] a\n", "```\n" + section + "```\n", "<!--\n" + section, "- a\n  ```\n" + section,
@@ -47,7 +52,8 @@ func FuzzJudge(f *testing.F) {
 	for _, middle := range []string{
 		"```sh\n# run this\n```", "<!--\n# c\n-->", "<div>\n## Other\n</div>", "<pre>\n# Other\n</pre>", "<div>\n```\n# x\n</div>",
 		"<!-->\n\n    # x", "    # x", "# x", "Notes\n---", "<!-- c --> ## Other", "> ## Other", "### x", "<details>\n## x\n</details>",
-		"1. [x] a", "~~~\n## x\n~~~", "<h2>Other</h2>", "##", "\u00a0## x",
+		"1. [x] a", "~~~\n## x\n~~~", "<h2>Other</h2>", "##", "\u00a0## x", "| a | b |\n|---|---|\n| - [ ] x | y |",
+		"text[^1]\n\n[^1]: a note", "[^1]: - [x] done",
 	} {
 		f.Add("", middle, "", uint(2))
 	}

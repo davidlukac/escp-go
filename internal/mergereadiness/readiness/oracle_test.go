@@ -116,6 +116,11 @@ var oracleCases = map[string]struct {
 	"59-template-quoted-in-fence-above-section":      {false, "an honest copy of the template in a code block: red, with a note that names its title line"},
 	"60-template-quoted-indented-above-section":      {false, "an honest copy of the template in an indented block: red, with a note that names its title line"},
 	"61-comment-then-box-after-short-opener":         {false, ""},
+	"63-footnote-definition-with-box-after-section":  {false, ""},
+	"64-footnote-definition-with-ordered-box":        {false, ""},
+	"65-footnote-continuation-with-box":              {false, ""},
+	"66-table-cell-with-box":                         {true, "the renderer shows no task in a table cell"},
+	"67-table-then-quoted-footnote-with-box":         {false, ""},
 	"62-three-line-comment-with-boxes":               {false, "the renderer hides the comment, Judge reports the boxes in it"},
 }
 

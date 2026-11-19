@@ -251,6 +251,55 @@ func TestRunIsRedWhenTheDescriptionCannotBeRead(t *testing.T) {
 	}
 }
 
+// The limit is the documented one, 1 MiB, whatever the constant says: the sizes are literal.
+func TestRunPinsTheLimitAtOneMebibyteByLiteralSizes(t *testing.T) {
+	tests := []struct {
+		name string
+		size int
+		code int
+		out  string
+	}{
+		{"1048576 bytes are judged", 1048576, exitPass, msgNoSection + "\n"},
+		{"1048577 bytes are refused", 1048577, exitRed, "merge readiness: the description is larger than 1 MiB: shorten it\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var out strings.Builder
+			if code := Run([]string{"-body-file", writeBody(t, strings.Repeat("a", tt.size))}, &out); code != tt.code || out.String() != tt.out {
+				t.Errorf("code %d, output %q; want %d, %q", code, out.String(), tt.code, tt.out)
+			}
+		})
+	}
+}
+
+// The naive reading reads to the end of the description, however many lines it has.
+func TestAnUntickedBoxAfterHundredsOfThousandsOfLinesIsStillRed(t *testing.T) {
+	filler := strings.Repeat("a\n", 500000)
+	tests := []struct {
+		name string
+		body string
+	}{
+		{"a plain box", ticked + filler + "- [ ] last\n"},
+		{"a box only the naive reading knows", ticked + filler + "1. [ ] last\n"},
+		{"a footnote box", ticked + filler + "[^1]: - [ ] last\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if len(tt.body) > maxBody {
+				t.Fatalf("the body is %d bytes, over the limit", len(tt.body))
+			}
+			got := Judge(tt.body)
+			if got.Pass || got.Unticked != 1 {
+				t.Errorf("pass %v, unticked %d: %q", got.Pass, got.Unticked, got.Lines)
+			}
+		})
+	}
+	var out strings.Builder
+	if code := Run([]string{"-body-file", writeBody(t, ticked+filler+"1. [ ] last\n")}, &out); code != exitRed {
+		t.Errorf("Run on the same description returned %d: %q", code, out.String())
+	}
+}
+
 func TestRunRefusesADescriptionOverOneMebibyte(t *testing.T) {
 	tests := []struct {
 		name string

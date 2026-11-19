@@ -26,8 +26,8 @@
 // naive reading knows no structure and does not end: from the first line titled "Merge readiness" in any
 // form (an ATX heading at any level, a quoted heading, a Setext heading, a heading in HTML, a title in bold
 // type) to the end of the description it counts every line that has the shape of an unticked task list
-// item, with any list marker, nested markers, a quote prefix, a numbered item, a tab or a no-break space,
-// in code, comments, HTML blocks and later sections as well. When the naive reading finds more unticked
+// item, with any list marker, nested markers, a quote prefix, a footnote label in front of it, a numbered
+// item, a tab or a no-break space, in code, comments, HTML blocks and later sections as well. When the naive reading finds more unticked
 // boxes than the structured one, the markup is ambiguous and the verdict is red: a box that this package
 // does not read must not turn the check green. A section with no box that it reads is red too, because it
 // is the template's section with its markup damaged, or a heading it does not read.
