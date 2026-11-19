@@ -10,11 +10,16 @@
 #   * The job reads the CURRENT description of the pull request through the API, not the one in the
 #     event payload: a re-run of an older run would otherwise publish a verdict for a description
 #     that has changed since. When the description cannot be read the job is red.
-#   * The description is untrusted input: it reaches the program through an environment variable and
-#     is never interpolated into a `run:` text. The token the job has only reads pull requests and
-#     the repository, and only the step that fetches the description gets it, so the program (and
-#     what a pull request changes in it) runs without it. No secret is used, so a pull request from
-#     a fork runs the same job.
+#   * The description is untrusted input: it is written to a file by the step that fetches it and the
+#     program reads that file (an environment variable would fail the step, with an opaque error, for a
+#     description over about 128 KiB; the program refuses a file over 1 MiB with a message). It is
+#     never interpolated into a `run:` text. The token the job has only reads pull requests and the
+#     repository, and only the step that fetches the description gets it, so the program (and what a
+#     pull request changes in it) runs without it. No secret is used, so a pull request from a fork
+#     runs the same job.
+#   * One run per pull request: an edit supersedes a run that is queued or running. A re-run of an
+#     older run belongs to the same group and can cancel a newer run that is in flight; a canceled
+#     run is not a pass, and the newer edit or a re-run of the newest run reports the verdict.
 #   * The job runs the pull request's own copy of the program and of this workflow, so a pull
 #     request that changes them is judged by the changed version: that is read in the diff, like any
 #     change to a workflow. Red blocks a merge only when the check is a required status check, which
@@ -54,11 +59,11 @@ jobs:
       # The current description, into a file: a failed request is a red job, never a pass.
       - name: Read the current description
         run: |
-          gh api "repos/${REPOSITORY}/pulls/${NUMBER}" --jq '.body // ""' > "$RUNNER_TEMP/description.txt" \
+          gh api "repos/${REPOSITORY}/pulls/${NUMBER}" --jq '.body // ""' > "$RUNNER_TEMP/body.md" \
             || { echo "::error::the pull request description could not be read"; exit 1; }
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
           NUMBER: ${{ github.event.pull_request.number }}
       - name: Boxes of the merge readiness section are ticked
-        run: PR_BODY="$(cat "$RUNNER_TEMP/description.txt")" go run ./internal/mergereadiness
+        run: go run ./internal/mergereadiness -body-file "$RUNNER_TEMP/body.md"

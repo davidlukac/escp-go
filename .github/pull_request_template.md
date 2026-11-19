@@ -24,7 +24,7 @@ Full list: [`CONTRIBUTING.md`](../CONTRIBUTING.md).
 ## Merge readiness
 
 <!-- Kept by the maintainer's assistant and its agents. The maintainer merges only when this pull request is not a draft and every box below is checked. -->
-<!-- Optional for outside contributors: delete this whole section, and the "Merge readiness" check skips the pull request. -->
+<!-- Optional for outside contributors: delete this whole section, and the "Merge readiness" check skips the pull request. Keep it the last section of the description: the check reads a box after it as unticked. -->
 
 - [ ] CI is green on the head commit
 - [ ] Local checks done (format, vet, lint, tests with `-race`, coverage policy)

@@ -22,34 +22,43 @@ func checkOutput(t *testing.T, v Verdict) {
 	}
 }
 
-// injected returns the ticked template with an unticked box inserted after the heading of its section,
-// at a line chosen by at, between a prefix and a suffix that the fuzzer supplies.
-func injected(prefix, suffix string, at uint) string {
+// injected returns the ticked template with an unticked box inserted after the heading of its section, at
+// the line chosen by at, preceded by whatever the fuzzer put before it (middle), and the whole between a
+// prefix and a suffix that the fuzzer supplies. The box is a plain line of its own.
+func injected(prefix, middle, suffix string, at uint) string {
 	lines := strings.Split(strings.TrimSuffix(ticked, "\n"), "\n")
 	at = 1 + at%uint(len(lines))
-	withBox := append(append(append([]string{}, lines[:at]...), "- [ ] injected"), lines[at:]...)
+	withBox := append(append(append([]string{}, lines[:at]...), middle, "- [ ] injected"), lines[at:]...)
 	return prefix + "\n" + strings.Join(withBox, "\n") + "\n" + suffix
 }
 
-// FuzzJudge: whatever the description holds, the judgment ends, its output holds no control character
-// and no line that starts a workflow command, and an unticked box inserted inside the section of an
-// otherwise ticked template is never green, whatever stands before and after the section.
+// FuzzJudge: whatever the description holds, the judgment ends, its output holds no control character and no
+// line that starts a workflow command, and an unticked box inserted inside the section of an otherwise
+// ticked template is never green, whatever stands before and after the section and whatever stands between
+// the heading and the box (heading-like lines of every kind, fences, comments, HTML blocks, quotes).
 func FuzzJudge(f *testing.F) {
 	for _, seed := range []string{
 		"", section, ticked, heading + "- [ ] a\n", "```\n" + section + "```\n", "<!--\n" + section, "- a\n  ```\n" + section,
 		"> ## Merge readiness\n> - [ ] a\n", "## Merge readiness\n1. [ ] a\n", "<!-- c --> ```\n" + heading,
 		"## a" + strings.Repeat(" ", 100) + "b", "::error::x\n" + heading + "- [ ] ::error::y\n", "\r\n\r\r\n", "\xff\xfe",
 	} {
-		f.Add(seed, "", uint(0))
+		f.Add(seed, "", "", uint(0))
 	}
-	f.Add("<!--", "-->", uint(3))
-	f.Add("```", "```", uint(5))
-	f.Add("<div>\n```", "</div>", uint(1))
-	f.Add("[ ]: x\n", "\n## Merge readiness\n", uint(2))
-	f.Fuzz(func(t *testing.T, body, suffix string, at uint) {
+	for _, middle := range []string{
+		"```sh\n# run this\n```", "<!--\n# c\n-->", "<div>\n## Other\n</div>", "<pre>\n# Other\n</pre>", "<div>\n```\n# x\n</div>",
+		"<!-->\n\n    # x", "    # x", "# x", "Notes\n---", "<!-- c --> ## Other", "> ## Other", "### x", "<details>\n## x\n</details>",
+		"1. [x] a", "~~~\n## x\n~~~", "<h2>Other</h2>", "##", "\u00a0## x",
+	} {
+		f.Add("", middle, "", uint(2))
+	}
+	f.Add("<!--", "", "-->", uint(3))
+	f.Add("```", "", "```", uint(5))
+	f.Add("<div>\n```", "", "</div>", uint(1))
+	f.Add("[ ]: x\n", "", "\n## Merge readiness\n", uint(2))
+	f.Fuzz(func(t *testing.T, body, middle, suffix string, at uint) {
 		checkOutput(t, Judge(body))
-		if v := Judge(injected(body, suffix, at)); v.Pass {
-			t.Fatalf("green with an unticked box injected (prefix %q, suffix %q, line %d): %q", body, suffix, at, v.Lines)
+		if v := Judge(injected(body, middle, suffix, at)); v.Pass {
+			t.Fatalf("green with an unticked box injected (prefix %q, middle %q, suffix %q, line %d): %q", body, middle, suffix, at, v.Lines)
 		}
 	})
 }

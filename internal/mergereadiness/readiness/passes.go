@@ -20,10 +20,17 @@ func splitLines(body string) []line {
 	return lines
 }
 
+// box is a line that holds an unticked box: its number (counted from 1) and the text after the box.
+type box struct {
+	line int
+	text string
+}
+
 // structure is what the structured reading found.
 type structure struct {
-	unticked []string // the text of each unticked box in them
-	ticked   int      // the number of ticked boxes in them
+	headings []int // the line of each heading of a merge readiness section
+	unticked []box // the unticked boxes in those sections
+	ticked   int   // the number of ticked boxes in them
 }
 
 // commentState follows the HTML comments across lines.
@@ -44,9 +51,9 @@ func newCommentState(lines []line) *commentState {
 	return state
 }
 
-// visibleLines calls visit with the text of each line that the structured reading looks at: a line in a
-// fenced code block, or in a comment that is closed later, is not looked at.
-func visibleLines(lines []line, visit func(line)) {
+// visibleLines calls visit with the index and the text of each line that the structured reading looks
+// at: a line in a fenced code block, or in a comment that is closed later, is not looked at.
+func visibleLines(lines []line, visit func(int, line)) {
 	comments := newCommentState(lines)
 	var fence line
 	for i, l := range lines {
@@ -71,7 +78,7 @@ func visibleLines(lines []line, visit func(line)) {
 		pos, open = skipLeadingComments(l, pos, comments.closesLater[i])
 		comments.open = open
 		if !open {
-			visit(l[pos:])
+			visit(i, l[pos:])
 		}
 	}
 }
@@ -86,24 +93,42 @@ func skipLeadingComments(l line, pos int, closesLater bool) (next int, open bool
 		if indent > maxIndent || !hasAt(l, start, commentOpen) {
 			return pos, false
 		}
-		end := indexFrom(l, start+len(commentOpen), commentClose)
+		end := commentEnd(l, start+len(commentOpen))
 		if end == notFound {
 			if closesLater {
 				return len(l), true
 			}
 			return pos, false
 		}
-		pos = end + len(commentClose)
+		pos = end
 	}
+}
+
+// commentEnd is the position after the end of the comment whose text starts at from, or notFound. The
+// renderer reads "<!-->" and "<!--->" as comments that are complete.
+func commentEnd(l line, from int) int {
+	switch {
+	case hasAt(l, from, ">"):
+		return from + len(">")
+	case hasAt(l, from, "->"):
+		return from + len("->")
+	}
+	if end := indexFrom(l, from, commentClose); end != notFound {
+		return end + len(commentClose)
+	}
+	return notFound
 }
 
 // structuredPass reads the headings, fences and comments, and the boxes of the sections.
 func structuredPass(lines []line) structure {
 	var found structure
 	inside := false
-	visibleLines(lines, func(l line) {
+	visibleLines(lines, func(index int, l line) {
 		if level, title, ok := headingOf(l); ok && level <= sectionLevel {
 			inside = level == sectionLevel && title == sectionTitle
+			if inside {
+				found.headings = append(found.headings, index+1)
+			}
 			return
 		}
 		if !inside {
@@ -112,7 +137,7 @@ func structuredPass(lines []line) structure {
 		switch unticked, text, ok := strictBox(l); {
 		case !ok:
 		case unticked:
-			found.unticked = append(found.unticked, text)
+			found.unticked = append(found.unticked, box{line: index + 1, text: text})
 		default:
 			found.ticked++
 		}
@@ -120,28 +145,32 @@ func structuredPass(lines []line) structure {
 	return found
 }
 
-// naivePass reads no structure: it reports whether a heading titled "merge readiness" (at any level, in
-// a quote too) exists, and the text of every line after one that has the shape of an unticked box, up
-// to the next heading of level 1 or 2.
-func naivePass(lines []line) (found bool, boxes []string) {
-	inside := false
-	for _, l := range lines {
-		if level, title, ok := looseHeading(l); ok {
-			if title == sectionTitle {
-				inside, found = true, true
-				continue
-			}
-			if level <= sectionLevel {
-				inside = false
-				continue
-			}
+// naiveTitle is the normalized title a line would have as a heading, whatever its form: the title of an
+// ATX heading, also in a quote, and otherwise the whole line without its markup, so that a Setext heading,
+// a heading in HTML or a title in bold type is found as well.
+func naiveTitle(l line) string {
+	rest := l[skipBlanksAndQuotes(l, 0):]
+	if _, title, ok := headingOf(rest); ok {
+		return title
+	}
+	return titleOf(rest)
+}
+
+// naivePass reads no structure and never ends the section: it returns the line of every line titled
+// "merge readiness" in any form, and every line after the first of them that has the shape of an
+// unticked box, in code, comments and later sections too.
+func naivePass(lines []line) (starts []int, boxes []box) {
+	for i, l := range lines {
+		if naiveTitle(l) == sectionTitle {
+			starts = append(starts, i+1)
+			continue
 		}
-		if !inside {
+		if len(starts) == 0 {
 			continue
 		}
 		if text, ok := naiveBox(l); ok {
-			boxes = append(boxes, text)
+			boxes = append(boxes, box{line: i + 1, text: text})
 		}
 	}
-	return found, boxes
+	return starts, boxes
 }

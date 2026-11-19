@@ -34,6 +34,8 @@ func TestHeadingOf(t *testing.T) {
 		{"closing sequence with a tab", "## A\t###", 2, "a", true},
 		{"only a closing sequence", "## ##", 2, "", true},
 		{"a hash glued to the title is part of it", "## A#", 2, "a#", true},
+		{"emphasis in the title", "## **Merge readiness**", 2, "merge readiness", true},
+		{"code marks and a closing sequence", "## `Merge readiness` ##", 2, "merge readiness", true},
 		{"a closing sequence of any length", "## A #", 2, "a", true},
 	}
 	for _, tt := range tests {
@@ -46,25 +48,60 @@ func TestHeadingOf(t *testing.T) {
 	}
 }
 
-func TestLooseHeadingFindsAHeadingInAQuoteOrAnIndent(t *testing.T) {
+func TestNaiveTitle(t *testing.T) {
 	tests := []struct {
-		name  string
-		line  string
-		level int
-		ok    bool
+		name string
+		line string
+		want string
 	}{
-		{"quote", "> ## A", 2, true},
-		{"nested quote", "> > # A", 1, true},
-		{"quote without a space", ">## A", 2, true},
-		{"deep indent", "        ## A", 2, true},
-		{"no-break space", "\u00a0## A", 2, true},
-		{"text", "> text", 0, false},
+		{"an ATX heading", "## A b", "a b"},
+		{"a quoted heading", "> ## A", "a"},
+		{"a nested quote", "> > # A", "a"},
+		{"a quote without a space", ">## A", "a"},
+		{"a deep indent", "        ## A", "a"},
+		{"a no-break space before", "\u00a0## A", "a"},
+		{"a plain line", "Some  Text", "some text"},
+		{"a line in bold type", "**Some Text**", "some text"},
+		{"a heading in HTML", "<h2 id=\"x\">Some Text</h2>", "some text"},
+		{"a quoted plain line", "> Some Text", "some text"},
+		{"a list item keeps its marker", "- Some Text", "- some text"},
+		{"an empty line", "", ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			level, _, ok := looseHeading(line(tt.line))
-			if level != tt.level || ok != tt.ok {
-				t.Errorf("looseHeading(%q) = %d, %v; want %d, %v", tt.line, level, ok, tt.level, tt.ok)
+			if got := naiveTitle(line(tt.line)); got != tt.want {
+				t.Errorf("naiveTitle(%q) = %q, want %q", tt.line, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestStripInline(t *testing.T) {
+	tests := []struct {
+		name string
+		text string
+		want string
+	}{
+		{"nothing to strip", "plain text", "plain text"},
+		{"emphasis", "**a** _b_ ~~c~~", "a b c"},
+		{"code marks", "`a`", "a"},
+		{"a link", "[a](http://example.com/x_y)", "a"},
+		{"a link with an unclosed target", "[a](b", "a(b"},
+		{"brackets without a target", "[a] b", "a b"},
+		{"a bracket and a parenthesis apart", "[a] (b)", "a (b)"},
+		{"tags", "<b>a</b> <i>b</i>", "a b"},
+		{"a tag with attributes", "<a href=\"x\">a</a>", "a"},
+		{"a less-than sign that opens nothing", "a < b", "a < b"},
+		{"an unclosed tag", "a <b", "a <b"},
+		{"two unclosed tags", "<a <b", "<a <b"},
+		{"two unclosed link targets", "[a](b [c](d", "a(b c(d"},
+		{"a tag that contains another opener", "<a <b>", ""},
+		{"empty", "", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := string(stripInline(line(tt.text))); got != tt.want {
+				t.Errorf("stripInline(%q) = %q, want %q", tt.text, got, tt.want)
 			}
 		})
 	}
@@ -157,6 +194,8 @@ func TestStrictBox(t *testing.T) {
 		{"another letter", "- [y] a", false, "", false},
 		{"text glued to the box", "- [ ]a", false, "", false},
 		{"a short line", "- [", false, "", false},
+		{"a box that is not closed", "- [ x", false, "", false},
+		{"a ticked box that is not closed", "- [x y", false, "", false},
 		{"a box that is not first", "- a [ ] b", false, "", false},
 		{"an ordered item", "1. [ ] a", false, "", false},
 		{"empty line", "", false, "", false},
@@ -209,6 +248,7 @@ func TestNaiveBox(t *testing.T) {
 		{"empty brackets", "- [] a", "", false},
 		{"two spaces in the brackets", "- [  ] a", "", false},
 		{"a short line", "- [ ", "", false},
+		{"a box that is not closed", "- [ x", "", false},
 		{"empty line", "", "", false},
 		{"only quotes", ">>", "", false},
 	}

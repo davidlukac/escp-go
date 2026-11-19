@@ -94,8 +94,41 @@ func headingOf(l line) (level int, title string, ok bool) {
 	return level, titleOf(rest), true
 }
 
+// stripInline is the text without its inline markup: emphasis and code marks, the brackets and the target of
+// a link, and the tags of HTML. What the renderer shows as a title is what remains.
+func stripInline(text line) line {
+	plain := make(line, 0, len(text))
+	// A search that fails once fails for every later start too, so it is not repeated: the time stays linear.
+	noTagEnd, noLinkEnd := false, false
+	for i := 0; i < len(text); i++ {
+		switch r := text[i]; r {
+		case '*', '_', '`', '~', '[':
+		case ']':
+			if i+1 < len(text) && text[i+1] == '(' && !noLinkEnd {
+				if end := indexFrom(text, i+2, ")"); end != notFound {
+					i = end
+				} else {
+					noLinkEnd = true
+				}
+			}
+		case '<':
+			if !noTagEnd {
+				if end := indexFrom(text, i+1, ">"); end != notFound {
+					i = end
+					continue
+				}
+				noTagEnd = true
+			}
+			plain = append(plain, r)
+		default:
+			plain = append(plain, r)
+		}
+	}
+	return plain
+}
+
 // titleOf is the title of a heading from the text after its marker: its closing sequence of # cut, its
-// whitespace collapsed and its case folded.
+// inline markup removed, its whitespace collapsed and its case folded.
 func titleOf(rest line) string {
 	title := strings.Trim(string(rest), " \t")
 	if strings.HasSuffix(title, "#") {
@@ -107,7 +140,7 @@ func titleOf(rest line) string {
 			title = string(stripped)
 		}
 	}
-	return strings.ToLower(strings.Join(strings.Fields(title), " "))
+	return strings.ToLower(strings.Join(strings.Fields(string(stripInline(line(title)))), " "))
 }
 
 // fenceMarker is the opening fence of l (its run of backticks or tildes), or nil when l opens none.
@@ -213,10 +246,4 @@ func naiveBox(l line) (string, bool) {
 		return "", false
 	}
 	return strings.Trim(string(l[pos+taskBoxLen:]), " \t"), true
-}
-
-// looseHeading is headingOf on the line without the blanks and quote marks in front of it, so that a
-// heading inside a quote or an indented block is found too.
-func looseHeading(l line) (level int, title string, ok bool) {
-	return headingOf(l[skipBlanksAndQuotes(l, 0):])
 }

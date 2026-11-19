@@ -3,6 +3,8 @@ package readiness
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -13,10 +15,10 @@ func TestTheUntickedBoxesAreListedInOrder(t *testing.T) {
 	got := Judge(section)
 	want := []string{
 		"merge readiness: 4 box(es) not ticked:",
-		"  - [ ] CI is green on the head commit",
-		"  - [ ] Local checks done",
-		"  - [ ] **Ready for the maintainer to merge**",
-		"  - [ ] a task (reviewer)",
+		"  - [ ] line 5: CI is green on the head commit",
+		"  - [ ] line 6: Local checks done",
+		"  - [ ] line 7: **Ready for the maintainer to merge**",
+		"  - [ ] line 11: a task (reviewer)",
 	}
 	if strings.Join(got.Lines, "\n") != strings.Join(want, "\n") {
 		t.Errorf("got\n%s\nwant\n%s", strings.Join(got.Lines, "\n"), strings.Join(want, "\n"))
@@ -24,7 +26,7 @@ func TestTheUntickedBoxesAreListedInOrder(t *testing.T) {
 }
 
 func TestAnEmptyBoxIsListedWithTheFullPrefix(t *testing.T) {
-	if got := Judge(heading + "- [ ]\n"); got.Lines[1] != "  - [ ] " {
+	if got := Judge(heading + "- [ ]\n"); got.Lines[1] != "  - [ ] line 3: " {
 		t.Errorf("got %q", got.Lines[1])
 	}
 }
@@ -78,7 +80,7 @@ func TestALongTextIsCutAtTheLimit(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := Judge(heading + "- [ ] " + strings.Repeat("a", tt.n) + "\n"); got.Lines[1] != boxPrefix+tt.want {
+			if got := Judge(heading + "- [ ] " + strings.Repeat("a", tt.n) + "\n"); got.Lines[1] != boxPrefix+"line 3: "+tt.want {
 				t.Errorf("got %d characters: %q", len(got.Lines[1]), got.Lines[1])
 			}
 		})
@@ -87,7 +89,7 @@ func TestALongTextIsCutAtTheLimit(t *testing.T) {
 
 func TestACutCountsCharactersNotBytes(t *testing.T) {
 	text := strings.Repeat("\u00e9", 201)
-	want := boxPrefix + strings.Repeat("\u00e9", 197) + "..."
+	want := boxPrefix + "line 3: " + strings.Repeat("\u00e9", 197) + "..."
 	if got := Judge(heading + "- [ ] " + text + "\n"); got.Lines[1] != want {
 		t.Errorf("got %q", got.Lines[1])
 	}
@@ -99,10 +101,11 @@ func TestTheListIsCutAtFiftyBoxesAndTheRestIsCounted(t *testing.T) {
 		lines int
 		last  string
 	}{
-		{49, 50, "  - [ ] box"},
-		{50, 51, "  - [ ] box"},
+		{49, 50, "  - [ ] line 51: box"},
+		{50, 51, "  - [ ] line 52: box"},
 		{51, 52, "... and 1 more"},
 		{57, 52, "... and 7 more"},
+		{120, 52, "... and 70 more"},
 	}
 	for _, tt := range tests {
 		t.Run(fmt.Sprint(tt.boxes), func(t *testing.T) {
@@ -114,6 +117,17 @@ func TestTheListIsCutAtFiftyBoxesAndTheRestIsCounted(t *testing.T) {
 				t.Errorf("heading %q, want %q", got.Lines[0], want)
 			}
 		})
+	}
+}
+
+// The ambiguous verdict counts what the naive reading found, past a hundred as well.
+func TestTheAmbiguousListIsCountedPastAHundred(t *testing.T) {
+	got := Judge(heading + strings.Repeat("1. [ ] box\n", 130))
+	if got.Unticked != 130 || got.Lines[len(got.Lines)-2] != msgAmbiguousNote && got.Lines[len(got.Lines)-1] != msgAmbiguousNote {
+		t.Errorf("unticked %d, lines %q", got.Unticked, got.Lines[len(got.Lines)-2:])
+	}
+	if want := "merge readiness: ambiguous markup: 130 possible box(es) not ticked, 0 recognized:"; got.Lines[0] != want {
+		t.Errorf("heading %q, want %q", got.Lines[0], want)
 	}
 }
 
@@ -135,6 +149,9 @@ func TestHostileLinesAreReadInMomentsWhateverTheyHold(t *testing.T) {
 		{"a long run of digits", heading + strings.Repeat("1", big) + ". [ ] x\n"},
 		{"many comments on a line", heading + strings.Repeat("<!--a-->", big/8) + "\n- [x] y\n"},
 		{"many unclosed comment openers", heading + strings.Repeat("<!--", big/4) + "\n- [x] y\n"},
+		{"many link openers", "a" + strings.Repeat("](", big/2) + "\n" + heading + "- [ ] x\n"},
+		{"many tag openers", "a" + strings.Repeat("<a", big/2) + "\n" + heading + "- [ ] x\n"},
+		{"many tag openers in a heading", "## " + strings.Repeat("<", big) + "\n" + heading + "- [ ] x\n"},
 		{"many fence lines", heading + strings.Repeat("```\n", big) + "- [x] y\n"},
 		{"many lines of the filler", strings.Repeat("text with [ ] and <!-- a comment --> and ``` and ## inside a line\n", 20000) + section},
 		{"long lines of backticks", heading + strings.Repeat("`", big) + " a`\n"},
@@ -160,44 +177,108 @@ func TestALargeBodyIsStillJudgedRight(t *testing.T) {
 	}
 }
 
-// failingWriter refuses every write.
-type failingWriter struct{}
-
-func (failingWriter) Write([]byte) (int, error) { return 0, errors.New("closed") }
+// writeBody writes the description to a file and returns its path.
+func writeBody(t *testing.T, body string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "body.md")
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
 
 func TestRunPrintsTheVerdictAndReturnsTheExitStatus(t *testing.T) {
 	tests := []struct {
 		name string
-		env  map[string]string
+		body string
 		code int
 		out  string
 	}{
-		{"an unset variable passes", nil, 0, msgNoSection + "\n"},
-		{"an empty variable passes", map[string]string{BodyVariable: ""}, 0, msgNoSection + "\n"},
-		{"a ticked description passes", map[string]string{BodyVariable: ticked}, 0, msgAllTicked + "\n"},
-		{"an unticked box fails", map[string]string{BodyVariable: heading + "- [ ] a\n"}, 1, "merge readiness: 1 box(es) not ticked:\n  - [ ] a\n"},
-		{"only the variable is read", map[string]string{"OTHER": section, "pr_body": section}, 0, msgNoSection + "\n"},
+		{"an empty file passes", "", 0, msgNoSection + "\n"},
+		{"a ticked description passes", ticked, 0, msgAllTicked + "\n"},
+		{"an unticked box fails", heading + "- [ ] a\n", 1, "merge readiness: 1 box(es) not ticked:\n  - [ ] line 3: a\n"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var out strings.Builder
-			if code := Run(func(name string) string { return tt.env[name] }, &out); code != tt.code || out.String() != tt.out {
+			if code := Run([]string{"-body-file", writeBody(t, tt.body)}, &out); code != tt.code || out.String() != tt.out {
 				t.Errorf("code %d, output %q; want %d, %q", code, out.String(), tt.code, tt.out)
 			}
 		})
 	}
 }
 
-func TestRunFailsWhenTheVerdictCannotBeWritten(t *testing.T) {
-	if code := Run(func(string) string { return ticked }, failingWriter{}); code != exitRed {
-		t.Errorf("code %d, want %d", code, exitRed)
+func TestRunRefusesACommandLineItDoesNotUnderstand(t *testing.T) {
+	file := writeBody(t, ticked)
+	tests := []struct {
+		name string
+		args []string
+	}{
+		{"no arguments", nil},
+		{"an empty file name", []string{"-body-file", ""}},
+		{"an unknown flag", []string{"-body", file}},
+		{"a flag without its value", []string{"-body-file"}},
+		{"an extra argument", []string{"-body-file", file, "more"}},
+		{"only a name", []string{file}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var out strings.Builder
+			if code := Run(tt.args, &out); code != exitUsage || out.String() != msgUsage+"\n" {
+				t.Errorf("code %d, output %q", code, out.String())
+			}
+		})
 	}
 }
 
-func TestRunAsksForNothingButTheDescription(t *testing.T) {
-	var asked []string
-	Run(func(name string) string { asked = append(asked, name); return "" }, &strings.Builder{})
-	if len(asked) != 1 || asked[0] != BodyVariable {
-		t.Errorf("asked for %q", asked)
+func TestRunDoesNotReadTheEnvironment(t *testing.T) {
+	t.Setenv("PR_BODY", section)
+	var out strings.Builder
+	if code := Run([]string{"-body-file", writeBody(t, "")}, &out); code != exitPass || out.String() != msgNoSection+"\n" {
+		t.Errorf("code %d, output %q", code, out.String())
+	}
+}
+
+func TestRunIsRedWhenTheDescriptionCannotBeRead(t *testing.T) {
+	var out strings.Builder
+	missing := filepath.Join(t.TempDir(), "absent.md")
+	if code := Run([]string{"-body-file", missing}, &out); code != exitRed || !strings.HasPrefix(out.String(), "merge readiness: the description could not be read: ") {
+		t.Errorf("a missing file: code %d, output %q", code, out.String())
+	}
+	out.Reset()
+	if code := Run([]string{"-body-file", t.TempDir()}, &out); code != exitRed || !strings.HasPrefix(out.String(), "merge readiness: the description could not be read: ") {
+		t.Errorf("a directory: code %d, output %q", code, out.String())
+	}
+}
+
+func TestRunRefusesADescriptionOverOneMebibyte(t *testing.T) {
+	tests := []struct {
+		name string
+		size int
+		code int
+		out  string
+	}{
+		{"exactly the limit", maxBody, exitPass, msgNoSection + "\n"},
+		{"one byte over", maxBody + 1, exitRed, msgTooLarge + "\n"},
+		{"far over", 3 * maxBody, exitRed, msgTooLarge + "\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var out strings.Builder
+			if code := Run([]string{"-body-file", writeBody(t, strings.Repeat("a", tt.size))}, &out); code != tt.code || out.String() != tt.out {
+				t.Errorf("code %d, output %q; want %d, %q", code, out.String(), tt.code, tt.out)
+			}
+		})
+	}
+}
+
+// failingWriter refuses every write.
+type failingWriter struct{}
+
+func (failingWriter) Write([]byte) (int, error) { return 0, errors.New("closed") }
+
+func TestRunFailsWhenTheVerdictCannotBeWritten(t *testing.T) {
+	if code := Run([]string{"-body-file", writeBody(t, ticked)}, failingWriter{}); code != exitRed {
+		t.Errorf("code %d, want %d", code, exitRed)
 	}
 }
