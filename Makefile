@@ -32,12 +32,17 @@ spell:
 # `Validate` method and does not call it, and `nosleep`, a sleep or a guess-wait on the clock without a
 # `// nosleep: <reason>`, run a second time with the `live` tag, and `hostport`, a test client aimed at the fake
 # that is left the real reply port without a `// hostport: <reason>`), after the tests of the checks themselves; then golangci-lint, for
-# every build tag and operating system.
+# every build tag and operating system. The same configuration and the `subtests` check also run over
+# devtools/recipecheck, which is Go like the rest (devtools is a module of its own, so `./...` above
+# does not reach it); the other devtools packages have findings of their own and are not linted yet.
 lint: spell
 	go -C devtools build -o $(CURDIR)/build/subtests ./subtests
 	go -C devtools build -o $(CURDIR)/build/analyzers ./analyzers
 	go -C devtools test -count=1 ./...
 	build/subtests ./...
+	go -C devtools tool golangci-lint run --config ../.golangci.yml ./recipecheck/...
+	go -C devtools tool golangci-lint run --config ../.golangci.yml --build-tags mutants ./recipecheck/...
+	cd devtools && ../build/subtests ./recipecheck/...
 	build/analyzers ./...
 	GOFLAGS=-tags=live build/analyzers -nosleep ./...
 	$(DEVTOOL) golangci-lint run ./...
@@ -103,9 +108,13 @@ mutationrecipe:
 # The same check, held to the mutants of the Makefile it must catch (devtools/recipecheck/testdata/
 # makefile_mutants.json): every mutant is applied to a copy of the Makefile and the check must fail on
 # it, except the ones listed as equivalent with their reason. About a minute (the mutants run in
-# parallel), so it is not part of `make lint`; CI runs it as a step of the lint job.
+# parallel), so it is not part of `make lint`; CI runs it as a step of the lint job. The target passes the
+# tag itself and fails unless the log has the PASS line of the test (`go test` exits 0 with "no tests to
+# run" when a tag or a name is wrong), and `make mutationrecipe` pins both lines as written.
 recipemutants:
-	go -C devtools test -tags mutants -count=1 -timeout 15m -run TestMakefileMutants ./recipecheck
+	@mkdir -p build
+	go -C devtools test -tags mutants -count=1 -v -timeout 15m -run '^TestMakefileMutants$$' ./recipecheck > build/recipemutants.log || { cat build/recipemutants.log; exit 1; }
+	grep -e '^--- PASS: TestMakefileMutants ' build/recipemutants.log
 
 catalogcheck:
 	go -C devtools build -o $(CURDIR)/build/catalogcheck ./catalogcheck

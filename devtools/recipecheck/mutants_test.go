@@ -14,32 +14,6 @@ import (
 	"testing"
 )
 
-// The recipes `go run ./internal/mutationreport`, which compiles and links the tool at every step: for
-// the many runs of this test a copy of the test binary stands in as `go` on the PATH and runs the tool
-// built once. Any other `go` command goes to the real one.
-const shimVariable = "RECIPECHECK_GO_SHIM"
-
-// init turns the process into that `go` when the shim variable is set and it was started as `go`.
-func init() {
-	if os.Getenv(shimVariable) == "" || filepath.Base(os.Args[0]) != "go" {
-		return
-	}
-	args := os.Args[1:]
-	program, rest := os.Getenv("RECIPECHECK_REAL_GO"), args
-	if len(args) >= 2 && args[0] == "run" && args[1] == "./internal/mutationreport" {
-		program, rest = os.Getenv("RECIPECHECK_REPORT_TOOL"), args[2:]
-	}
-	cmd := exec.Command(program, rest...) //nolint:gosec // the programs this test names
-	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
-	if err := cmd.Run(); err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			os.Exit(exitErr.ExitCode())
-		}
-		os.Exit(127)
-	}
-	os.Exit(0)
-}
-
 // installShim builds the report tool once and puts the stand-in `go` first on the PATH.
 func installShim(t *testing.T, realRoot string) {
 	t.Helper()
@@ -67,7 +41,7 @@ func installShim(t *testing.T, realRoot string) {
 	if err := os.MkdirAll(bin, 0o750); err != nil {
 		t.Fatal(err)
 	}
-	dst, err := os.OpenFile(filepath.Join(bin, "go"), os.O_CREATE|os.O_WRONLY, 0o755) //nolint:gosec // an executable copy
+	dst, err := os.OpenFile(filepath.Join(bin, "go"), os.O_CREATE|os.O_WRONLY, 0o755)
 	if err != nil {
 		t.Fatal(err)
 	}

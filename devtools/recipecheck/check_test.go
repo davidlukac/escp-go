@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -13,7 +14,9 @@ import (
 // newChecker is a checker over a scratch repository that talks to the ideal make.
 func newChecker(t *testing.T, m *idealMake) *checker {
 	t.Helper()
-	return &checker{root: repoRoot(t), run: m.runner(), standin: "'standin-binary' " + standinCommand, files: osFiles{}}
+	root := repoRoot(t)
+	m.root = root
+	return &checker{root: root, run: m.runner(), standin: "'standin-binary' " + standinCommand, files: osFiles{}}
 }
 
 func TestAMakefileAsPinnedHasNoProblem(t *testing.T) {
@@ -31,7 +34,7 @@ type deviation struct {
 }
 
 func lastNonGremlins(lines []string) int {
-	for i := len(lines) - 1; i >= 0; i-- {
+	for i := range slices.Backward(lines) {
 		if !strings.Contains(lines[i], gremlinsMarker) {
 			return i
 		}
@@ -46,14 +49,6 @@ func gremlinsAt(lines []string) int {
 		}
 	}
 	return -1
-}
-
-// without removes the first occurrence of word from the gremlins line.
-func without(lines []string, word string) []string {
-	out := append([]string{}, lines...)
-	i := gremlinsAt(out)
-	out[i] = strings.Replace(out[i], word, "", 1)
-	return out
 }
 
 func deviations() []deviation {
@@ -84,6 +79,12 @@ func deviations() []deviation {
 			out[i] += " --threshold-efficacy 90"
 			return out, true
 		}},
+		{"the threshold given to gremlins, in the middle", func(_ dryCase, lines []string) ([]string, bool) {
+			i := gremlinsAt(lines)
+			out := append([]string{}, lines...)
+			out[i] = strings.Replace(out[i], gremlinsPrefix, gremlinsPrefix+"--threshold-efficacy 90 ", 1)
+			return out, true
+		}},
 		{"the tool's prefix missing", func(tc dryCase, lines []string) ([]string, bool) {
 			i := gremlinsAt(lines)
 			out := append([]string{}, lines...)
@@ -95,8 +96,8 @@ func deviations() []deviation {
 
 func TestEveryRecipeCaseNoticesEachDeviation(t *testing.T) {
 	for _, tc := range dryCases() {
-		if tc.target == "lint" {
-			continue // no gremlins line; TestTheLintTargetMustRunTheCheck
+		if tc.target == "lint" || tc.plain {
+			continue // no gremlins line; the tests of those cases
 		}
 		for _, dev := range deviations() {
 			t.Run(tc.label+": "+dev.name, func(t *testing.T) {
@@ -188,17 +189,117 @@ func hasProblemFor(problems []string, label string) bool {
 	return false
 }
 
-func TestTheLintTargetMustRunTheCheck(t *testing.T) {
-	m := newIdealMake(t)
-	m.dryLines = func(tc dryCase, lines []string) []string {
-		if tc.target == "lint" {
-			return []string{"go build", "go run ./other"}
-		}
-		return lines
+// The lint line must be the recipe of the mutationrecipe target with the root, whole: a prefix that
+// matches is not enough (`|| true`, an extra flag), and a root resolved through symbolic links is the
+// same root.
+func TestTheLintTargetMustRunTheCheckAsTheWholeLine(t *testing.T) {
+	tests := []struct {
+		name  string
+		lines func(root string) []string
+		want  bool // a problem
+	}{
+		{"the line as it is", func(root string) []string { return []string{"go build", lintRecipe + root} }, false},
+		{"the line with its links resolved", func(root string) []string {
+			resolved, _ := filepath.EvalSymlinks(root)
+			return []string{lintRecipe + resolved}
+		}, false},
+		{"another recipe", func(string) []string { return []string{"go build", "go run ./other"} }, true},
+		{"the check made non-fatal", func(root string) []string { return []string{lintRecipe + root + " || true"} }, true},
+		{"an extra flag", func(root string) []string { return []string{lintRecipe + root + " -make true"} }, true},
+		{"another root", func(string) []string { return []string{lintRecipe + "/elsewhere"} }, true},
+		{"the prefix only", func(string) []string { return []string{lintRecipe} }, true},
+		{"a second root flag", func(root string) []string { return []string{lintRecipe + root + " -root /tmp"} }, true},
 	}
-	problems, err := newChecker(t, m).check(context.Background())
-	if err != nil || len(problems) != 1 || !strings.Contains(problems[0], "make lint does not run the check") {
-		t.Errorf("problems %q, error %v", problems, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := newIdealMake(t)
+			c := newChecker(t, m)
+			m.dryLines = func(tc dryCase, lines []string) []string {
+				if tc.target == "lint" {
+					return tt.lines(c.root)
+				}
+				return lines
+			}
+			problems, err := c.check(context.Background())
+			if err != nil || (len(problems) == 1) != tt.want || len(problems) > 1 ||
+				(tt.want && !strings.Contains(problems[0], "make lint does not run the check")) {
+				t.Errorf("problems %q, error %v, want a problem: %v", problems, err, tt.want)
+			}
+		})
+	}
+}
+
+// `make -n` hides a `-` and an `@`, so the recipe of the mutationrecipe target is also read as it is
+// written in the Makefile.
+func TestTheRecipeOfTheCheckTargetIsPinnedAsWritten(t *testing.T) {
+	tests := []struct {
+		name     string
+		makefile string
+		want     string // a word of the problem, "" for none
+	}{
+		{"as it is", goodMakefile, ""},
+		{"a - prefix", strings.Replace(goodMakefile, "\tgo -C", "\t-go -C", 1), "mutationrecipe is not as written"},
+		{"an @ prefix", strings.Replace(goodMakefile, "\tgo -C", "\t@go -C", 1), "mutationrecipe is not as written"},
+		{"|| true", strings.Replace(goodMakefile, "$(CURDIR)", "$(CURDIR) || true", 1), "mutationrecipe is not as written"},
+		{"an extra flag", strings.Replace(goodMakefile, "$(CURDIR)", "$(CURDIR) -make true", 1), "mutationrecipe is not as written"},
+		{"another line", strings.Replace(goodMakefile, recipeSource+"\n", recipeSource+"\n\ttrue\n", 1), "mutationrecipe is not as written"},
+		{"no recipe", strings.Replace(goodMakefile, recipeSource+"\n", "", 1), "mutationrecipe is not as written"},
+		{"no target", "all:\n\ttrue\n", "no mutationrecipe target"},
+		{"the mutants recipe without the PASS line", strings.Replace(goodMakefile, mutantsSource[2]+"\n", "", 1), "recipemutants"},
+		{"a - prefix on the PASS line", strings.Replace(goodMakefile, "\tgrep -e", "\t-grep -e", 1), "recipemutants"},
+		{"an @ prefix on the test run", strings.Replace(goodMakefile, "\tgo -C devtools test", "\t@go -C devtools test", 1), "recipemutants"},
+		{"the test run made non-fatal", strings.Replace(goodMakefile, "exit 1; }", "exit 1; } || true", 1), "recipemutants"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			problems := sourceProblems(tt.makefile)
+			switch {
+			case tt.want == "" && len(problems) != 0, tt.want != "" && !strings.Contains(strings.Join(problems, "\n"), tt.want):
+				t.Errorf("problems %q, want %q", problems, tt.want)
+			}
+		})
+	}
+}
+
+func TestAMakefileThatCannotBeReadStopsTheCheck(t *testing.T) {
+	c := newChecker(t, newIdealMake(t))
+	if err := os.Remove(filepath.Join(c.root, "Makefile")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.check(context.Background()); err == nil || !strings.Contains(err.Error(), "reading the Makefile") {
+		t.Errorf("error %v", err)
+	}
+}
+
+// A recipe without gremlins is compared whole.
+func TestAPlainRecipeCaseNoticesEachDeviation(t *testing.T) {
+	deviations := map[string]func(lines []string) []string{
+		"a line missing": func(lines []string) []string { return lines[1:] },
+		"a step made non-fatal": func(lines []string) []string {
+			return append(slices.Clone(lines[:len(lines)-1]), lines[len(lines)-1]+" || true")
+		},
+		"a step added":         func(lines []string) []string { return append(slices.Clone(lines), "true") },
+		"the log not required": func(lines []string) []string { return lines[:len(lines)-1] },
+	}
+	for _, tc := range dryCases() {
+		if !tc.plain {
+			continue
+		}
+		for name, deviate := range deviations {
+			t.Run(tc.label+": "+name, func(t *testing.T) {
+				m := newIdealMake(t)
+				m.dryLines = func(got dryCase, lines []string) []string {
+					if got.label == tc.label {
+						return deviate(lines)
+					}
+					return lines
+				}
+				problems, err := newChecker(t, m).check(context.Background())
+				if err != nil || len(problems) != 1 || !strings.HasPrefix(problems[0], tc.label+":") {
+					t.Errorf("problems %q, error %v", problems, err)
+				}
+			})
+		}
 	}
 }
 
@@ -340,6 +441,7 @@ func TestTheReportOfTheWorkingTreeComesBack(t *testing.T) {
 		wantErr bool
 	}{
 		{name: "a run to the end", prepare: write(precious, 0o640)},
+		{name: "permissions a umask would change", prepare: write(precious, 0o666)},
 		{name: "none before, a stand-in's report left behind", prepare: func(*testing.T, string) {}},
 		{name: "an error in the middle", prepare: write(precious, 0o640),
 			onRun: func(*testing.T, *checker, context.CancelFunc) func(env, args []string) error {
@@ -487,9 +589,6 @@ func TestAFileSystemThatFailsStopsTheCheck(t *testing.T) {
 				return only(op == "WriteFile" && strings.HasSuffix(name, "bad.json"), boom)
 			}
 		}, "writing a report", false},
-		{"build cannot be made", func(*checker) func(op, name string) error {
-			return func(op, _ string) error { return only(op == "MkdirAll", boom) }
-		}, "build/", false},
 		{"the report of the tree cannot be looked at", func(*checker) func(op, name string) error {
 			return func(op, name string) error {
 				return only(op == "Stat" && strings.HasSuffix(name, "mutation.json"), boom)
@@ -500,15 +599,8 @@ func TestAFileSystemThatFailsStopsTheCheck(t *testing.T) {
 				return only(op == "ReadFile" && strings.HasSuffix(name, "mutation.json"), boom)
 			}
 		}, "reading build/mutation.json", true},
-		{"build cannot be made again for a run", func(*checker) func(op, name string) error {
-			calls := 0
-			return func(op, path string) error {
-				if op != "MkdirAll" {
-					return nil
-				}
-				calls++
-				return only(calls == 2, boom) // the first is the staging
-			}
+		{"build cannot be made for a run", func(*checker) func(op, name string) error {
+			return func(op, _ string) error { return only(op == "MkdirAll", boom) }
 		}, "build/", false},
 		{"a report cannot be removed", func(*checker) func(op, name string) error {
 			return func(op, name string) error {
@@ -534,7 +626,8 @@ func TestAFileSystemThatFailsStopsTheCheck(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := newChecker(t, newIdealMake(t))
-			c.files = failingFiles{fail: tt.fail(c)}
+			var temps []string
+			c.files = failingFiles{fail: tt.fail(c), temps: &temps}
 			if tt.reportFirst {
 				if err := os.MkdirAll(filepath.Join(c.root, "build"), 0o750); err != nil {
 					t.Fatal(err)
@@ -544,6 +637,11 @@ func TestAFileSystemThatFailsStopsTheCheck(t *testing.T) {
 			_, err := c.check(context.Background())
 			if err == nil || !errors.Is(err, boom) && !strings.Contains(err.Error(), tt.want) {
 				t.Fatalf("error %v, want one about %q", err, tt.want)
+			}
+			for _, dir := range temps {
+				if _, statErr := os.Stat(dir); !errors.Is(statErr, os.ErrNotExist) {
+					t.Errorf("the scratch directory %s was not removed (%v)", dir, statErr)
+				}
 			}
 			if tt.reportFirst {
 				data, readErr := os.ReadFile(filepath.Join(c.root, "build", "mutation.json"))
@@ -579,5 +677,64 @@ func TestTheCasesAreWhatTheJobsUse(t *testing.T) {
 	}
 	if got := fmt.Sprint(recipeOf(targetExtended, nil, "10")); got != "[mkdir -p build go run ./internal/mutationreport coefficient \"10\" GREMLINS]" {
 		t.Errorf("the extended recipe is %s", got)
+	}
+}
+
+// The ending is a suffix of the gremlins line (a word after it, or its last word glued to another, is
+// not), and a pinned word is a whole word (the same words with a digit glued on are not).
+func TestThePinnedEndingIsASuffixAndThePinnedWordsAreWholeWords(t *testing.T) {
+	for _, tc := range dryCases() {
+		if tc.pins.ending == "" && len(tc.pins.has) == 0 {
+			continue
+		}
+		edits := map[string]func(line string) string{
+			"a word after the line": func(line string) string { return line + " --verbose" },
+			"the last word glued":   func(line string) string { return line + "x" },
+		}
+		for _, word := range tc.pins.has {
+			edits["the word "+word+" glued to a digit"] = func(line string) string {
+				at := strings.LastIndex(line, word)
+				return line[:at+len(word)] + "0" + line[at+len(word):]
+			}
+		}
+		for name, edit := range edits {
+			if tc.pins.ending == "" && strings.HasPrefix(name, "a word") || tc.pins.ending == "" && strings.HasPrefix(name, "the last") {
+				continue
+			}
+			t.Run(tc.label+": "+name, func(t *testing.T) {
+				m := newIdealMake(t)
+				m.dryLines = func(got dryCase, lines []string) []string {
+					if got.label != tc.label {
+						return lines
+					}
+					out := slices.Clone(lines)
+					i := gremlinsAt(out)
+					out[i] = edit(out[i])
+					return out
+				}
+				problems, err := newChecker(t, m).check(context.Background())
+				if err != nil || !hasProblemFor(problems, tc.label) {
+					t.Errorf("not noticed: problems %q, error %v", problems, err)
+				}
+			})
+		}
+	}
+}
+
+// The reports the stand-in leaves are what they are named for: the good one passes any threshold up to
+// 100 (a timed-out mutant is a kill), the bad one has a survivor.
+func TestTheReportsAreAsNamed(t *testing.T) {
+	for _, tt := range []struct {
+		name, report string
+		has, lacks   string
+	}{
+		{"good", goodReportJSON, `"TIMED OUT"`, `"LIVED"`},
+		{"bad", badReportJSON, `"LIVED"`, `"TIMED OUT"`},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if !strings.Contains(tt.report, `"KILLED"`) || !strings.Contains(tt.report, tt.has) || strings.Contains(tt.report, tt.lacks) {
+				t.Errorf("the %s report is %s", tt.name, tt.report)
+			}
+		})
 	}
 }

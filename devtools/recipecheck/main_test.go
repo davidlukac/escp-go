@@ -14,11 +14,13 @@ import (
 func testEnvironment(t *testing.T, m *idealMake) (environment, *bytes.Buffer, *bytes.Buffer) {
 	t.Helper()
 	var stdout, stderr bytes.Buffer
+	root := repoRoot(t)
+	m.root = root
 	e := environment{
 		stdout: &stdout, stderr: &stderr,
 		getenv:     func(string) string { return "" },
 		executable: func() (string, error) { return "/bin/recipecheck", nil },
-		abs:        func(p string) (string, error) { return filepath.Join(repoRoot(t), p), nil },
+		abs:        func(string) (string, error) { return root, nil },
 		newRunner:  func(string, string) runner { return m.runner() },
 		files:      osFiles{},
 	}
@@ -58,12 +60,20 @@ func TestRunGivesTheMakeProgramAndTheRootToTheRunner(t *testing.T) {
 			e, _, _ := testEnvironment(t, newIdealMake(t))
 			e.getenv = func(name string) string { return map[string]string{"MAKE": tt.makeEnv}[name] }
 			var gotRoot, gotMake string
-			e.newRunner = func(root, makeBin string) runner {
-				gotRoot, gotMake = root, makeBin
-				return newIdealMake(t).runner()
+			e.newRunner = func(rootDir, makeBin string) runner {
+				gotRoot, gotMake = rootDir, makeBin
+				ideal := newIdealMake(t)
+				ideal.root = rootDir
+				return ideal.runner()
 			}
-			base := t.TempDir()
+			base := repoRoot(t)
 			e.abs = func(p string) (string, error) { return filepath.Join(base, p), nil }
+			if err := os.MkdirAll(filepath.Join(base, "repo"), 0o750); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(base, "repo", "Makefile"), []byte(goodMakefile), 0o600); err != nil {
+				t.Fatal(err)
+			}
 			if code := run(context.Background(), append(tt.args, "-root", "repo"), e); code != exitOK {
 				t.Fatalf("code %d", code)
 			}

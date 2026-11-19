@@ -25,7 +25,7 @@ func TestTheStandInLeavesAMarkAndTheReport(t *testing.T) {
 			t.Fatalf("code %d", code)
 		}
 	}
-	if data, err := os.ReadFile(log); err != nil || string(data) != "ran\nran\n" {
+	if data, err := os.ReadFile(log); err != nil || string(data) != strings.Repeat("ran\n", 2) {
 		t.Errorf("log %q (%v)", data, err)
 	}
 	if data, err := os.ReadFile(reportFile); err != nil || string(data) != goodReportJSON {

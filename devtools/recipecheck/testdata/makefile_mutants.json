@@ -551,5 +551,138 @@
   "new": "PKG_DIRS := ",
   "occurrence": 0,
   "equivalent": "the list is only ever read when PKG is set, so expanding it eagerly changes the time make takes and nothing it prints or does"
+ },
+ {
+  "name": "mutationrecipe: the check made non-fatal with || true",
+  "old": "-root $(CURDIR)\n",
+  "new": "-root $(CURDIR) || true\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutationrecipe: an extra flag after the root",
+  "old": "-root $(CURDIR)\n",
+  "new": "-root $(CURDIR) -make true\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutationrecipe: another root",
+  "old": "-root $(CURDIR)\n",
+  "new": "-root /tmp\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutationrecipe: the check made non-fatal with a - prefix",
+  "old": "mutationrecipe:\n\tgo -C",
+  "new": "mutationrecipe:\n\t-go -C",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutationrecipe: the check hidden with an @ prefix",
+  "old": "mutationrecipe:\n\tgo -C",
+  "new": "mutationrecipe:\n\t@go -C",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutationrecipe: a second step after the check",
+  "old": "-root $(CURDIR)\n",
+  "new": "-root $(CURDIR)\n\ttrue\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation: gremlins made non-fatal with || true",
+  "old": "\t$(MUTATE)\n",
+  "new": "\t$(MUTATE) || true\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation: a word added after gremlins",
+  "old": "\t$(MUTATE)\n",
+  "new": "\t$(MUTATE) --verbose\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation-diff: gremlins made non-fatal with || true",
+  "old": "--diff $(or $(BASE),origin/main)\n",
+  "new": "--diff $(or $(BASE),origin/main) || true\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation-diff: a word added after the diff",
+  "old": "--diff $(or $(BASE),origin/main)\n",
+  "new": "--diff $(or $(BASE),origin/main) --verbose\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation-extended: gremlins made non-fatal with || true",
+  "old": "\t$(MUTATE_EXTENDED)\n",
+  "new": "\t$(MUTATE_EXTENDED) || true\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation-extended: a word added after the operators",
+  "old": "\t$(MUTATE_EXTENDED)\n",
+  "new": "\t$(MUTATE_EXTENDED) --verbose\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "the report path glued to another word",
+  "old": "MUTATE := $(GREMLINS) --output build/mutation.json",
+  "new": "MUTATE := $(GREMLINS) --output build/mutation.json.bak",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "the coefficient word glued to a digit",
+  "old": "--timeout-coefficient $(TIMEOUT_COEFFICIENT)",
+  "new": "--timeout-coefficient $(TIMEOUT_COEFFICIENT)0",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "the workers word glued to a digit",
+  "old": "--workers $(or $(WORKERS),4)",
+  "new": "--workers $(or $(WORKERS),4)0",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "GOFLAGS glued to a digit",
+  "old": "GREMLINS := GOFLAGS=-count=1 ",
+  "new": "GREMLINS := GOFLAGS=-count=10 ",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation: the coefficient 010 let through",
+  "old": "coefficient \"$(TIMEOUT_COEFFICIENT)\"",
+  "new": "coefficient \"$(subst 010,10,$(TIMEOUT_COEFFICIENT))\"",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation: the coefficient 10000 let through",
+  "old": "coefficient \"$(TIMEOUT_COEFFICIENT)\"",
+  "new": "coefficient \"$(subst 10000,1000,$(TIMEOUT_COEFFICIENT))\"",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "mutation: a threshold that is not a percentage let through",
+  "old": "threshold \"$(EFFICACY)\"",
+  "new": "threshold \"$(subst 90%,90,$(EFFICACY))\"",
+  "occurrence": 0,
+  "equivalent": ""
  }
 ]

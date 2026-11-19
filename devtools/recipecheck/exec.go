@@ -31,8 +31,7 @@ func execRunner(root, makeBin string) runner {
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			return "", 0, ctxErr
 		}
-		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
+		if exitErr, ok := errors.AsType[*exec.ExitError](err); ok {
 			return out.String(), exitErr.ExitCode(), nil
 		}
 		return out.String(), 0, err

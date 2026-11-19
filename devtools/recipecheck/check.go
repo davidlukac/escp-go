@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -75,6 +76,11 @@ func (c *checker) check(ctx context.Context) (problems []string, err error) {
 		}
 		problems = append(problems, found...)
 	}
+	text, err := c.files.ReadFile(filepath.Join(c.root, "Makefile"))
+	if err != nil {
+		return nil, fmt.Errorf("reading the Makefile: %w", err)
+	}
+	problems = append(problems, sourceProblems(string(text))...)
 	s, err := c.stage()
 	if err != nil {
 		return nil, err
@@ -101,7 +107,14 @@ func (c *checker) dry(ctx context.Context, tc dryCase) ([]string, error) {
 	}
 	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
 	if tc.target == "lint" {
-		return lintProblems(tc, lines), nil
+		return lintProblems(tc, lines, c.root), nil
+	}
+	if tc.plain {
+		if equalLines(tc.want, lines) {
+			return nil, nil
+		}
+		return []string{fmt.Sprintf("%s: the recipe is not what it must be; wanted, then got:\n%s\n%s",
+			tc.label, describeLines(tc.want), describeLines(lines))}, nil
 	}
 	var problems []string
 	gremlins, replaced := splitGremlins(lines)
@@ -113,14 +126,52 @@ func (c *checker) dry(ctx context.Context, tc dryCase) ([]string, error) {
 	return problems, nil
 }
 
-// lintProblems says whether `make -n lint` runs this check.
-func lintProblems(tc dryCase, lines []string) []string {
+// lintProblems says whether `make -n lint` runs this check: a line that is exactly the recipe of the
+// mutationrecipe target with the root of the repository (as given, and with its symbolic links
+// resolved, which is what make's own idea of the directory may be), with nothing after it (`|| true`, an
+// extra flag).
+func lintProblems(tc dryCase, lines []string, root string) []string {
+	wanted := []string{lintRecipe + root}
+	if resolved, err := filepath.EvalSymlinks(root); err == nil {
+		wanted = append(wanted, lintRecipe+resolved)
+	}
 	for _, line := range lines {
-		if strings.HasPrefix(line, lintRecipePrefix) {
+		if slices.Contains(wanted, line) {
 			return nil
 		}
 	}
-	return []string{tc.label + ": make lint does not run the check (no line starts with `" + lintRecipePrefix + "`)"}
+	return []string{tc.label + ": make lint does not run the check as `" + wanted[0] + "` (no line of its recipe is that, whole)"}
+}
+
+// sourceProblems pins the recipes of the mutationrecipe and recipemutants targets in the text of the
+// Makefile: `make -n` hides a `-` prefix (a failing step that does not fail make) and an `@`, so each
+// recipe is compared as it is written, line by line, and must have no other line.
+func sourceProblems(makefile string) []string {
+	lines := strings.Split(makefile, "\n")
+	var problems []string
+	for target, want := range map[string][]string{
+		recipeTarget:  {recipeSource},
+		mutantsTarget: mutantsSource,
+	} {
+		at := slices.Index(lines, target+":")
+		if at < 0 {
+			problems = append(problems, "the Makefile has no "+target+" target")
+			continue
+		}
+		var recipe []string
+		for _, line := range lines[at+1:] {
+			if !strings.HasPrefix(line, "\t") {
+				break
+			}
+			recipe = append(recipe, line)
+		}
+		if !slices.Equal(recipe, want) {
+			problems = append(problems, fmt.Sprintf("the recipe of %s is not as written in the check (a prefix or a suffix on a line, or another line, hides a failure from make): got %q, want %q",
+				target, recipe, want))
+		}
+	}
+	slices.Sort(problems)
+	return problems
 }
 
 // splitGremlins returns the lines that run gremlins and the recipe with the line that starts as the
@@ -203,10 +254,6 @@ func (c *checker) stage() (*stage, error) {
 			s.discard()
 			return nil, fmt.Errorf("writing a report: %w", err)
 		}
-	}
-	if err := c.files.MkdirAll(filepath.Join(c.root, "build"), dirMode); err != nil {
-		s.discard()
-		return nil, fmt.Errorf("making build/: %w", err)
 	}
 	if err := s.putAside(); err != nil {
 		s.discard()

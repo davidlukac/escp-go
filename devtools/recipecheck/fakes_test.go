@@ -2,8 +2,11 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -14,6 +17,15 @@ import (
 // RECIPECHECK_FAKE_STATUS).
 func TestMain(m *testing.M) {
 	switch {
+	case runAsGoShim():
+		os.Exit(goShim())
+	case os.Getenv("RECIPECHECK_HELPER") == "listen":
+		ctx, stop := listen(context.Background())
+		fmt.Println("ready")
+		<-ctx.Done()
+		stop()
+		fmt.Println("canceled")
+		os.Exit(0)
 	case len(os.Args) > 1 && os.Args[1] == standinCommand:
 		os.Exit(runStandin(os.Getenv, os.Stderr))
 	case os.Getenv("RECIPECHECK_FAKE_MAKE") != "":
@@ -34,6 +46,8 @@ type idealMake struct {
 	t   *testing.T
 	dry map[string]dryCase
 	run map[string]exitCase
+	// root is the repository the check is run over, as the lint recipe prints it.
+	root string
 
 	// dryLines, when set, is given the case and the recipe the ideal make prints and returns what to print.
 	dryLines func(tc dryCase, lines []string) []string
@@ -90,7 +104,7 @@ func (m *idealMake) printDry(tc dryCase) string {
 	var lines []string
 	switch {
 	case tc.target == "lint":
-		lines = []string{"go build", lintRecipePrefix + "/repo"}
+		lines = []string{"go build", lintRecipe + m.root}
 	case tc.want == nil:
 		lines = []string{"mkdir -p build", gremlinsLine(tc.pins)}
 	default:
@@ -157,16 +171,26 @@ func (m *idealMake) runExit(env, args []string) (string, int, error) {
 	return "", status, nil
 }
 
-// repoRoot is a directory with a build/ directory, as the check expects the repository to have.
+// goodMakefile is the part of the Makefile the check reads for itself.
+var goodMakefile = "all:\n\ttrue\n\n" + recipeTarget + ":\n" + recipeSource + "\n\n" +
+	mutantsTarget + ":\n" + strings.Join(mutantsSource, "\n") + "\n\nnext:\n\ttrue\n"
+
+// repoRoot is a scratch repository: a directory with the Makefile the check reads.
 func repoRoot(t *testing.T) string {
 	t.Helper()
-	return t.TempDir()
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "Makefile"), []byte(goodMakefile), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return dir
 }
 
 // failingFiles is the real file system that fails an operation on a name when fail says so.
 type failingFiles struct {
 	osFiles
 	fail func(op, name string) error
+	// temps collects the scratch directories made.
+	temps *[]string
 }
 
 func (f failingFiles) err(op, name string) error {
@@ -180,7 +204,11 @@ func (f failingFiles) MkdirTemp(dir, pattern string) (string, error) {
 	if err := f.err("MkdirTemp", pattern); err != nil {
 		return "", err
 	}
-	return f.osFiles.MkdirTemp(dir, pattern)
+	made, err := f.osFiles.MkdirTemp(dir, pattern)
+	if err == nil && f.temps != nil {
+		*f.temps = append(*f.temps, made)
+	}
+	return made, err
 }
 
 func (f failingFiles) MkdirAll(path string, perm os.FileMode) error {
@@ -216,4 +244,33 @@ func (f failingFiles) Remove(name string) error {
 		return err
 	}
 	return f.osFiles.Remove(name)
+}
+
+// The recipes `go run ./internal/mutationreport`, which compiles and links the tool at every step: for
+// the many runs of this test a copy of the test binary stands in as `go` on the PATH and runs the tool
+// built once. Any other `go` command goes to the real one.
+const shimVariable = "RECIPECHECK_GO_SHIM"
+
+// runAsGoShim says whether this process was started as the stand-in `go`.
+func runAsGoShim() bool {
+	return os.Getenv(shimVariable) != "" && filepath.Base(os.Args[0]) == "go"
+}
+
+// goShim is the stand-in `go`: it runs the report tool or the real go and returns the exit status.
+func goShim() int {
+	args := os.Args[1:]
+	program, rest := os.Getenv("RECIPECHECK_REAL_GO"), args
+	if len(args) >= 2 && args[0] == "run" && args[1] == "./internal/mutationreport" {
+		program, rest = os.Getenv("RECIPECHECK_REPORT_TOOL"), args[2:]
+	}
+	cmd := exec.Command(program, rest...)
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+	err := cmd.Run()
+	if exitErr, ok := errors.AsType[*exec.ExitError](err); ok {
+		return exitErr.ExitCode()
+	}
+	if err != nil {
+		return 127
+	}
+	return 0
 }

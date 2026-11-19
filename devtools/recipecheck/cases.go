@@ -8,16 +8,19 @@ import (
 // The files and words of the recipes under check. A recipe is compared with them whole, so they are
 // written out here and not derived from the Makefile.
 const (
-	reportFile       = "build/mutation.json"
-	extendedFile     = "build/mutation-extended.json"
-	reportTool       = "go run ./internal/mutationreport"
-	gremlinsMarker   = "gremlins unleash"
-	gremlinsPrefix   = "GOFLAGS=-count=1 go tool -modfile=devtools/go.mod gremlins unleash . "
-	gremlinsPlace    = "GREMLINS"
-	defaultBase      = "origin/main"
-	defaultCoeff     = "10"
-	otherCoeff       = "20"
-	lintRecipePrefix = "go -C devtools run ./recipecheck -root "
+	reportFile     = "build/mutation.json"
+	extendedFile   = "build/mutation-extended.json"
+	reportTool     = "go run ./internal/mutationreport"
+	gremlinsMarker = "gremlins unleash"
+	gremlinsPrefix = "GOFLAGS=-count=1 go tool -modfile=devtools/go.mod gremlins unleash . "
+	gremlinsPlace  = "GREMLINS"
+	defaultBase    = "origin/main"
+	defaultCoeff   = "10"
+	otherCoeff     = "20"
+	lintRecipe     = "go -C devtools run ./recipecheck -root "
+	recipeTarget   = "mutationrecipe"
+	mutantsTarget  = "recipemutants"
+	recipeSource   = "\tgo -C devtools run ./recipecheck -root $(CURDIR)"
 )
 
 // The targets.
@@ -46,6 +49,8 @@ type dryCase struct {
 	want   []string
 	pins   pins
 	target string
+	// plain: no gremlins in the recipe, only the whole-line comparison.
+	plain bool
 }
 
 // thresholdLine, coefficientLine and checkLine are the steps the recipes run around gremlins.
@@ -104,7 +109,7 @@ func packageFilter(dir string) string { return "-E '^" + dir + "/[^/]+$'" }
 // environment, the extended run whatever the efficacy says, BASE, WORKERS, the PKG filter, and the lint
 // target that runs this check.
 func dryCases() []dryCase {
-	var cases []dryCase
+	cases := make([]dryCase, 0, 40)
 	targets := []string{targetMutation, targetDiff, targetExtended}
 	for _, coefficient := range []string{defaultCoeff, otherCoeff} {
 		for _, target := range targets {
@@ -140,6 +145,8 @@ func dryCases() []dryCase {
 			target: targetDiff},
 	)
 	cases = append(cases, filterCases()...)
+	cases = append(cases, dryCase{label: "recipemutants runs the mutants test with its tag and needs its PASS line",
+		args: []string{mutantsTarget}, target: mutantsTarget, plain: true, want: mutantsRecipe})
 	cases = append(cases, dryCase{label: "make lint runs this check", args: []string{"lint"}, target: "lint"})
 	return cases
 }
@@ -160,6 +167,22 @@ func filterCases() []dryCase {
 		{label: "mutation with PKG=model", args: []string{targetMutation, "PKG=model"}, pins: withPKG, target: targetMutation},
 		{label: "mutation-diff with PKG=.", args: []string{targetDiff, "PKG=."}, pins: diffAtRoot, target: targetDiff},
 	}
+}
+
+// mutantsRecipe is the recipe of `make recipemutants` as `make -n` prints it: the test is run with the
+// mutants tag and its output kept, and the log must have the PASS line of the test, because `go test`
+// exits 0 with "no tests to run" when a tag or a name is wrong.
+var mutantsRecipe = []string{
+	"mkdir -p build",
+	"go -C devtools test -tags mutants -count=1 -v -timeout 15m -run '^TestMakefileMutants$' ./recipecheck > build/recipemutants.log || { cat build/recipemutants.log; exit 1; }",
+	"grep -e '^--- PASS: TestMakefileMutants ' build/recipemutants.log",
+}
+
+// mutantsSource is the same recipe as it is written in the Makefile, where `make -n` hides a prefix.
+var mutantsSource = []string{
+	"\t@mkdir -p build",
+	"\tgo -C devtools test -tags mutants -count=1 -v -timeout 15m -run '^TestMakefileMutants$$' ./recipecheck > build/recipemutants.log || { cat build/recipemutants.log; exit 1; }",
+	"\tgrep -e '^--- PASS: TestMakefileMutants ' build/recipemutants.log",
 }
 
 // expectation is what an exit-code run must do.

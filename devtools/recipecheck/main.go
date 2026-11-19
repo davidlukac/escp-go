@@ -55,9 +55,18 @@ const (
 	exitError    = 2
 )
 
+// interrupts are the signals that stop the check: it restores the report of the working tree and exits
+// (a wrapper such as `timeout` sends TERM to this process alone).
+var interrupts = []os.Signal{os.Interrupt, syscall.SIGTERM, syscall.SIGHUP}
+
+// listen is the context that is canceled by one of the interrupts.
+func listen(parent context.Context) (context.Context, context.CancelFunc) {
+	return signal.NotifyContext(parent, interrupts...)
+}
+
 // main is the process entry point.
 func main() {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
+	ctx, stop := listen(context.Background())
 	code := run(ctx, os.Args[1:], processEnvironment())
 	stop()
 	os.Exit(code)
@@ -96,28 +105,28 @@ func run(ctx context.Context, args []string, e environment) int {
 	}
 	exe, err := e.executable()
 	if err != nil {
-		fmt.Fprintf(e.stderr, "recipecheck: %v\n", err)
+		_, _ = fmt.Fprintf(e.stderr, "recipecheck: %v\n", err)
 		return exitError
 	}
 	absRoot, err := e.abs(*root)
 	if err != nil {
-		fmt.Fprintf(e.stderr, "recipecheck: %v\n", err)
+		_, _ = fmt.Fprintf(e.stderr, "recipecheck: %v\n", err)
 		return exitError
 	}
 	c := &checker{root: absRoot, run: e.newRunner(absRoot, *makeBin), files: e.files,
 		standin: shellQuote(exe) + " " + standinCommand}
 	problems, err := c.check(ctx)
 	if err != nil {
-		fmt.Fprintf(e.stderr, "recipecheck: %v\n", err)
+		_, _ = fmt.Fprintf(e.stderr, "recipecheck: %v\n", err)
 		return exitError
 	}
 	for _, p := range problems {
-		fmt.Fprintf(e.stderr, "recipecheck: %s\n", p)
+		_, _ = fmt.Fprintf(e.stderr, "recipecheck: %s\n", p)
 	}
 	if len(problems) > 0 {
 		return exitProblems
 	}
-	fmt.Fprintln(e.stdout, "recipecheck: the mutation recipes are as pinned")
+	_, _ = fmt.Fprintln(e.stdout, "recipecheck: the mutation recipes are as pinned")
 	return exitOK
 }
 
