@@ -70,11 +70,13 @@ zizmor:
 # (NN-name.md -> NN-name.html), the ground truth the tests of the "Merge readiness" check compare the
 # parser with (it must report at least as many unticked boxes as the renderer shows). It needs `gh auth`
 # and the network, posts nothing (the markdown endpoint only renders), and is not run in CI: run it when
-# a description is added or GitHub's renderer changes, and commit the HTML that changed.
+# a description is added or GitHub's renderer changes, and commit the HTML that changed. The renderer puts a
+# random hash in the ids of a footnote; it is cut, so that a re-recording is identical.
 .PHONY: oracle-refresh
 oracle-refresh:
 	@for f in internal/mergereadiness/readiness/testdata/oracle/*.md; do \
-		gh api -X POST /markdown -F text=@"$$f" -f mode=gfm > "$${f%.md}.html" || exit 1; \
+		gh api -X POST /markdown -F text=@"$$f" -f mode=gfm > "$${f%.md}.html.tmp" || exit 1; \
+		sed -E 's/-[0-9a-f]{32}"/"/g' "$${f%.md}.html.tmp" > "$${f%.md}.html"; rm -f "$${f%.md}.html.tmp"; \
 	done
 
 # The module files: tidy would change nothing (this module and devtools), and every downloaded
