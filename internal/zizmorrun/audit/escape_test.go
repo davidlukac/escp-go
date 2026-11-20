@@ -110,6 +110,36 @@ func TestLineEscaperForwardsAtMostTwoHundredLines(t *testing.T) {
 	}
 }
 
+// maxEscapedLine is the longest line the escaper can write, which is what it promises: the prefix, the 200
+// characters verdict.Escape keeps, each of them at most ten characters long (a character outside the first
+// planes is written as \UXXXXXXXX, ten characters), and the "..." that marks a line cut before it was escaped. A
+// line of more than 200 characters that Escape cuts has 197 of them and its own "...", which is less.
+const maxEscapedLine = len(linePrefix) + 200*10 + len(ellipsis)
+
+// The longest lines the escaper writes: the bound above is reached, and not exceeded.
+func TestLineEscaperLongestLine(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		text string
+		want int
+	}{
+		{name: "200 characters of four bytes are all the bytes kept allow, and the line is not marked as cut", text: strings.Repeat("\U0001f308", 200), want: len(linePrefix) + 200*10},
+		{name: "201 characters of four bytes: the bytes kept end at 200 characters and the line is marked as cut, the longest line", text: strings.Repeat("\U0001f308", 201), want: maxEscapedLine},
+		{name: "201 characters of two bytes are cut by the escaper to 197", text: strings.Repeat("\u00e9", 201), want: len(linePrefix) + 197*6 + 3},
+		{name: "invalid bytes are four characters each", text: strings.Repeat("\xff", 200), want: len(linePrefix) + 200*4},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := strings.TrimSuffix(feed(tc.text+"\n"), "\n")
+			if len(got) != tc.want {
+				t.Errorf("a line of %d bytes, want %d: %.60s", len(got), tc.want, got)
+			}
+			if len(got) > maxEscapedLine {
+				t.Errorf("a line longer than the bound: %d", len(got))
+			}
+		})
+	}
+}
+
 // FuzzLineEscaper: whatever zizmor writes, in whatever pieces, every line that comes out starts with the prefix
 // (so none starts a workflow command), is printable ASCII with no end of line inside it, and is no longer than
 // the bound, and at most the limit of lines (and one more for the count) come out.
@@ -137,7 +167,7 @@ func FuzzLineEscaper(f *testing.F) {
 			t.Fatalf("%d lines came out", len(lines))
 		}
 		for _, line := range lines {
-			if !strings.HasPrefix(line, linePrefix) || len(line) > len(linePrefix)+maxLineBytes*4 {
+			if !strings.HasPrefix(line, linePrefix) || len(line) > maxEscapedLine {
 				t.Fatalf("a line without the prefix or too long: %q", line)
 			}
 			for _, r := range line {

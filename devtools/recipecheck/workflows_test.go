@@ -14,6 +14,13 @@ func TestTheZizmorJobOfAWorkflowIsPinned(t *testing.T) {
 		want     string // a word of the problem, "" for none
 	}{
 		{name: "as it is", workflow: goodWorkflow, want: ""},
+		{name: "a comment at the level of the jobs inside the job", workflow: strings.Replace(goodWorkflow, "      - uses: actions/checkout@abc\n", "  # a note between two steps\n      - uses: actions/checkout@abc\n", 1), want: ""},
+		{name: "a comment at the level of the jobs between the two pinned steps is not part of them", workflow: strings.Replace(goodWorkflow, "      - name: Prove that the options hold", "  # a note\n      - name: Prove that the options hold", 1), want: "does not run the gate as pinned"},
+		{name: "a blank line inside the job", workflow: strings.Replace(goodWorkflow, "      - uses: actions/checkout@abc\n", "\n      - uses: actions/checkout@abc\n", 1), want: ""},
+		{name: "the words of the job key in a line before it", workflow: strings.Replace(goodWorkflow, "      - run: make lint", "      - run: make lint # the  zizmor: job is below", 1), want: ""},
+		{name: "the steps are the last lines of the file, without an end of line", workflow: goodWorkflow[:strings.Index(goodWorkflow, step)+len(step)], want: ""},
+		{name: "the steps are the last lines of the file, with an end of line", workflow: goodWorkflow[:strings.Index(goodWorkflow, step)+len(step)] + "\n", want: ""},
+		{name: "the steps are the last lines of the file and something follows them", workflow: goodWorkflow[:strings.Index(goodWorkflow, step)+len(step)] + "\n          ZIZMOR_CONFIG: x", want: "does not run the gate as pinned"},
 		{name: "the audit replaced by true", workflow: strings.Replace(goodWorkflow, "run: make zizmor\n", "run: \"true\"\n", 1), want: "does not run the gate as pinned"},
 		{name: "the audit made non-fatal", workflow: strings.Replace(goodWorkflow, "run: make zizmor\n", "run: make zizmor || true\n", 1), want: "does not run the gate as pinned"},
 		{name: "the audit with a number of its own", workflow: strings.Replace(goodWorkflow, "run: make zizmor\n", "run: make zizmor ZIZMOR_SELF_REPOSITORY_FINDINGS=99\n", 1), want: "does not run the gate as pinned"},

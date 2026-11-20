@@ -289,12 +289,12 @@ func judge(c probeCase, res result) []string {
 }
 
 // outputProblems says what is wrong with the output of a run: a line that starts with a prefix the case
-// forbids, or text the case wants and the output lacks.
+// forbids (white space before it does not count),  or text the case wants and the output lacks.
 func outputProblems(c probeCase, output string) []string {
 	var problems []string
 	for _, prefix := range c.noLineStartsWith {
 		for line := range strings.SplitSeq(output, "\n") {
-			if strings.HasPrefix(line, prefix) {
+			if strings.HasPrefix(strings.TrimLeft(line, " \t"), prefix) {
 				problems = append(problems, fmt.Sprintf("a line of the output starts with %q: %q", prefix, line))
 				break
 			}

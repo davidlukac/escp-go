@@ -197,6 +197,8 @@ func TestRunChecksTheOutputOfTheCases(t *testing.T) {
 		}
 		for name, output := range map[string]string{
 			"a line that starts a workflow command": c.outputHas[0] + "\n::warning::x.yml\n",
+			"a line that starts one after spaces":   c.outputHas[0] + "\n  ::warning::x.yml\n",
+			"a line that starts one after a tab":    c.outputHas[0] + "\n\t::warning::x.yml\n",
 			"the escaped line missing":              "something else\n",
 		} {
 			t.Run(c.name+": "+name, func(t *testing.T) {
