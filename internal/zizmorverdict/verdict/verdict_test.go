@@ -1,0 +1,416 @@
+package verdict
+
+import (
+	"encoding/json"
+	"os"
+	"strconv"
+	"strings"
+	"testing"
+	"unicode"
+)
+
+// jsonString is the JSON text of a string.
+func jsonString(text string) string {
+	encoded, err := json.Marshal(text)
+	if err != nil {
+		panic(err)
+	}
+	return string(encoded)
+}
+
+// findingJSON returns the JSON of one finding of the given rule, with a description and a first location.
+func findingJSON(rule, desc, path string, row int) string {
+	return `{"ident":` + jsonString(rule) + `,"desc":` + jsonString(desc) + `,"locations":[{"symbolic":{"key":{"Local":{"verbatim_path":` +
+		jsonString(path) + `}}},"concrete":{"location":{"start_point":{"row":` + strconv.Itoa(row) + `,"column":3}}}}]}`
+}
+
+// list joins findings into an answer.
+func list(findings ...string) []byte { return []byte("[" + strings.Join(findings, ",") + "]") }
+
+// repeat returns n copies of the finding.
+func repeat(n int, f string) []string {
+	out := make([]string, n)
+	for i := range out {
+		out[i] = f
+	}
+	return out
+}
+
+// guarantee: ParseExpected
+func TestParseExpected(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		text string
+		want int
+		fail bool
+	}{
+		{name: "zero", text: "0", want: 0},
+		{name: "one digit", text: "7", want: 7},
+		{name: "the number in the Makefile", text: "13", want: 13},
+		{name: "the most digits", text: "999999", want: 999999},
+		{name: "one digit too many", text: "1000000", fail: true},
+		{name: "absurdly long", text: strings.Repeat("9", 4000), fail: true},
+		{name: "a number that overflows", text: "99999999999999999999", fail: true},
+		{name: "empty", text: "", fail: true},
+		{name: "a leading plus", text: "+1", fail: true},
+		{name: "a leading minus", text: "-1", fail: true},
+		{name: "minus zero", text: "-0", fail: true},
+		{name: "a leading space", text: " 1", fail: true},
+		{name: "a trailing space", text: "1 ", fail: true},
+		{name: "a trailing newline", text: "1\n", fail: true},
+		{name: "only a space", text: " ", fail: true},
+		{name: "a leading zero (octal to one reader, decimal to another)", text: "010", fail: true},
+		{name: "two zeros", text: "00", fail: true},
+		{name: "a float", text: "1.0", fail: true},
+		{name: "an exponent", text: "1e2", fail: true},
+		{name: "a hexadecimal number", text: "0x10", fail: true},
+		{name: "an underscore", text: "1_0", fail: true},
+		{name: "a letter", text: "1x", fail: true},
+		{name: "a word", text: "all", fail: true},
+		{name: "Arabic-Indic digits", text: "٣", fail: true},
+		{name: "a NUL byte", text: "1\x00", fail: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := ParseExpected(tc.text)
+			if tc.fail {
+				if err == nil {
+					t.Fatalf("ParseExpected(%q) = %d, want an error", tc.text, got)
+				}
+				return
+			}
+			if err != nil || got != tc.want {
+				t.Fatalf("ParseExpected(%q) = %d, %v; want %d", tc.text, got, err, tc.want)
+			}
+		})
+	}
+}
+
+func TestParseExpectedErrorsDoNotRepeatControlCharacters(t *testing.T) {
+	_, err := ParseExpected("1\n::error::x\x1b[31m")
+	if err == nil {
+		t.Fatal("no error")
+	}
+	if !printableLines(err.Error()) {
+		t.Errorf("the error carries unprintable text: %q", err)
+	}
+}
+
+// printableLines reports whether the text is one line of printable ASCII.
+func printableLines(text string) bool {
+	for _, r := range text {
+		if r > unicode.MaxASCII || !unicode.IsPrint(r) {
+			return false
+		}
+	}
+	return true
+}
+
+const (
+	allowed = "self-repository"
+	other   = "template-injection"
+	site    = "./.github/workflows/zz.yml"
+)
+
+func TestJudgePasses(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		expected int
+		answer   []byte
+	}{
+		{name: "no findings, none expected", expected: 0, answer: []byte("[]")},
+		{name: "white space around an empty list", expected: 0, answer: []byte(" \t\r\n[ ]\n\n")},
+		{name: "one allowed finding", expected: 1, answer: list(findingJSON(allowed, "d", site, 1))},
+		{name: "thirteen allowed findings", expected: 13, answer: list(repeat(13, findingJSON(allowed, "d", site, 1))...)},
+		{name: "a finding with the bare minimum, a rule name", expected: 1, answer: []byte(`[{"ident":"self-repository"}]`)},
+		{name: "extra keys are ignored", expected: 1, answer: []byte(`[{"ident":"self-repository","ignored":true,"fixes":[],"x":{"y":[1,2]}}]`)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := Judge(tc.expected, tc.answer)
+			if !got.Pass {
+				t.Fatalf("Judge = %q, want a pass", got.Lines)
+			}
+			want := "zizmor: no findings but the " + strconv.Itoa(tc.expected) + " allowed ones"
+			if len(got.Lines) != 1 || got.Lines[0] != want {
+				t.Errorf("lines = %q, want [%q]", got.Lines, want)
+			}
+		})
+	}
+}
+
+func TestJudgeFailsOnTheNumberOfAllowedFindings(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		expected int
+		have     int
+	}{
+		{name: "one fewer", expected: 13, have: 12},
+		{name: "one more", expected: 13, have: 14},
+		{name: "none, one expected", expected: 1, have: 0},
+		{name: "one, none expected", expected: 0, have: 1},
+		{name: "none expected, many found", expected: 0, have: 13},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := Judge(tc.expected, list(repeat(tc.have, findingJSON(allowed, "d", site, 1))...))
+			if got.Pass {
+				t.Fatal("passed")
+			}
+			wantTail := "zizmor findings: " + strconv.Itoa(tc.have) + " of the allowed rule (self-repository), 0 of other rules; " +
+				"allowed exactly " + strconv.Itoa(tc.expected) + " of the first and none of the second (ZIZMOR_SELF_REPOSITORY_FINDINGS in the Makefile)"
+			if len(got.Lines) != 1 || got.Lines[0] != wantTail {
+				t.Errorf("lines = %q, want [%q]", got.Lines, wantTail)
+			}
+		})
+	}
+}
+
+func TestJudgeFailsOnAFindingOfAnotherRule(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		expected int
+		answer   []byte
+		counts   string
+	}{
+		{name: "the allowed ones exact, one other", expected: 2, answer: list(findingJSON(allowed, "d", site, 1), findingJSON(other, "d", site, 1), findingJSON(allowed, "d", site, 1)), counts: "2 of the allowed rule (self-repository), 1 of other rules; allowed exactly 2"},
+		{name: "only one other", expected: 0, answer: list(findingJSON(other, "d", site, 1)), counts: "0 of the allowed rule (self-repository), 1 of other rules; allowed exactly 0"},
+		{name: "two others, fewer allowed", expected: 3, answer: list(findingJSON(other, "d", site, 1), findingJSON("excessive-permissions", "d", site, 2), findingJSON(allowed, "d", site, 1)), counts: "1 of the allowed rule (self-repository), 2 of other rules; allowed exactly 3"},
+		{name: "a rule whose name starts with the allowed one", expected: 1, answer: list(findingJSON("self-repository-extra", "d", site, 1)), counts: "0 of the allowed rule"},
+		{name: "a rule whose name differs in case", expected: 1, answer: list(findingJSON("Self-Repository", "d", site, 1)), counts: "0 of the allowed rule"},
+		{name: "a rule whose name has a trailing space", expected: 1, answer: list(findingJSON("self-repository ", "d", site, 1)), counts: "0 of the allowed rule"},
+		{name: "a rule whose name has a leading space", expected: 1, answer: list(findingJSON(" self-repository", "d", site, 1)), counts: "0 of the allowed rule"},
+		{name: "a rule whose name ends in a NUL", expected: 1, answer: list(findingJSON("self-repository\x00", "d", site, 1)), counts: "0 of the allowed rule"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := Judge(tc.expected, tc.answer)
+			if got.Pass {
+				t.Fatal("passed")
+			}
+			last := got.Lines[len(got.Lines)-1]
+			if !strings.Contains(last, tc.counts) {
+				t.Errorf("last line = %q, want it to hold %q", last, tc.counts)
+			}
+			if len(got.Lines) < 2 {
+				t.Errorf("lines = %q, want the finding of the other rule listed before the counts", got.Lines)
+			}
+		})
+	}
+}
+
+func TestJudgeNamesTheOtherFindingsPlaceDescriptionAndRule(t *testing.T) {
+	got := Judge(0, list(findingJSON(other, "code injection via template expansion", "./.github/workflows/zz-probe.yml", 11)))
+	want := `zizmor: "./.github/workflows/zz-probe.yml":12: "code injection via template expansion" ("template-injection")`
+	if got.Pass || len(got.Lines) != 2 || got.Lines[0] != want {
+		t.Fatalf("Judge = %v, %q; want a failure whose first line is %q", got.Pass, got.Lines, want)
+	}
+}
+
+func TestPlace(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		answer string
+		want   string
+	}{
+		{name: "the first location, the row counted from one", answer: `[{"ident":"x","desc":"d","locations":[{"symbolic":{"key":{"Local":{"verbatim_path":"a.yml"}}},"concrete":{"location":{"start_point":{"row":0}}}},{"symbolic":{"key":{"Local":{"verbatim_path":"b.yml"}}},"concrete":{"location":{"start_point":{"row":9}}}}]}]`, want: `"a.yml":1`},
+		{name: "no locations key", answer: `[{"ident":"x","desc":"d"}]`, want: "?"},
+		{name: "an empty list of locations", answer: `[{"ident":"x","locations":[]}]`, want: "?"},
+		{name: "locations that are not a list", answer: `[{"ident":"x","locations":{}}]`, want: "?"},
+		{name: "a location that is not an object", answer: `[{"ident":"x","locations":[1]}]`, want: "?"},
+		{name: "a row that is not a number", answer: `[{"ident":"x","locations":[{"concrete":{"location":{"start_point":{"row":"1"}}}}]}]`, want: "?"},
+		{name: "a path that is not a string", answer: `[{"ident":"x","locations":[{"symbolic":{"key":{"Local":{"verbatim_path":3}}}}]}]`, want: "?"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			findings, err := decode([]byte(tc.answer))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := findings[0].place(); got != tc.want {
+				t.Errorf("place() = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestDescriptionIsEmptyWhenItIsNotAString(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		answer string
+		want   string
+	}{
+		{name: "a string", answer: `[{"ident":"x","desc":"why"}]`, want: "why"},
+		{name: "absent", answer: `[{"ident":"x"}]`, want: ""},
+		{name: "a number", answer: `[{"ident":"x","desc":4}]`, want: ""},
+		{name: "null", answer: `[{"ident":"x","desc":null}]`, want: ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			findings, err := decode([]byte(tc.answer))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := findings[0].description(); got != tc.want {
+				t.Errorf("description() = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+// Every answer below is one the verdict must refuse, with a message that says what is wrong, whatever the
+// number expected: a reader that treated it as "no findings" would pass the gate on nothing.
+func TestJudgeRefusesWhatItDoesNotUnderstand(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		answer []byte
+		marker string
+	}{
+		{name: "empty", answer: nil, marker: "not a list"},
+		{name: "white space only", answer: []byte(" \n"), marker: "not a list"},
+		{name: "an object", answer: []byte(`{}`), marker: "not a list"},
+		{name: "an object that holds the findings", answer: []byte(`{"findings":[]}`), marker: "not a list"},
+		{name: "null", answer: []byte(`null`), marker: "not a list"},
+		{name: "a string", answer: []byte(`"[]"`), marker: "not a list"},
+		{name: "a number", answer: []byte(`0`), marker: "not a list"},
+		{name: "a boolean", answer: []byte(`true`), marker: "not a list"},
+		{name: "plain text", answer: []byte(`no findings`), marker: "not a list"},
+		{name: "a byte order mark before the list", answer: []byte("\xef\xbb\xbf[]"), marker: "not a list"},
+		{name: "an unterminated list", answer: []byte(`[`), marker: "not a list of findings:"},
+		{name: "a list cut in the middle of a finding", answer: []byte(`[{"ident":"self-rep`), marker: "not a list of findings:"},
+		{name: "a trailing bracket", answer: []byte(`[]]`), marker: "text after"},
+		{name: "two lists", answer: []byte(`[] []`), marker: "text after"},
+		{name: "a list and text", answer: []byte(`[]x`), marker: "text after"},
+		{name: "a list and a NUL", answer: []byte("[]\x00"), marker: "text after"},
+		{name: "a list and a log line", answer: []byte("[]\n INFO audit: done\n"), marker: "text after"},
+		{name: "invalid UTF-8", answer: []byte("[{\"ident\":\"self-repository\",\"desc\":\"\xff\"}]"), marker: "UTF-8"},
+		{name: "a list of numbers", answer: []byte(`[1]`), marker: "not a list of findings:"},
+		{name: "a list of lists", answer: []byte(`[[]]`), marker: "not a list of findings:"},
+		{name: "a list of strings", answer: []byte(`["self-repository"]`), marker: "not a list of findings:"},
+		{name: "a null element", answer: []byte(`[null]`), marker: "finding 1:"},
+		{name: "an element without a rule", answer: []byte(`[{}]`), marker: "finding 1:"},
+		{name: "a rule that is null", answer: []byte(`[{"ident":null}]`), marker: "finding 1:"},
+		{name: "a rule that is empty", answer: []byte(`[{"ident":""}]`), marker: "finding 1:"},
+		{name: "a rule that is a number", answer: []byte(`[{"ident":1}]`), marker: "finding 1:"},
+		{name: "a rule that is a list", answer: []byte(`[{"ident":["self-repository"]}]`), marker: "finding 1:"},
+		{name: "a rule that is an object", answer: []byte(`[{"ident":{"self-repository":1}}]`), marker: "finding 1:"},
+		{name: "the key in another case", answer: []byte(`[{"IDENT":"self-repository"}]`), marker: "finding 1:"},
+		{name: "the key with a prefix", answer: []byte(`[{"x-ident":"self-repository"}]`), marker: "finding 1:"},
+		{name: "the second finding has no rule", answer: []byte(`[{"ident":"self-repository"},{"desc":"x"}]`), marker: "finding 2:"},
+		{name: "the third finding has no rule", answer: []byte(`[{"ident":"self-repository"},{"ident":"self-repository"},{}]`), marker: "finding 3:"},
+	} {
+		for _, expected := range []int{0, 1} {
+			t.Run(tc.name+" expecting "+strconv.Itoa(expected), func(t *testing.T) {
+				got := Judge(expected, tc.answer)
+				if got.Pass {
+					t.Fatalf("passed on %q", tc.answer)
+				}
+				if len(got.Lines) != 1 || !strings.Contains(got.Lines[0], tc.marker) || !strings.HasPrefix(got.Lines[0], "zizmor: ") {
+					t.Errorf("lines = %q, want one starting with %q that holds %q", got.Lines, "zizmor: ", tc.marker)
+				}
+			})
+		}
+	}
+}
+
+// A real answer of the pinned zizmor (--no-ignores --format json-v1, taken from this repository): the format
+// the reader is written for. Its thirteen findings are the allowed ones of the Makefile.
+func TestJudgeReadsARealAnswerOfZizmor(t *testing.T) {
+	answer, err := os.ReadFile("testdata/zizmor-1.32.0-self-repository.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name     string
+		expected int
+		pass     bool
+	}{
+		{name: "the allowed number", expected: 13, pass: true},
+		{name: "one fewer allowed", expected: 12, pass: false},
+		{name: "one more allowed", expected: 14, pass: false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := Judge(tc.expected, answer); got.Pass != tc.pass {
+				t.Errorf("Judge(%d) = %v, %q; want pass %v", tc.expected, got.Pass, got.Lines, tc.pass)
+			}
+		})
+	}
+	// The same answer with one finding renamed is a finding of another rule, and its place is read.
+	renamed := strings.Replace(string(answer), `"ident": "self-repository"`, `"ident": "template-injection"`, 1)
+	if renamed == string(answer) {
+		t.Fatal("the fixture does not hold the rule name in the form the test replaces")
+	}
+	got := Judge(13, []byte(renamed))
+	if got.Pass || len(got.Lines) != 2 || !strings.Contains(got.Lines[0], `"./.github/workflows/`) || !strings.Contains(got.Lines[0], `("template-injection")`) {
+		t.Errorf("Judge = %v, %q; want a failure that names the place and the rule of the renamed finding", got.Pass, got.Lines)
+	}
+}
+
+// What the verdict prints is made of strings the audited tree controls (a description, a path): none of
+// them may start a workflow command of the job log, add a line, or carry a control character.
+func TestJudgeOutputIsSafeForALog(t *testing.T) {
+	hostile := "line\n::error::injected\r::add-mask::x\x1b[31m\u202e\u2028\x00\u00e9"
+	got := Judge(0, list(findingJSON(hostile, hostile, "::stop-commands::\n"+hostile, 2)))
+	if got.Pass {
+		t.Fatal("passed")
+	}
+	if len(got.Lines) != 2 {
+		t.Fatalf("lines = %q, want a finding line and the counts", got.Lines)
+	}
+	for _, line := range got.Lines {
+		if !printableLines(line) || strings.HasPrefix(line, "::") {
+			t.Errorf("an unsafe line: %q", line)
+		}
+	}
+	if !strings.Contains(got.Lines[0], `\n::error::injected\r`) {
+		t.Errorf("the hostile text is not shown escaped: %q", got.Lines[0])
+	}
+}
+
+func TestJudgeCutsLongStrings(t *testing.T) {
+	long := strings.Repeat("x", 5000)
+	for _, tc := range []struct {
+		name string
+		text string
+		want int
+	}{
+		{name: "the limit is not cut", text: strings.Repeat("y", maxField), want: maxField + 2},
+		{name: "one over the limit is cut to the limit", text: strings.Repeat("y", maxField+1), want: maxField + 2},
+		{name: "a very long string", text: long, want: maxField + 2},
+		{name: "wide characters are counted as characters", text: strings.Repeat("é", maxField+1), want: maxField*6 - 3*6 + 3 + 2},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := quote(tc.text)
+			if len(got) != tc.want {
+				t.Errorf("len(quote) = %d, want %d: %.40s", len(got), tc.want, got)
+			}
+		})
+	}
+	if got := quote(strings.Repeat("y", maxField+1)); !strings.HasSuffix(got, ellipsis+`"`) {
+		t.Errorf("a cut string does not end in the ellipsis: ...%s", got[len(got)-10:])
+	}
+	if got := quote(strings.Repeat("y", maxField)); strings.Contains(got, ellipsis) {
+		t.Errorf("a string of the limit was cut: %s", got)
+	}
+}
+
+func TestJudgeListsAtMostTwentyFindings(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		count int
+		lines int
+		more  string
+	}{
+		{name: "none over the limit", count: maxListed, lines: maxListed + 1},
+		{name: "one over the limit", count: maxListed + 1, lines: maxListed + 2, more: "zizmor: and 1 more findings of other rules"},
+		{name: "many over the limit", count: 500, lines: maxListed + 2, more: "zizmor: and 480 more findings of other rules"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := Judge(0, list(repeat(tc.count, findingJSON(other, "d", site, 1))...))
+			if got.Pass || len(got.Lines) != tc.lines {
+				t.Fatalf("pass %v, %d lines, want a failure with %d", got.Pass, len(got.Lines), tc.lines)
+			}
+			if tc.more != "" && got.Lines[maxListed] != tc.more {
+				t.Errorf("line %d = %q, want %q", maxListed+1, got.Lines[maxListed], tc.more)
+			}
+			counts := got.Lines[len(got.Lines)-1]
+			if want := strconv.Itoa(tc.count) + " of other rules"; !strings.Contains(counts, want) {
+				t.Errorf("counts = %q, want %q (every finding counts, listed or not)", counts, want)
+			}
+		})
+	}
+}

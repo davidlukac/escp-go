@@ -16,21 +16,15 @@
 # A symbolic link under .github/ is refused: it would make the files audited depend on where it points.
 #
 # It audits online (the audits that look up an action's history) when a GitHub token is in GH_TOKEN
-# or GITHUB_TOKEN, offline otherwise. An empty variable counts as no token. It needs python3, which
-# zizmor's own installation already needs (it is a PyPI package), to read zizmor's JSON; the reader
-# runs isolated (-I), so a file of the audited tree that is named like a module it imports is not
-# picked up.
+# or GITHUB_TOKEN, offline otherwise. An empty variable counts as no token. It needs the go tool, to run
+# the program that reads zizmor's JSON (internal/zizmorverdict): that is the one place the answer is read,
+# the number is validated there too (a plain non-negative integer), and it fails closed on anything
+# it does not understand.
 set -eu
 
 root=${1:-.}
 expected=${ZIZMOR_SELF_REPOSITORY_FINDINGS:?set it to the number of self-repository findings the workflows may carry}
-case $expected in
-'' | *[!0-9]*)
-	echo "ZIZMOR_SELF_REPOSITORY_FINDINGS must be a plain non-negative integer, not '$expected'" >&2
-	exit 1
-	;;
-*) ;;
-esac
+repo=$(cd "$(dirname "$0")/.." && pwd)
 cd "$root"
 
 links=$(find .github -type l)
@@ -85,33 +79,8 @@ trap 'rm -f "$findings"' EXIT
 # default is not read as a different answer.
 audit --no-ignores --no-exit-codes --format json-v1 >"$findings"
 
-verdict=$(cat <<'PY'
-import json
-import sys
-
-expected = int(sys.argv[1])
-with open(sys.argv[2], encoding="utf-8") as handle:
-    findings = json.load(handle)
-
-if not isinstance(findings, list):
-    print("zizmor printed %s, not a list of findings" % type(findings).__name__, file=sys.stderr)
-    sys.exit(1)
-
-def place(finding):
-    for location in finding["locations"]:
-        path = location["symbolic"]["key"]["Local"]["verbatim_path"]
-        row = location["concrete"]["location"]["start_point"]["row"] + 1
-        return "%s:%d" % (path, row)
-    return "?"
-
-allowed = [f for f in findings if f["ident"] == "self-repository"]
-others = [f for f in findings if f["ident"] != "self-repository"]
-for finding in others:
-    print("%s: %s (%s)" % (place(finding), finding["desc"], finding["ident"]), file=sys.stderr)
-if others or len(allowed) != expected:
-    print("zizmor findings: %d of the allowed rule (self-repository), %d of other rules; allowed exactly %d of the first and none of the second (ZIZMOR_SELF_REPOSITORY_FINDINGS in the Makefile)" % (len(allowed), len(others), expected), file=sys.stderr)
-    sys.exit(1)
-print("zizmor: no findings but the %d allowed ones" % expected)
-PY
-)
-python3 -I -c "$verdict" "$expected" "$findings"
+# The verdict is a Go program of this repository (internal/zizmorverdict, tested and fuzzed): the number
+# expected on the command line, zizmor's answer on the standard input. It is built and run from the
+# directory of this script's repository, never from the audited tree, so that no file of the tree (a
+# go.mod, a go.work, a vendor directory) can change which program judges it.
+go -C "$repo" run ./internal/zizmorverdict "$expected" <"$findings"

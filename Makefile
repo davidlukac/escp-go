@@ -67,7 +67,8 @@ actionlint:
 # the local setup action, which the workflows write as `./.github/actions/setup`) and nothing else. The
 # rule is counted, not located: a use of another local action that the rule also reports counts the same,
 # and is audited itself because the whole repository is the input. A new finding, a new use or a
-# removed one is a deliberate edit of this number in the same pull request. The number goes away, with the comments on those uses, when actionlint accepts the `$/` form of a local
+# removed one is a deliberate edit of this number in the same pull request. The answer (--format json-v1)
+# is read by internal/zizmorverdict, a Go program, which fails closed on anything it does not understand. The number goes away, with the comments on those uses, when actionlint accepts the `$/` form of a local
 # action (rhysd/actionlint#711).
 ZIZMOR_SELF_REPOSITORY_FINDINGS := 13
 
