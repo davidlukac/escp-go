@@ -120,7 +120,8 @@ modcheck:
 #                 matching, an exclusion that swallows a fixture or a rule that was relaxed fails here;
 #   zizmorcheck   scripts/zizmor.sh, the command `make zizmor` runs, still reports a deliberate finding
 #                 next to each input the audited tree can carry (a configuration file, an ignore file, an
-#                 extra inline suppression; scripts/check-zizmor-options.sh, offline). It needs the pinned
+#                 extra inline suppression, a file zizmor cannot load, a link, a stub zizmor that records the command line
+#                 and the environment; internal/zizmorprobe, a Go program, offline). It needs the pinned
 #                 zizmor: without it the check says so and passes, and the `zizmor` jobs of CI, which
 #                 install it, set ZIZMOR_REQUIRED so that it cannot be skipped there.
 .PHONY: catalogcheck guarantee lintfixtures mutationrecipe recipemutants zizmorcheck
@@ -173,7 +174,7 @@ deadcode:
 	$(DEVTOOL) golangci-lint run --config .golangci-deadcode.yml --build-tags live ./...
 
 zizmorcheck:
-	@ZIZMOR_SELF_REPOSITORY_FINDINGS=$(ZIZMOR_SELF_REPOSITORY_FINDINGS) scripts/check-zizmor-options.sh
+	@ZIZMOR_SELF_REPOSITORY_FINDINGS=$(ZIZMOR_SELF_REPOSITORY_FINDINGS) go run ./internal/zizmorprobe
 
 # Known vulnerabilities in the code and its dependencies.
 vuln:

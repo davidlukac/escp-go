@@ -5,7 +5,7 @@
 # (--no-config), every workflow is collected, whatever an ignore file says (--collect=all), and a
 # file that cannot be loaded fails the run instead of being skipped with a warning
 # (--strict-collection). It is the one place the command line is built: `make zizmor` calls it, and
-# so do the probes of scripts/check-zizmor-options.sh.
+# so do the probes of internal/zizmorprobe.
 #
 # The findings are judged against an exact expectation, not against zizmor's own exit status: zizmor is
 # run with --no-ignores, so an ignore comment in a workflow changes nothing, and the run passes only
