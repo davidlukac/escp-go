@@ -190,15 +190,28 @@ func (k *keyChecker) name(top *frame, token json.Token) error {
 
 // rejectRepeatedKeys fails when an object of the answer, at any depth, has the same name twice (the decoder
 // of the standard library keeps the last one, so a repeated "ident" would be read as whichever comes
-// last). The answer is valid JSON when it is called, so the only end of the tokens is the end of the text.
-// Names are compared after their escapes are decoded, so "ident" and "\u0069dent" are the same name.
+// last). Names are compared after their escapes are decoded, so "ident" and "\u0069dent" are the same name.
+//
+// The tokens are read differently from the typed decode that came before (a number is a float64 here, so one that
+// does not fit is an error here and not there), so an error is not the end of the answer: it is returned, and the
+// scan ends without an error only at the end of the text with no object or list left open.
 func rejectRepeatedKeys(answer []byte) error {
 	decoder := json.NewDecoder(bytes.NewReader(answer))
 	var k keyChecker
-	for token, err := decoder.Token(); err == nil; token, err = decoder.Token() {
+	for {
+		token, err := decoder.Token()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("the answer is not a list of findings: %s", quote(err.Error()))
+		}
 		if repeated := k.add(token); repeated != nil {
 			return repeated
 		}
+	}
+	if len(k.stack) != 0 {
+		return errors.New("the answer ends inside an object or a list")
 	}
 	return nil
 }

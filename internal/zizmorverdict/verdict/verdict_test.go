@@ -426,8 +426,9 @@ func TestJudgeRefusesARepeatedName(t *testing.T) {
 		{name: "the rule name twice, the allowed rule last", answer: `[{"ident":"template-injection","ident":"self-repository"}]`},
 		{name: "the rule name twice, the allowed rule first", answer: `[{"ident":"self-repository","ident":"template-injection"}]`},
 		{name: "the rule name twice with the same value", answer: `[{"ident":"self-repository","ident":"self-repository"}]`},
-		{name: "the second name written with an escape", answer: `[{"ident":"template-injection","ident":"self-repository"}]`},
-		{name: "the first name written with an escape", answer: `[{"ident":"self-repository","ident":"template-injection"}]`},
+		{name: "the second name written with an escape", answer: "[{\"ident\":\"template-injection\",\"\\u0069dent\":\"self-repository\"}]"},
+		{name: "the first name written with an escape", answer: "[{\"\\u0069dent\":\"self-repository\",\"ident\":\"template-injection\"}]"},
+		{name: "both names written with different escapes", answer: "[{\"id\\u0065nt\":\"self-repository\",\"\\u0069dent\":\"template-injection\"}]"},
 		{name: "another name twice", answer: `[{"ident":"self-repository","desc":"a","desc":"b"}]`},
 		{name: "a name with capitals twice", answer: `[{"ident":"self-repository","Desc":1,"Desc":2}]`},
 		{name: "an empty name twice", answer: `[{"ident":"self-repository","":1,"":2}]`},
@@ -497,6 +498,56 @@ func TestEscape(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := Escape(tc.text); got != tc.want {
 				t.Errorf("Escape(%q) = %q, want %q", tc.text, got, tc.want)
+			}
+		})
+	}
+}
+
+// The token reader that looks for repeated names reads numbers differently from the typed decode that came
+// before it: a number the typed decode takes as text (one a float64 cannot hold) is an error for the tokens.
+// An error there is not the end of the answer: the answer is refused, so that a name repeated after such a
+// number is not left unseen.
+func TestJudgeRefusesWhatTheTokenReaderCannotRead(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		answer string
+	}{
+		{name: "a repeated name after a number out of range", answer: `[{"ident":"template-injection","n":1e999,"ident":"self-repository"}]`},
+		{name: "a repeated name after a negative number out of range", answer: `[{"ident":"template-injection","n":-1e999,"ident":"self-repository"}]`},
+		{name: "a repeated name in a list after a number out of range", answer: `[{"ident":"self-repository"},{"l":[1e999],"ident":"a","ident":"self-repository"}]`},
+		{name: "a number out of range and no repeated name", answer: `[{"ident":"self-repository","n":1e999}]`},
+		{name: "a number out of range as the first value", answer: `[{"n":1e999,"ident":"self-repository"}]`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := Judge(1, []byte(tc.answer))
+			if got.Pass || len(got.Lines) != 1 || !strings.Contains(got.Lines[0], "not a list of findings:") {
+				t.Errorf("pass %v, lines %q; want a refusal that says the answer could not be read", got.Pass, got.Lines)
+			}
+		})
+	}
+}
+
+// The scan fails closed by itself too: an answer it cannot read to its end, or that ends inside an object or a
+// list, is an error and not "nothing repeated".
+func TestRejectRepeatedKeysFailsClosed(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		answer string
+		want   string // a word of the error, "" for none
+	}{
+		{name: "a complete answer", answer: `[{"a":1},{"a":2}]`},
+		{name: "a number the tokens cannot read", answer: `[{"a":1e999}]`, want: "not a list of findings"},
+		{name: "a list that is not closed", answer: `[{"a":1}`, want: "ends inside"},
+		{name: "an object that is not closed", answer: `[{"a":`, want: "ends inside"},
+		{name: "nothing", answer: ``},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := rejectRepeatedKeys([]byte(tc.answer))
+			switch {
+			case tc.want == "" && err != nil:
+				t.Errorf("error %v, want none", err)
+			case tc.want != "" && (err == nil || !strings.Contains(err.Error(), tc.want)):
+				t.Errorf("error %v, want one with %q", err, tc.want)
 			}
 		})
 	}
