@@ -174,7 +174,8 @@ func (m *idealMake) runExit(env, args []string) (string, int, error) {
 // goodMakefile is the part of the Makefile the check reads for itself.
 var goodMakefile = "all:\n\ttrue\n\n" + recipeTarget + ":\n" + recipeSource + "\n\n" +
 	mutantsTarget + ":\n" + strings.Join(mutantsSource, "\n") + "\n\n" +
-	deadcodeTarget + ":\n" + strings.Join(deadcodeSource, "\n") + "\n\nnext:\n\ttrue\n"
+	deadcodeTarget + ":\n" + strings.Join(deadcodeSource, "\n") + "\n\n" +
+	zizmorTarget + ":\n" + strings.Join(zizmorSource, "\n") + "\n\nnext:\n\ttrue\n"
 
 // repoRoot is a scratch repository: a directory with the Makefile the check reads.
 func repoRoot(t *testing.T) string {

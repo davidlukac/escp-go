@@ -126,11 +126,11 @@ func (c *checker) dry(ctx context.Context, tc dryCase) ([]string, error) {
 	return problems, nil
 }
 
-// lintProblems says whether `make -n lint` runs this check and the dead-code check. For this check: a
+// lintProblems says whether `make -n lint` runs this check, the dead-code check and the zizmor probes. For this check: a
 // line that is exactly the recipe of the mutationrecipe target with the root of the repository (as given,
 // and with its symbolic links resolved, which is what make's own idea of the directory may be), with
-// nothing after it (`|| true`, an extra flag). For the dead-code check: each line of the case's pins.has,
-// whole.
+// nothing after it (`|| true`, an extra flag). For the dead-code check and the zizmor probes: each line of the
+// case's pins.has, whole.
 func lintProblems(tc dryCase, lines []string, root string) []string {
 	var problems []string
 	wanted := []string{lintRecipe + root}
@@ -148,7 +148,7 @@ func lintProblems(tc dryCase, lines []string, root string) []string {
 	return problems
 }
 
-// sourceProblems pins the recipes of the mutationrecipe, recipemutants and deadcode targets in the text of the
+// sourceProblems pins the recipes of the mutationrecipe, recipemutants, deadcode and zizmorcheck targets in the text of the
 // Makefile: `make -n` hides a `-` prefix (a failing step that does not fail make) and an `@`, so each
 // recipe is compared as it is written, line by line, and must have no other line.
 func sourceProblems(makefile string) []string {
@@ -158,6 +158,7 @@ func sourceProblems(makefile string) []string {
 		recipeTarget:   {recipeSource},
 		mutantsTarget:  mutantsSource,
 		deadcodeTarget: deadcodeSource,
+		zizmorTarget:   zizmorSource,
 	} {
 		at := slices.Index(lines, target+":")
 		if at < 0 {

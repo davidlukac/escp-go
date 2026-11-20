@@ -540,8 +540,8 @@
  },
  {
   "name": "make lint without the recipe check",
-  "old": "lint: catalogcheck guarantee lintfixtures mutationrecipe",
-  "new": "lint: catalogcheck guarantee lintfixtures",
+  "old": "lint: catalogcheck guarantee lintfixtures mutationrecipe zizmorcheck",
+  "new": "lint: catalogcheck guarantee lintfixtures zizmorcheck",
   "occurrence": 0,
   "equivalent": ""
  },
@@ -731,6 +731,55 @@
   "name": "mutation: a threshold that is not a percentage let through",
   "old": "threshold \"$(EFFICACY)\"",
   "new": "threshold \"$(subst 90%,90,$(EFFICACY))\"",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "make lint without the zizmor probes",
+  "old": "lint: catalogcheck guarantee lintfixtures mutationrecipe zizmorcheck",
+  "new": "lint: catalogcheck guarantee lintfixtures mutationrecipe",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "zizmorcheck: the probes made non-fatal with a - prefix",
+  "old": "zizmorcheck:\n\tZIZMOR_",
+  "new": "zizmorcheck:\n\t-ZIZMOR_",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "zizmorcheck: the probes hidden with an @ prefix",
+  "old": "zizmorcheck:\n\tZIZMOR_",
+  "new": "zizmorcheck:\n\t@ZIZMOR_",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "zizmorcheck: the probes made non-fatal with || true",
+  "old": "go run ./internal/zizmorprobe\n",
+  "new": "go run ./internal/zizmorprobe || true\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "zizmorcheck: a number of its own",
+  "old": "ZIZMOR_SELF_REPOSITORY_FINDINGS=$(ZIZMOR_SELF_REPOSITORY_FINDINGS) go run",
+  "new": "ZIZMOR_SELF_REPOSITORY_FINDINGS=13 go run",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "zizmorcheck: the probes not run",
+  "old": "\tZIZMOR_SELF_REPOSITORY_FINDINGS=$(ZIZMOR_SELF_REPOSITORY_FINDINGS) go run ./internal/zizmorprobe\n",
+  "new": "\ttrue\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "zizmorcheck: another program",
+  "old": "go run ./internal/zizmorprobe\n",
+  "new": "go run ./internal/zizmorrun\n",
   "occurrence": 0,
   "equivalent": ""
  }

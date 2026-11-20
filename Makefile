@@ -174,7 +174,7 @@ deadcode:
 	$(DEVTOOL) golangci-lint run --config .golangci-deadcode.yml --build-tags live ./...
 
 zizmorcheck:
-	@ZIZMOR_SELF_REPOSITORY_FINDINGS=$(ZIZMOR_SELF_REPOSITORY_FINDINGS) go run ./internal/zizmorprobe
+	ZIZMOR_SELF_REPOSITORY_FINDINGS=$(ZIZMOR_SELF_REPOSITORY_FINDINGS) go run ./internal/zizmorprobe
 
 # Known vulnerabilities in the code and its dependencies.
 vuln:

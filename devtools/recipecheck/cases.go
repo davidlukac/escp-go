@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -22,6 +23,18 @@ const (
 	mutantsTarget  = "recipemutants"
 	recipeSource   = "\tgo -C devtools run ./recipecheck -root $(CURDIR)"
 	deadcodeTarget = "deadcode"
+	zizmorTarget   = "zizmorcheck"
+	// zizmorCount is the number of allowed findings the lint case hands to make, to see that the recipe passes
+	// the Makefile's variable on and does not hold a number of its own.
+	zizmorCount = "7"
+)
+
+// zizmorRecipe is the line `make -n lint` must print for the probes of the zizmor gate, whole, with the
+// number given on the command line; zizmorSource is the recipe as it is written in the Makefile, where
+// `make -n` hides a prefix.
+var (
+	zizmorRecipe = "ZIZMOR_SELF_REPOSITORY_FINDINGS=" + zizmorCount + " go run ./internal/zizmorprobe"
+	zizmorSource = []string{"\tZIZMOR_SELF_REPOSITORY_FINDINGS=$(ZIZMOR_SELF_REPOSITORY_FINDINGS) go run ./internal/zizmorprobe"}
 )
 
 // deadcodeRecipe is what `make -n lint` must print for the dead-code check, each line whole: the
@@ -163,8 +176,9 @@ func dryCases() []dryCase {
 	cases = append(cases, filterCases()...)
 	cases = append(cases, dryCase{label: "recipemutants runs the mutants test with its tag and needs its PASS line",
 		args: []string{mutantsTarget}, target: mutantsTarget, plain: true, want: mutantsRecipe})
-	cases = append(cases, dryCase{label: "make lint runs this check and the dead-code check", args: []string{"lint"}, target: "lint",
-		pins: pins{has: deadcodeRecipe}})
+	cases = append(cases, dryCase{label: "make lint runs this check, the dead-code check and the zizmor probes",
+		args: []string{"lint", "ZIZMOR_SELF_REPOSITORY_FINDINGS=" + zizmorCount}, target: "lint",
+		pins: pins{has: append(slices.Clone(deadcodeRecipe), zizmorRecipe)}})
 	return cases
 }
 

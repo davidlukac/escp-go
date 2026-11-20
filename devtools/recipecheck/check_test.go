@@ -219,7 +219,7 @@ func TestTheLintTargetMustRunTheCheckAsTheWholeLine(t *testing.T) {
 			c := newChecker(t, m)
 			m.dryLines = func(tc dryCase, lines []string) []string {
 				if tc.target == "lint" {
-					return append(tt.lines(c.root), deadcodeRecipe...)
+					return append(append(tt.lines(c.root), deadcodeRecipe...), zizmorRecipe)
 				}
 				return lines
 			}
@@ -259,7 +259,7 @@ func TestTheLintTargetMustPrintTheDeadcodeLinesWhole(t *testing.T) {
 			c := newChecker(t, m)
 			m.dryLines = func(tc dryCase, lines []string) []string {
 				if tc.target == "lint" {
-					return append([]string{"go build", lintRecipe + c.root}, tt.lines...)
+					return append([]string{"go build", lintRecipe + c.root, zizmorRecipe}, tt.lines...)
 				}
 				return lines
 			}
@@ -270,6 +270,50 @@ func TestTheLintTargetMustPrintTheDeadcodeLinesWhole(t *testing.T) {
 			for _, p := range problems {
 				if !strings.Contains(p, "make lint does not run `go tool") {
 					t.Errorf("a problem that is not about a line of the dead-code check: %q", p)
+				}
+			}
+		})
+	}
+}
+
+// `make lint` must print the line of the zizmor probes whole, with the number the Makefile holds (the case
+// hands it 7 on the command line): a line gone (the prerequisite deleted), a suffix (`|| true`), a number of
+// its own in the recipe, another program or the number missing each leave no line that is the wanted one.
+func TestTheLintTargetMustPrintTheZizmorLineWhole(t *testing.T) {
+	tests := []struct {
+		name string
+		line string // "" for no line
+		want int    // the number of problems
+	}{
+		{"the line", zizmorRecipe, 0},
+		{"the prerequisite deleted", "", 1},
+		{"made non-fatal", zizmorRecipe + " || true", 1},
+		{"a number of its own", strings.Replace(zizmorRecipe, "="+zizmorCount, "=13", 1), 1},
+		{"another program", strings.Replace(zizmorRecipe, "zizmorprobe", "other", 1), 1},
+		{"the number missing", strings.Replace(zizmorRecipe, "="+zizmorCount, "=", 1), 1},
+		{"a flag added", zizmorRecipe + " -root /tmp", 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := newIdealMake(t)
+			c := newChecker(t, m)
+			m.dryLines = func(tc dryCase, lines []string) []string {
+				if tc.target != "lint" {
+					return lines
+				}
+				out := append([]string{"go build", lintRecipe + c.root}, deadcodeRecipe...)
+				if tt.line != "" {
+					out = append(out, tt.line)
+				}
+				return out
+			}
+			problems, err := c.check(context.Background())
+			if err != nil || len(problems) != tt.want {
+				t.Errorf("problems %q, error %v, want %d", problems, err, tt.want)
+			}
+			for _, p := range problems {
+				if !strings.Contains(p, "make lint does not run `ZIZMOR_SELF_REPOSITORY_FINDINGS=") {
+					t.Errorf("a problem that is not about the zizmor line: %q", p)
 				}
 			}
 		})
@@ -294,6 +338,12 @@ func TestTheRecipeOfTheCheckTargetIsPinnedAsWritten(t *testing.T) {
 		{"no target", "all:\n\ttrue\n", "no mutationrecipe target"},
 		{"a - prefix on the dead-code run", strings.Replace(goodMakefile, "\t$(DEVTOOL) golangci-lint run --config .golangci-deadcode.yml ./...", "\t-$(DEVTOOL) golangci-lint run --config .golangci-deadcode.yml ./...", 1), "deadcode is not as written"},
 		{"an @ prefix on the dead-code live run", strings.Replace(goodMakefile, "\t$(DEVTOOL) golangci-lint run --config .golangci-deadcode.yml --build-tags live", "\t@$(DEVTOOL) golangci-lint run --config .golangci-deadcode.yml --build-tags live", 1), "deadcode is not as written"},
+		{"a - prefix on the zizmor probes", strings.Replace(goodMakefile, "\tZIZMOR_SELF", "\t-ZIZMOR_SELF", 1), "zizmorcheck is not as written"},
+		{"an @ prefix on the zizmor probes", strings.Replace(goodMakefile, "\tZIZMOR_SELF", "\t@ZIZMOR_SELF", 1), "zizmorcheck is not as written"},
+		{"|| true on the zizmor probes", strings.Replace(goodMakefile, "zizmorprobe", "zizmorprobe || true", 1), "zizmorcheck is not as written"},
+		{"a number of its own in the zizmor probes", strings.Replace(goodMakefile, "$(ZIZMOR_SELF_REPOSITORY_FINDINGS)", "13", 1), "zizmorcheck is not as written"},
+		{"another line after the zizmor probes", strings.Replace(goodMakefile, zizmorSource[0]+"\n", zizmorSource[0]+"\n\ttrue\n", 1), "zizmorcheck is not as written"},
+		{"no zizmorcheck recipe", strings.Replace(goodMakefile, zizmorSource[0]+"\n", "", 1), "zizmorcheck is not as written"},
 		{"the dead-code live run missing", strings.Replace(goodMakefile, deadcodeSource[1]+"\n", "", 1), "deadcode is not as written"},
 		{"the mutants recipe without the PASS line", strings.Replace(goodMakefile, mutantsSource[2]+"\n", "", 1), "recipemutants"},
 		{"a - prefix on the PASS line", strings.Replace(goodMakefile, "\tgrep -e", "\t-grep -e", 1), "recipemutants"},
