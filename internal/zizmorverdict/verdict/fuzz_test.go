@@ -1,30 +1,28 @@
 package verdict
 
 import (
-	"encoding/json"
 	"regexp"
 	"strconv"
 	"strings"
 	"testing"
 	"unicode"
-	"unicode/utf8"
 )
 
-// plainReading is the oracle of FuzzJudge: the answer read as plainly as possible, with no code of the
-// package under test. It returns the number of findings of the rule and of the others, and false when
-// the plain reading rejects the answer (not valid JSON, not a list, an element that is not an object with a
-// non-empty string rule name under the exact key).
+// plainReading is the oracle of FuzzJudge: the answer read by strictParse, a reader of the JSON grammar that
+// shares no code with the package under test or with encoding/json (so a leniency of the library, such as
+// keeping the last of two equal names, is not the oracle's too). It returns the number of findings of the
+// rule and of the others, and false when the plain reading rejects the answer (not valid JSON, a repeated
+// name, not a list, an element that is not an object with a non-empty string rule name under the exact key).
 func plainReading(answer []byte) (allowedCount, otherCount int, ok bool) {
-	if !utf8.Valid(answer) || !json.Valid(answer) {
-		return 0, 0, false
-	}
-	var list []map[string]any
-	if json.Unmarshal(answer, &list) != nil || list == nil {
+	value, ok := strictParse(answer)
+	list, isList := value.([]any)
+	if !ok || !isList {
 		return 0, 0, false
 	}
 	for _, element := range list {
-		rule, isString := element["ident"].(string)
-		if element == nil || !isString || rule == "" {
+		object, isObject := element.(map[string]any)
+		rule, isString := object["ident"].(string)
+		if !isObject || !isString || rule == "" {
 			return 0, 0, false
 		}
 		if rule == AllowedRule {
@@ -60,7 +58,7 @@ func FuzzJudge(f *testing.F) {
 		nil, []byte("[]"), sample, []byte("{}"), []byte("null"), []byte("[null]"), []byte("[{}]"), []byte(`[{"ident":null}]`),
 		[]byte(`[{"ident":""}]`), []byte(`[{"IDENT":"self-repository"}]`), []byte("[]\x00"), []byte("[] []"), []byte("\xef\xbb\xbf[]"),
 		[]byte(`[{"ident":"self-repository"},{"ident":"template-injection","desc":"::error::x\n::add-mask::y"}]`),
-		[]byte("[{\"ident\":\"self-repository\",\"desc\":\"\xff\"}]"), []byte(`[{"ident":"self-repository","ident":"x"}]`),
+		[]byte("[{\"ident\":\"self-repository\",\"desc\":\"\xff\"}]"), []byte(`[{"ident":"template-injection","ident":"self-repository"}]`), []byte(`[{"ident":"self-repository","ident":"self-repository"}]`), []byte(`[{"ident":"self-repository","x":{"y":1},"x":2}]`), []byte(`[{"ident":"self-repository","\u0069dent":"x"}]`),
 		[]byte(`[{"ident":"self-repository","locations":[{"concrete":{"location":{"start_point":{"row":9223372036854775807}}}}]}]`),
 		[]byte(`[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]`), []byte(`[1e999]`), []byte(`["\ud800"]`),
 	} {

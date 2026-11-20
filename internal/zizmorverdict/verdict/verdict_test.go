@@ -414,3 +414,63 @@ func TestJudgeListsAtMostTwentyFindings(t *testing.T) {
 		})
 	}
 }
+
+// An object that has the same name twice is refused wherever it is, whichever value comes last: the decoder of
+// the standard library would keep the last one, and a finding whose rule name is read as whichever comes last
+// can be made to say what its writer wants.
+func TestJudgeRefusesARepeatedName(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		answer string
+	}{
+		{name: "the rule name twice, the allowed rule last", answer: `[{"ident":"template-injection","ident":"self-repository"}]`},
+		{name: "the rule name twice, the allowed rule first", answer: `[{"ident":"self-repository","ident":"template-injection"}]`},
+		{name: "the rule name twice with the same value", answer: `[{"ident":"self-repository","ident":"self-repository"}]`},
+		{name: "the second name written with an escape", answer: `[{"ident":"template-injection","ident":"self-repository"}]`},
+		{name: "the first name written with an escape", answer: `[{"ident":"self-repository","ident":"template-injection"}]`},
+		{name: "another name twice", answer: `[{"ident":"self-repository","desc":"a","desc":"b"}]`},
+		{name: "a name with capitals twice", answer: `[{"ident":"self-repository","Desc":1,"Desc":2}]`},
+		{name: "an empty name twice", answer: `[{"ident":"self-repository","":1,"":2}]`},
+		{name: "in a nested object", answer: `[{"ident":"self-repository","locations":[{"concrete":{"a":1,"a":2}}]}]`},
+		{name: "in the object of a list", answer: `[{"ident":"self-repository","l":[{"a":1,"a":2}]}]`},
+		{name: "after a nested object", answer: `[{"ident":"self-repository","x":{"y":1},"x":2}]`},
+		{name: "after an empty object", answer: `[{"ident":"self-repository","x":{},"x":2}]`},
+		{name: "after a list", answer: `[{"ident":"self-repository","x":[1,2],"x":3}]`},
+		{name: "after an empty list", answer: `[{"ident":"self-repository","x":[],"x":3}]`},
+		{name: "after a list of objects", answer: `[{"ident":"self-repository","x":[{"a":1}],"x":3}]`},
+		{name: "after two nested levels", answer: `[{"ident":"self-repository","x":{"y":{"z":1}},"x":3}]`},
+		{name: "in the second finding", answer: `[{"ident":"self-repository"},{"ident":"self-repository","a":1,"a":1}]`},
+		{name: "the repeat is the last name", answer: `[{"ident":"self-repository","a":1,"b":2,"a":3}]`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			// subtests: the two expected counts are the same case, read both ways
+			for _, expected := range []int{1, 2} {
+				got := Judge(expected, []byte(tc.answer))
+				if got.Pass || len(got.Lines) != 1 || !strings.Contains(got.Lines[0], "repeats the name") {
+					t.Errorf("expecting %d: pass %v, lines %q; want a refusal that says a name is repeated", expected, got.Pass, got.Lines)
+				}
+			}
+		})
+	}
+}
+
+// The same name in different objects, or at different depths, is not a repeat.
+func TestJudgeAcceptsTheSameNameInDifferentObjects(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		answer   string
+		expected int
+	}{
+		{name: "two findings with the same names", answer: `[{"ident":"self-repository","a":1},{"ident":"self-repository","a":2}]`, expected: 2},
+		{name: "a name inside a nested object that the finding has too", answer: `[{"ident":"self-repository","a":{"a":1,"ident":"x"}}]`, expected: 1},
+		{name: "empty nested objects side by side", answer: `[{"ident":"self-repository","a":{},"b":{},"c":[],"d":[]}]`, expected: 1},
+		{name: "a list of objects with the same names", answer: `[{"ident":"self-repository","l":[{"a":1},{"a":2}]}]`, expected: 1},
+		{name: "names that differ in case", answer: `[{"ident":"self-repository","Desc":1,"desc":2}]`, expected: 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := Judge(tc.expected, []byte(tc.answer)); !got.Pass {
+				t.Errorf("Judge = %q, want a pass", got.Lines)
+			}
+		})
+	}
+}

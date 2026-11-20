@@ -112,6 +112,9 @@ func decode(answer []byte) ([]finding, error) {
 	if _, err := decoder.Token(); !errors.Is(err, io.EOF) {
 		return nil, errors.New("the answer has text after the list of findings")
 	}
+	if err := rejectRepeatedKeys(answer); err != nil {
+		return nil, err
+	}
 	findings := make([]finding, len(elements))
 	for i, raw := range elements {
 		rule, err := ruleOf(raw)
@@ -121,6 +124,83 @@ func decode(answer []byte) ([]finding, error) {
 		findings[i] = finding{rule: rule, raw: raw}
 	}
 	return findings, nil
+}
+
+// frame is an object or an array the token reader of rejectRepeatedKeys is inside of.
+type frame struct {
+	// keys are the names seen in an object (nil for an array); wantKey is true while the next token is a name.
+	keys    map[string]struct{}
+	wantKey bool
+}
+
+// keyChecker follows the tokens of the answer and the objects they are in.
+type keyChecker struct{ stack []*frame }
+
+// top is the object or array the next token is in, nil at the top level.
+func (k *keyChecker) top() *frame {
+	if len(k.stack) == 0 {
+		return nil
+	}
+	return k.stack[len(k.stack)-1]
+}
+
+// done records that a value ended: in an object the next token is a name again.
+func (k *keyChecker) done() {
+	if top := k.top(); top != nil && top.keys != nil {
+		top.wantKey = true
+	}
+}
+
+// add takes the next token: a name is recorded (and refused when the object has it already), anything else
+// opens, closes or is a value.
+func (k *keyChecker) add(token json.Token) error {
+	if top := k.top(); top != nil && top.keys != nil && top.wantKey {
+		return k.name(top, token)
+	}
+	delim, isDelim := token.(json.Delim)
+	switch {
+	case isDelim && delim == '{':
+		k.stack = append(k.stack, &frame{keys: map[string]struct{}{}, wantKey: true})
+	case isDelim && delim == '[':
+		k.stack = append(k.stack, &frame{})
+	case isDelim:
+		k.stack = k.stack[:len(k.stack)-1]
+		k.done()
+	default:
+		k.done()
+	}
+	return nil
+}
+
+// name takes a token where an object has a name: the name, or the delimiter that closes the object.
+func (k *keyChecker) name(top *frame, token json.Token) error {
+	name, isName := token.(string)
+	if !isName { // the end of the object: the decoder gives nothing else where it expects a name
+		k.stack = k.stack[:len(k.stack)-1]
+		k.done()
+		return nil
+	}
+	if _, seen := top.keys[name]; seen {
+		return fmt.Errorf("the answer repeats the name %s in an object", quote(name))
+	}
+	top.keys[name] = struct{}{}
+	top.wantKey = false
+	return nil
+}
+
+// rejectRepeatedKeys fails when an object of the answer, at any depth, has the same name twice (the decoder
+// of the standard library keeps the last one, so a repeated "ident" would be read as whichever comes
+// last). The answer is valid JSON when it is called, so the only end of the tokens is the end of the text.
+// Names are compared after their escapes are decoded, so "ident" and "\u0069dent" are the same name.
+func rejectRepeatedKeys(answer []byte) error {
+	decoder := json.NewDecoder(bytes.NewReader(answer))
+	var k keyChecker
+	for token, err := decoder.Token(); err == nil; token, err = decoder.Token() {
+		if repeated := k.add(token); repeated != nil {
+			return repeated
+		}
+	}
+	return nil
 }
 
 // ruleOf returns the rule name of a finding: a non-empty string under the key "ident".
