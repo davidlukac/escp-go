@@ -117,7 +117,11 @@ func (c *checker) dry(ctx context.Context, tc dryCase) ([]string, error) {
 		return lintProblems(tc, lines, c.root), nil
 	}
 	if tc.plain {
-		if equalLines(tc.want, lines) {
+		want := tc.want
+		if tc.looseTabs {
+			want, lines = withoutLeadingTabs(want), withoutLeadingTabs(lines)
+		}
+		if equalLines(want, lines) {
 			return nil, nil
 		}
 		return []string{fmt.Sprintf("%s: the recipe is not what it must be; wanted, then got:\n%s\n%s",
@@ -227,6 +231,15 @@ func pinProblems(tc dryCase, gremlins []string) []string {
 		}
 	}
 	return problems
+}
+
+// withoutLeadingTabs is the lines with the tabs at the start of each taken off.
+func withoutLeadingTabs(lines []string) []string {
+	out := make([]string, len(lines))
+	for i, line := range lines {
+		out[i] = strings.TrimLeft(line, "\t")
+	}
+	return out
 }
 
 // equalLines says whether two lists of lines are the same.

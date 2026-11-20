@@ -276,6 +276,50 @@ func TestTheLintTargetMustPrintTheDeadcodeLinesWhole(t *testing.T) {
 	}
 }
 
+// GNU make takes the tab off a line that continues the one before it and make 3.81 does not: the recipe of `make
+// zizmor` is accepted with either, and refused when a word of a line differs.
+func TestTheZizmorRecipeIsComparedWithoutTheTabsOfContinuationLines(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		lines func() []string
+		want  int
+	}{
+		{"as it is", func() []string { return zizmorRunRecipe }, 0},
+		{"the tabs taken off, as GNU make prints it", func() []string { return withoutLeadingTabs(zizmorRunRecipe) }, 0},
+		{"another tab count", func() []string {
+			out := slices.Clone(zizmorRunRecipe)
+			out[1] = "\t\t\t" + strings.TrimLeft(out[1], "\t")
+			return out
+		}, 0},
+		{"a word changed", func() []string {
+			out := slices.Clone(zizmorRunRecipe)
+			out[1] = strings.Replace(out[1], "not installed", "installed", 1)
+			return out
+		}, 1},
+		{"a line missing", func() []string { return zizmorRunRecipe[1:] }, 1},
+		{"a space where a tab was", func() []string {
+			out := slices.Clone(zizmorRunRecipe)
+			out[1] = " " + strings.TrimLeft(out[1], "\t")
+			return out
+		}, 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m := newIdealMake(t)
+			c := newChecker(t, m)
+			m.dryLines = func(dc dryCase, lines []string) []string {
+				if dc.target == zizmorRunTarget {
+					return tc.lines()
+				}
+				return lines
+			}
+			problems, err := c.check(context.Background())
+			if err != nil || len(problems) != tc.want {
+				t.Errorf("problems %q, error %v, want %d", problems, err, tc.want)
+			}
+		})
+	}
+}
+
 // `make lint` must print the line of the zizmor probes whole, with the number the Makefile holds (the case
 // hands it 7 on the command line): a line gone (the prerequisite deleted), a suffix (`|| true`), a number of
 // its own in the recipe, another program or the number missing each leave no line that is the wanted one.

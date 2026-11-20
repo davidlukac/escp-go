@@ -111,6 +111,11 @@ type dryCase struct {
 	target string
 	// plain: no gremlins in the recipe, only the whole-line comparison.
 	plain bool
+	// looseTabs: the lines are compared without their leading tabs. GNU make removes a tab after a backslash and
+	// a new line when it prints a recipe and make 3.81 does not, so the lines of a recipe that continues a line
+	// differ in their tabs between the two; the words of the lines are still compared whole. The recipe as it is
+	// written in the Makefile is pinned with its tabs by sourceProblems.
+	looseTabs bool
 }
 
 // thresholdLine, coefficientLine and checkLine are the steps the recipes run around gremlins.
@@ -208,7 +213,7 @@ func dryCases() []dryCase {
 	cases = append(cases, dryCase{label: "recipemutants runs the mutants test with its tag and needs its PASS line",
 		args: []string{mutantsTarget}, target: mutantsTarget, plain: true, want: mutantsRecipe})
 	cases = append(cases, dryCase{label: "make zizmor runs the script with the number the Makefile holds",
-		args: []string{zizmorRunTarget, "ZIZMOR_SELF_REPOSITORY_FINDINGS=" + zizmorCount}, target: zizmorRunTarget, plain: true, want: zizmorRunRecipe})
+		args: []string{zizmorRunTarget, "ZIZMOR_SELF_REPOSITORY_FINDINGS=" + zizmorCount}, target: zizmorRunTarget, plain: true, looseTabs: true, want: zizmorRunRecipe})
 	cases = append(cases, dryCase{label: "make lint runs this check, the dead-code check and the zizmor probes",
 		args: []string{"lint", "ZIZMOR_SELF_REPOSITORY_FINDINGS=" + zizmorCount}, target: "lint",
 		pins: pins{has: append(slices.Clone(deadcodeRecipe), zizmorRecipe)}})
