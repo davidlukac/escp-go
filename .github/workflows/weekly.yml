@@ -81,6 +81,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # The audit is run by a Go program of this repository (internal/zizmorrun, started by scripts/zizmor.sh), built
+      # with the go tool from the go.mod of the checked-out tree. That tree is the one audited, so these files, go.mod,
+      # go.work, vendor/ and this step are part of what the gate runs on: a change to any of them changes the gate.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
       - name: Install the pinned zizmor
         run: |
           python3 -m venv "$RUNNER_TEMP/zizmor"
@@ -90,3 +97,7 @@ jobs:
         run: make zizmor
         env:
           GH_TOKEN: ${{ github.token }}
+      - name: Prove that the options hold
+        run: make zizmorcheck
+        env:
+          ZIZMOR_REQUIRED: "1"

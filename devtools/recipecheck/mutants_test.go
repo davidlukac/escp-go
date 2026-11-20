@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -61,7 +62,9 @@ func installShim(t *testing.T, realRoot string) {
 // occurrence-th place (counted from 0). A mutant with a reason in equivalent changes nothing the check
 // can observe, and the check must not report it: that is how the list says why it is let through.
 type mutant struct {
-	Name       string `json:"name"`
+	Name string `json:"name"`
+	// File is the file the mutant changes, relative to the repository: the Makefile when empty.
+	File       string `json:"file"`
 	Old        string `json:"old"`
 	New        string `json:"new"`
 	Occurrence int    `json:"occurrence"`
@@ -86,10 +89,27 @@ func (m mutant) apply(t *testing.T, text string) string {
 	return text[:at] + m.New + text[at+len(m.Old):]
 }
 
-// copyRepository builds a scratch repository the recipes can run in: the Makefile (given), go.mod and
+// check applies the mutant to its file (the Makefile, or a workflow) and runs the check over the result.
+func (m mutant) check(t *testing.T, realRoot, makefile string) []string {
+	t.Helper()
+	if m.File == "" {
+		return checkCopy(t, realRoot, m.apply(t, makefile), nil)
+	}
+	if !slices.Contains(zizmorWorkflows, m.File) {
+		t.Fatalf("%s: the mutant changes %s, which the check does not read", m.Name, m.File)
+	}
+	data, err := os.ReadFile(filepath.Join(realRoot, filepath.FromSlash(m.File)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return checkCopy(t, realRoot, makefile, map[string]string{m.File: m.apply(t, string(data))})
+}
+
+// copyRepository builds a scratch repository the recipes can run in: the Makefile (given), the workflows the
+// check reads (those of the real repository, or the texts given in workflows by name), go.mod and
 // go.sum, the sources of the report tool the recipes `go run`, and an empty Go file in every other
 // directory that has Go files in the real repository (the Makefile lists them for its PKG filter).
-func copyRepository(t *testing.T, realRoot, makefile string) string {
+func copyRepository(t *testing.T, realRoot, makefile string, workflows map[string]string) string {
 	t.Helper()
 	dir := t.TempDir()
 	put := func(name string, data []byte) {
@@ -102,6 +122,17 @@ func copyRepository(t *testing.T, realRoot, makefile string) string {
 		}
 	}
 	put("Makefile", []byte(makefile))
+	for _, name := range zizmorWorkflows {
+		text, ok := workflows[name]
+		if !ok {
+			data, err := os.ReadFile(filepath.Join(realRoot, filepath.FromSlash(name)))
+			if err != nil {
+				t.Fatal(err)
+			}
+			text = string(data)
+		}
+		put(filepath.FromSlash(name), []byte(text))
+	}
 	for _, name := range []string{"go.mod", "go.sum"} {
 		data, err := os.ReadFile(filepath.Join(realRoot, name))
 		if err != nil {
@@ -143,10 +174,11 @@ func copyRepository(t *testing.T, realRoot, makefile string) string {
 	return dir
 }
 
-// checkCopy runs the check over a scratch repository with the Makefile text and returns its problems.
-func checkCopy(t *testing.T, realRoot, makefile string) []string {
+// checkCopy runs the check over a scratch repository with the Makefile text and the workflow texts given, and returns
+// its problems.
+func checkCopy(t *testing.T, realRoot, makefile string, workflows map[string]string) []string {
 	t.Helper()
-	dir := copyRepository(t, realRoot, makefile)
+	dir := copyRepository(t, realRoot, makefile, workflows)
 	exe, err := os.Executable()
 	if err != nil {
 		t.Fatal(err)
@@ -183,7 +215,7 @@ func TestMakefileMutants(t *testing.T) {
 	}
 	t.Run("the Makefile as it is", func(t *testing.T) {
 		t.Parallel()
-		if problems := checkCopy(t, realRoot, string(makefile)); len(problems) != 0 {
+		if problems := checkCopy(t, realRoot, string(makefile), nil); len(problems) != 0 {
 			t.Errorf("problems in the Makefile as it is:\n%s", strings.Join(problems, "\n"))
 		}
 	})
@@ -196,7 +228,7 @@ func TestMakefileMutants(t *testing.T) {
 			names[m.Name] = true
 			t.Run(m.Name, func(t *testing.T) {
 				t.Parallel()
-				problems := checkCopy(t, realRoot, m.apply(t, string(makefile)))
+				problems := m.check(t, realRoot, string(makefile))
 				switch {
 				case m.Equivalent == "" && len(problems) == 0:
 					t.Errorf("the check does not notice this mutant")

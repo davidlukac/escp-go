@@ -6,8 +6,9 @@
 #     Dependabot keeps the SHAs current.
 #   * Steps call the Makefile, so a local `make <target>` reproduces CI.
 #   * Shared setup lives in .github/actions/setup. It is referenced as `./.github/actions/setup` with
-#     `# zizmor: ignore[self-repository]`: the `$/` form zizmor prefers is not yet accepted by the
-#     pinned actionlint (rhysd/actionlint#711), so each use carries the ignore until it is.
+#     a comment that says why: the `$/` form zizmor prefers is not yet accepted by the pinned
+#     actionlint (rhysd/actionlint#711). These uses are the only findings `make zizmor` allows, and
+#     it counts them (the comment is for the reader: the check does not read it).
 #   * Every workflow is checked by actionlint (syntax) and zizmor (security): `make actionlint zizmor`.
 name: Tests
 
@@ -69,10 +70,11 @@ jobs:
   # What a workflow may do and how untrusted input reaches it (template injection, token
   # permissions, persisted credentials, dangerous triggers, impostor or unpinned actions): the
   # pinned zizmor (devtools/zizmor/requirements.txt, installed with its hashes), at the default
-  # severity and persona, over everything in .github/. Console output and a red exit, no code
-  # scanning upload. It is installed from PyPI and not through its own action, so that no further
-  # third-party action runs in a job that reads the workflows; the token it is given only reads
-  # public data (the online audits look up whether a pinned SHA belongs to the action's history).
+  # severity and persona, over the whole repository (the workflows and every composite action).
+  # Console output and a red exit, no code scanning upload. It is installed from PyPI and not
+  # through its own action, so that no further third-party action runs in a job that reads the
+  # workflows; the token it is given only reads public data (the online audits look up whether a
+  # pinned SHA belongs to the action's history).
   zizmor:
     name: Workflow security (zizmor)
     runs-on: ubuntu-24.04
@@ -83,6 +85,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # The audit is run by a Go program of this repository (internal/zizmorrun, started by scripts/zizmor.sh), built
+      # with the go tool from the go.mod of the checked-out tree. That tree is the one audited, so these files, go.mod,
+      # go.work, vendor/ and this step are part of what the gate runs on: a change to any of them changes the gate.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
       - name: Install the pinned zizmor
         run: |
           python3 -m venv "$RUNNER_TEMP/zizmor"
@@ -92,6 +101,10 @@ jobs:
         run: make zizmor
         env:
           GH_TOKEN: ${{ github.token }}
+      - name: Prove that the options hold
+        run: make zizmorcheck
+        env:
+          ZIZMOR_REQUIRED: "1"
 
   # Go matrix: "go.mod" is the minimum the module declares (the supported floor),
   # "stable" is the newest release and catches toolchain regressions early.

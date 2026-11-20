@@ -540,8 +540,8 @@
  },
  {
   "name": "make lint without the recipe check",
-  "old": "lint: catalogcheck guarantee lintfixtures mutationrecipe",
-  "new": "lint: catalogcheck guarantee lintfixtures",
+  "old": "lint: catalogcheck guarantee lintfixtures mutationrecipe zizmorcheck",
+  "new": "lint: catalogcheck guarantee lintfixtures zizmorcheck",
   "occurrence": 0,
   "equivalent": ""
  },
@@ -731,6 +731,248 @@
   "name": "mutation: a threshold that is not a percentage let through",
   "old": "threshold \"$(EFFICACY)\"",
   "new": "threshold \"$(subst 90%,90,$(EFFICACY))\"",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "make lint without the zizmor probes",
+  "old": "lint: catalogcheck guarantee lintfixtures mutationrecipe zizmorcheck",
+  "new": "lint: catalogcheck guarantee lintfixtures mutationrecipe",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "zizmorcheck: the probes made non-fatal with a - prefix",
+  "old": "zizmorcheck:\n\tZIZMOR_",
+  "new": "zizmorcheck:\n\t-ZIZMOR_",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "zizmorcheck: the probes hidden with an @ prefix",
+  "old": "zizmorcheck:\n\tZIZMOR_",
+  "new": "zizmorcheck:\n\t@ZIZMOR_",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "zizmorcheck: the probes made non-fatal with || true",
+  "old": "go run ./internal/zizmorprobe\n",
+  "new": "go run ./internal/zizmorprobe || true\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "zizmorcheck: a number of its own",
+  "old": "ZIZMOR_SELF_REPOSITORY_FINDINGS=$(ZIZMOR_SELF_REPOSITORY_FINDINGS) go run",
+  "new": "ZIZMOR_SELF_REPOSITORY_FINDINGS=13 go run",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "zizmorcheck: the probes not run",
+  "old": "\tZIZMOR_SELF_REPOSITORY_FINDINGS=$(ZIZMOR_SELF_REPOSITORY_FINDINGS) go run ./internal/zizmorprobe\n",
+  "new": "\ttrue\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "zizmorcheck: another program",
+  "old": "go run ./internal/zizmorprobe\n",
+  "new": "go run ./internal/zizmorrun\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "zizmor: the call replaced by @true",
+  "old": "\t@ZIZMOR_SELF_REPOSITORY_FINDINGS=$(ZIZMOR_SELF_REPOSITORY_FINDINGS) scripts/zizmor.sh\n",
+  "new": "\t@true\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "zizmor: the call made non-fatal with || true",
+  "old": "scripts/zizmor.sh\n",
+  "new": "scripts/zizmor.sh || true\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "zizmor: the call made non-fatal with a - prefix",
+  "old": "\t@ZIZMOR_SELF_REPOSITORY_FINDINGS=$(ZIZMOR_SELF_REPOSITORY_FINDINGS) scripts/zizmor.sh\n",
+  "new": "\t-ZIZMOR_SELF_REPOSITORY_FINDINGS=$(ZIZMOR_SELF_REPOSITORY_FINDINGS) scripts/zizmor.sh\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "zizmor: a number of its own in the call",
+  "old": "=$(ZIZMOR_SELF_REPOSITORY_FINDINGS) scripts/zizmor.sh",
+  "new": "=13 scripts/zizmor.sh",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "zizmor: the variable dropped from the call",
+  "old": "\t@ZIZMOR_SELF_REPOSITORY_FINDINGS=$(ZIZMOR_SELF_REPOSITORY_FINDINGS) scripts/zizmor.sh\n",
+  "new": "\t@scripts/zizmor.sh\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "zizmor: the install check made non-fatal with a - prefix",
+  "old": "zizmor:\n\t@command -v",
+  "new": "zizmor:\n\t-command -v",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "zizmor: the version check made non-fatal with a - prefix",
+  "old": "\t@pin=",
+  "new": "\t-pin=",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "test.yml: the audit replaced by true",
+  "file": ".github/workflows/test.yml",
+  "old": "run: make zizmor\n",
+  "new": "run: \"true\"\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "test.yml: the audit made non-fatal with || true",
+  "file": ".github/workflows/test.yml",
+  "old": "run: make zizmor\n",
+  "new": "run: make zizmor || true\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "test.yml: the audit with a number of its own",
+  "file": ".github/workflows/test.yml",
+  "old": "run: make zizmor\n",
+  "new": "run: make zizmor ZIZMOR_SELF_REPOSITORY_FINDINGS=99\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "test.yml: the audit without its token",
+  "file": ".github/workflows/test.yml",
+  "old": "          GH_TOKEN: ${{ github.token }}\n",
+  "new": "",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "test.yml: the probes dropped",
+  "file": ".github/workflows/test.yml",
+  "old": "      - name: Prove that the options hold\n        run: make zizmorcheck\n        env:\n          ZIZMOR_REQUIRED: \"1\"\n",
+  "new": "",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "test.yml: the probes made non-fatal",
+  "file": ".github/workflows/test.yml",
+  "old": "run: make zizmorcheck\n",
+  "new": "run: make zizmorcheck || true\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "test.yml: the probes allowed to be skipped",
+  "file": ".github/workflows/test.yml",
+  "old": "ZIZMOR_REQUIRED: \"1\"",
+  "new": "ZIZMOR_REQUIRED: \"\"",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "test.yml: a variable added to the audit step",
+  "file": ".github/workflows/test.yml",
+  "old": "          GH_TOKEN: ${{ github.token }}\n",
+  "new": "          GH_TOKEN: ${{ github.token }}\n          ZIZMOR_OFFLINE: \"true\"\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "test.yml: the zizmor job made non-blocking",
+  "file": ".github/workflows/test.yml",
+  "old": "    name: Workflow security (zizmor)\n",
+  "new": "    name: Workflow security (zizmor)\n    continue-on-error: true\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "weekly.yml: the audit replaced by true",
+  "file": ".github/workflows/weekly.yml",
+  "old": "run: make zizmor\n",
+  "new": "run: \"true\"\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "weekly.yml: the audit made non-fatal with || true",
+  "file": ".github/workflows/weekly.yml",
+  "old": "run: make zizmor\n",
+  "new": "run: make zizmor || true\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "weekly.yml: the audit with a number of its own",
+  "file": ".github/workflows/weekly.yml",
+  "old": "run: make zizmor\n",
+  "new": "run: make zizmor ZIZMOR_SELF_REPOSITORY_FINDINGS=99\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "weekly.yml: the audit without its token",
+  "file": ".github/workflows/weekly.yml",
+  "old": "          GH_TOKEN: ${{ github.token }}\n",
+  "new": "",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "weekly.yml: the probes dropped",
+  "file": ".github/workflows/weekly.yml",
+  "old": "      - name: Prove that the options hold\n        run: make zizmorcheck\n        env:\n          ZIZMOR_REQUIRED: \"1\"\n",
+  "new": "",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "weekly.yml: the probes made non-fatal",
+  "file": ".github/workflows/weekly.yml",
+  "old": "run: make zizmorcheck\n",
+  "new": "run: make zizmorcheck || true\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "weekly.yml: the probes allowed to be skipped",
+  "file": ".github/workflows/weekly.yml",
+  "old": "ZIZMOR_REQUIRED: \"1\"",
+  "new": "ZIZMOR_REQUIRED: \"\"",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "weekly.yml: a variable added to the audit step",
+  "file": ".github/workflows/weekly.yml",
+  "old": "          GH_TOKEN: ${{ github.token }}\n",
+  "new": "          GH_TOKEN: ${{ github.token }}\n          ZIZMOR_OFFLINE: \"true\"\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "weekly.yml: the zizmor job made non-blocking",
+  "file": ".github/workflows/weekly.yml",
+  "old": "    name: Workflow security (zizmor)\n",
+  "new": "    name: Workflow security (zizmor)\n    continue-on-error: true\n",
   "occurrence": 0,
   "equivalent": ""
  }

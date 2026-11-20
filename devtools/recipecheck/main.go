@@ -22,7 +22,13 @@
 //   - the exit codes: a good, a bad, a missing and a stale report, a threshold or a coefficient that must
 //     be refused before gremlins starts;
 //   - `make lint` runs this check, and the dead-code check (`make deadcode`): both of its recipe lines
-//     are printed whole by `make -n lint`, and as written (no `-` or `@` prefix) in the Makefile.
+//     are printed whole by `make -n lint`, and as written (no `-` or `@` prefix) in the Makefile.;
+//   - the zizmor gate: `make -n lint` prints the line of the probes (`make zizmorcheck`) whole, `make -n zizmor`
+//     prints its recipe whole (the number of allowed findings comes from the Makefile's variable), the recipes of
+//     both targets are read as written, and the zizmor job of `test.yml` and `weekly.yml` holds the audit step and
+//     the probe step as written, with no `env:`, `continue-on-error:` or `if:` at the level of the job. These are a
+//     tripwire against an accidental or partial edit of the gate: they do not establish what else in a workflow
+//     or in the Makefile decides whether and where those steps run (see workflows.go).
 //
 // The report of the working tree (build/mutation.json) is put aside while the exit codes are run and put
 // back with its permissions, on an interrupt (INT, TERM, HUP) too. Each make runs as a fresh one, with
