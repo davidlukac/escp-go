@@ -17,6 +17,9 @@
 // is this program, run under the name zizmor, and records its arguments and its environment. They need no
 // network and no zizmor.
 //
+// The probes run a POSIX shell script over symbolic links, so the tests of this package are not built for
+// Windows.
+//
 // The program needs zizmor on the PATH, the pinned version (`make zizmor` prints how to install it). Without
 // it the probes that need it say so and pass, unless ZIZMOR_REQUIRED is set, as it is in the CI jobs that install
 // zizmor. ZIZMOR_SELF_REPOSITORY_FINDINGS is the number the Makefile holds.

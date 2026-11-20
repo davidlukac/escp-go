@@ -1,3 +1,8 @@
+//go:build !windows
+
+// These tests run a POSIX shell script over symbolic links and file modes, as the probes do; the tool is for
+// the systems that script runs on, so they are not built for Windows.
+
 package probe
 
 import (
