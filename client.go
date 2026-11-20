@@ -51,8 +51,6 @@ type Client struct {
 	// claim is what the client holds in the registry of switches in use (registry.go); nil until
 	// the client claims its switch.
 	claim *claim
-	// closed is set by Close and never cleared; guarded by mu.
-	closed bool
 	// stop is closed by Close (once, see stopOnce) before it waits for the lock, so that the call in
 	// flight ends at once and the calls queued behind it give up. Nil in a Client that was not made
 	// by Dial: the zero Client, which is closed.
@@ -97,26 +95,6 @@ func (s seams) now() time.Time {
 
 // dialOption changes how dial builds a client; only tests use it.
 type dialOption func(*Client)
-
-// withLoopback lets the client move a switch that lives on 127.0.0.0/8.
-func withLoopback() dialOption { return func(c *Client) { c.allowLoopback = true } }
-
-// withClaim makes this client claim its switch even in the tests, which otherwise do not.
-func withClaim() dialOption { return func(c *Client) { c.shared = false } }
-
-// withMoveWait shortens the wait for a switch that was told to move.
-func withMoveWait(d time.Duration) dialOption { return func(c *Client) { c.moveWait = d } }
-
-// withMovePoll shortens the pause between the probes of that wait.
-func withMovePoll(d time.Duration) dialOption { return func(c *Client) { c.movePoll = d } }
-
-// withFirstContact shortens the time the configured address gets to answer the first discovery.
-func withFirstContact(d time.Duration) dialOption { return func(c *Client) { c.firstContact = d } }
-
-// withLocator replaces the lookup of a switch by its MAC address.
-func withLocator(f func(ctx context.Context, mac model.MAC) (model.Info, error)) dialOption {
-	return func(c *Client) { c.locator = f }
-}
 
 // Dial prepares a client for the switch at cfg.Host, which must be an IPv4 address or a
 // name that resolves to one (a name is looked up now; use DialContext to bound or cancel the lookup), or,
@@ -229,7 +207,6 @@ func (c *Client) Close() error {
 	c.stopOnce.Do(func() { close(c.stop) })
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.closed = true
 	if c.claim != nil {
 		c.claim.release()
 	}

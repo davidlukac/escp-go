@@ -106,6 +106,8 @@ func (c *Client) decrypt(b []byte) []byte {
 // must come from the switch, decode to a valid packet, echo the current
 // sequence number and not be our own broadcast discovery coming back.
 func (c *Client) accept(from *net.UDPAddr, data []byte) (reply, bool) {
+	// c.alsoFrom == nil is required, not redundant: net.IP(nil).Equal(net.IP(nil)) is true, so a source with
+	// no address would match an absent second address (TestAcceptTakesAReplyFromTheSwitchAndFromTheAddressItIsMovingTo).
 	if !from.IP.Equal(c.dest.IP) && (c.alsoFrom == nil || !from.IP.Equal(c.alsoFrom)) {
 		return reply{}, false
 	}
@@ -317,7 +319,7 @@ func (c *Client) send(ctx context.Context, op byte, tlvs []wire.TLV, static bool
 // of this process holds it) sends nothing either, because its key exchange would replace the session
 // of the client that owns the switch. Callers hold c.mu.
 func (c *Client) mayExchange() error {
-	if c.closed || c.closing() {
+	if c.closing() {
 		return ErrClosed
 	}
 	return c.reclaim()

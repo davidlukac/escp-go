@@ -129,6 +129,7 @@ func (c *Client) finishMove(ctx context.Context, m moveOutcome) error {
 		c.alsoFrom = nil
 		return err
 	}
+	// errors.Is(err, ErrClosed) is a deliberate belt-and-braces check on a management write: every reachable ErrClosed implies closing(), so dropping the operand is an equivalent mutant.
 	if err != nil && (errors.Is(err, ErrClosed) || c.closing()) {
 		c.alsoFrom = nil
 		return cutShort() // Close ended the write: nothing is settled on a closed client

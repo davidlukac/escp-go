@@ -24,14 +24,16 @@ func (c *Client) lock(ctx context.Context) error {
 	if err := acquire(ctx, &c.mu); err != nil {
 		return err
 	}
-	if c.closed || c.closing() {
+	if c.closing() {
 		c.mu.Unlock()
 		return ErrClosed
 	}
 	return nil
 }
 
-// closing reports whether Close has begun, which is before it holds the lock.
+// closing reports whether Close has begun, which is before it holds the lock. It is the one source of
+// that state: Close closes c.stop first and then waits for c.mu, so a caller that holds c.mu and finds
+// the client closed finds the channel closed, and no second flag is needed.
 func (c *Client) closing() bool {
 	select {
 	case <-c.stop:
