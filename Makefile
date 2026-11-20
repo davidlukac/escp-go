@@ -140,11 +140,14 @@ guarantee:
 lintfixtures:
 	go -C devtools build -o $(CURDIR)/build/lintcheck ./lintcheck
 	build/lintcheck -root . -lint "$$($(DEVTOOL) -n golangci-lint)"
+	build/lintcheck -root . -lint "$$($(DEVTOOL) -n golangci-lint)" -config .golangci-deadcode.yml -fixtures devtools/deadcodefixtures -linters ""
 
 # Code that only a test uses. `make lint` runs `unused` with the tests on, so a function, a field or a dial
 # option that a test calls counts as used and ships in the production build for nothing. This runs `unused`
 # alone with the tests left out (.golangci-deadcode.yml: `run.tests: false`), with and without the `live`
-# build tag, and fails on any finding. A prerequisite of `lint`.
+# build tag, and fails on any finding. A prerequisite of `lint`. `make lintfixtures` holds the configuration to
+# a fixture (devtools/deadcodefixtures) and `make mutationrecipe` pins the prerequisite and the recipe, so that
+# a configuration weakened or a recipe switched off is noticed.
 .PHONY: deadcode
 lint: deadcode
 deadcode:

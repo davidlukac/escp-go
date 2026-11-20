@@ -21,6 +21,22 @@ const (
 	recipeTarget   = "mutationrecipe"
 	mutantsTarget  = "recipemutants"
 	recipeSource   = "\tgo -C devtools run ./recipecheck -root $(CURDIR)"
+	deadcodeTarget = "deadcode"
+)
+
+// deadcodeRecipe is what `make -n lint` must print for the dead-code check, each line whole: the
+// pinned linter with the configuration that runs `unused` alone with the tests left out, with and
+// without the live tag. deadcodeSource is the same recipe as it is written in the Makefile, where
+// `make -n` hides a prefix.
+var (
+	deadcodeRecipe = []string{
+		"go tool -modfile=devtools/go.mod golangci-lint run --config .golangci-deadcode.yml ./...",
+		"go tool -modfile=devtools/go.mod golangci-lint run --config .golangci-deadcode.yml --build-tags live ./...",
+	}
+	deadcodeSource = []string{
+		"\t$(DEVTOOL) golangci-lint run --config .golangci-deadcode.yml ./...",
+		"\t$(DEVTOOL) golangci-lint run --config .golangci-deadcode.yml --build-tags live ./...",
+	}
 )
 
 // The targets.
@@ -147,7 +163,8 @@ func dryCases() []dryCase {
 	cases = append(cases, filterCases()...)
 	cases = append(cases, dryCase{label: "recipemutants runs the mutants test with its tag and needs its PASS line",
 		args: []string{mutantsTarget}, target: mutantsTarget, plain: true, want: mutantsRecipe})
-	cases = append(cases, dryCase{label: "make lint runs this check", args: []string{"lint"}, target: "lint"})
+	cases = append(cases, dryCase{label: "make lint runs this check and the dead-code check", args: []string{"lint"}, target: "lint",
+		pins: pins{has: deadcodeRecipe}})
 	return cases
 }
 

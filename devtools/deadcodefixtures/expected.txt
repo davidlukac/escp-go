@@ -1,0 +1,4 @@
+# The findings `.golangci-deadcode.yml` must report on this module, one per line: `file: linter: text`, sorted.
+# `make lintfixtures` runs the configuration over the fixtures and compares: every line here must be
+# reported and nothing else may be. The line numbers are not part of it.
+testonly.go: unused: func onlyATest is unused

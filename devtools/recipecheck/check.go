@@ -126,32 +126,38 @@ func (c *checker) dry(ctx context.Context, tc dryCase) ([]string, error) {
 	return problems, nil
 }
 
-// lintProblems says whether `make -n lint` runs this check: a line that is exactly the recipe of the
-// mutationrecipe target with the root of the repository (as given, and with its symbolic links
-// resolved, which is what make's own idea of the directory may be), with nothing after it (`|| true`, an
-// extra flag).
+// lintProblems says whether `make -n lint` runs this check and the dead-code check. For this check: a
+// line that is exactly the recipe of the mutationrecipe target with the root of the repository (as given,
+// and with its symbolic links resolved, which is what make's own idea of the directory may be), with
+// nothing after it (`|| true`, an extra flag). For the dead-code check: each line of the case's pins.has,
+// whole.
 func lintProblems(tc dryCase, lines []string, root string) []string {
+	var problems []string
 	wanted := []string{lintRecipe + root}
 	if resolved, err := filepath.EvalSymlinks(root); err == nil {
 		wanted = append(wanted, lintRecipe+resolved)
 	}
-	for _, line := range lines {
-		if slices.Contains(wanted, line) {
-			return nil
+	if !slices.ContainsFunc(lines, func(line string) bool { return slices.Contains(wanted, line) }) {
+		problems = append(problems, tc.label+": make lint does not run the check as `"+wanted[0]+"` (no line of its recipe is that, whole)")
+	}
+	for _, want := range tc.pins.has {
+		if !slices.Contains(lines, want) {
+			problems = append(problems, tc.label+": make lint does not run `"+want+"` (no line of its recipe is that, whole)")
 		}
 	}
-	return []string{tc.label + ": make lint does not run the check as `" + wanted[0] + "` (no line of its recipe is that, whole)"}
+	return problems
 }
 
-// sourceProblems pins the recipes of the mutationrecipe and recipemutants targets in the text of the
+// sourceProblems pins the recipes of the mutationrecipe, recipemutants and deadcode targets in the text of the
 // Makefile: `make -n` hides a `-` prefix (a failing step that does not fail make) and an `@`, so each
 // recipe is compared as it is written, line by line, and must have no other line.
 func sourceProblems(makefile string) []string {
 	lines := strings.Split(makefile, "\n")
 	var problems []string
 	for target, want := range map[string][]string{
-		recipeTarget:  {recipeSource},
-		mutantsTarget: mutantsSource,
+		recipeTarget:   {recipeSource},
+		mutantsTarget:  mutantsSource,
+		deadcodeTarget: deadcodeSource,
 	} {
 		at := slices.Index(lines, target+":")
 		if at < 0 {

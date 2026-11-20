@@ -21,7 +21,8 @@
 //     and the report path the check reads, and never `--threshold-efficacy`;
 //   - the exit codes: a good, a bad, a missing and a stale report, a threshold or a coefficient that must
 //     be refused before gremlins starts;
-//   - `make lint` runs this check.
+//   - `make lint` runs this check, and the dead-code check (`make deadcode`): both of its recipe lines
+//     are printed whole by `make -n lint`, and as written (no `-` or `@` prefix) in the Makefile.
 //
 // The report of the working tree (build/mutation.json) is put aside while the exit codes are run and put
 // back with its permissions, on an interrupt (INT, TERM, HUP) too. Each make runs as a fresh one, with
