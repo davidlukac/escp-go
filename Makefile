@@ -141,6 +141,16 @@ lintfixtures:
 	go -C devtools build -o $(CURDIR)/build/lintcheck ./lintcheck
 	build/lintcheck -root . -lint "$$($(DEVTOOL) -n golangci-lint)"
 
+# Code that only a test uses. `make lint` runs `unused` with the tests on, so a function, a field or a dial
+# option that a test calls counts as used and ships in the production build for nothing. This runs `unused`
+# alone with the tests left out (.golangci-deadcode.yml: `run.tests: false`), with and without the `live`
+# build tag, and fails on any finding. A prerequisite of `lint`.
+.PHONY: deadcode
+lint: deadcode
+deadcode:
+	$(DEVTOOL) golangci-lint run --config .golangci-deadcode.yml ./...
+	$(DEVTOOL) golangci-lint run --config .golangci-deadcode.yml --build-tags live ./...
+
 # Known vulnerabilities in the code and its dependencies.
 vuln:
 	$(DEVTOOL) govulncheck ./...
