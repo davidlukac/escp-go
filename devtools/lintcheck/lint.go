@@ -41,7 +41,7 @@ func lintFixtures(o options, lint linterRunner) ([]finding, error) {
 	if err := copyTree(filepath.Join(o.root, o.fixtures), work); err != nil {
 		return nil, fmt.Errorf("copying the fixtures: %w", err)
 	}
-	config, err := os.ReadFile(filepath.Join(o.root, configName))
+	config, err := os.ReadFile(filepath.Join(o.root, o.config))
 	if err != nil {
 		return nil, fmt.Errorf("reading the configuration: %w", err)
 	}
@@ -92,10 +92,16 @@ func copyTree(src, dst string) error {
 // lintExitFindings is the exit status of golangci-lint when it ran and found something.
 const lintExitFindings = 1
 
-// execLinter runs golangci-lint. GOWORK is off so that a go.work of the developer cannot change what the
+// execLinter runs golangci-lint, limited to linters when that is not empty (empty: the ones the
+// configuration enables). GOWORK is off so that a go.work of the developer cannot change what the
 // fixture module resolves; the exit status that means "found something" is not an error.
 func execLinter(bin, dir, reportPath, linters string) error {
-	cmd := exec.Command(bin, "run", "--enable-only", linters, "--output.json.path", reportPath, "--output.text.path", "", "./...")
+	args := []string{"run"}
+	if linters != "" {
+		args = append(args, "--enable-only", linters)
+	}
+	args = append(args, "--output.json.path", reportPath, "--output.text.path", "", "./...")
+	cmd := exec.Command(bin, args...)
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), "GOWORK=off")
 	var stderr strings.Builder

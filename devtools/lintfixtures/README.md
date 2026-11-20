@@ -18,3 +18,5 @@ swallows a fixture, or a rule that was relaxed fails the target (issue #252; the
 - A new `depguard` rule or `forbidigo` pattern, and a new exclusion, comes with its fixture and its line in
   `expected.txt` in the same pull request.
 - The fixtures only have to compile: they are never run.
+- The dead-code configuration (`.golangci-deadcode.yml`) has a module of its own, `../deadcodefixtures`, run by the
+  same target with the same checker (`-config`, `-fixtures`, and `-linters ""` so that the configuration chooses the linters).

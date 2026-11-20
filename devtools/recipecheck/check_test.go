@@ -135,6 +135,9 @@ func TestEveryRecipeCaseNoticesEachDeviation(t *testing.T) {
 
 func TestEveryPinnedWordOfTheGremlinsLineIsRequired(t *testing.T) {
 	for _, tc := range dryCases() {
+		if tc.target == "lint" {
+			continue // the lines of `make lint` are not on the gremlins line; TestTheLintTargetMustPrintTheDeadcodeLinesWhole
+		}
 		var words []string
 		words = append(words, tc.pins.has...)
 		if tc.pins.ending != "" {
@@ -216,7 +219,7 @@ func TestTheLintTargetMustRunTheCheckAsTheWholeLine(t *testing.T) {
 			c := newChecker(t, m)
 			m.dryLines = func(tc dryCase, lines []string) []string {
 				if tc.target == "lint" {
-					return tt.lines(c.root)
+					return append(tt.lines(c.root), deadcodeRecipe...)
 				}
 				return lines
 			}
@@ -224,6 +227,50 @@ func TestTheLintTargetMustRunTheCheckAsTheWholeLine(t *testing.T) {
 			if err != nil || (len(problems) == 1) != tt.want || len(problems) > 1 ||
 				(tt.want && !strings.Contains(problems[0], "make lint does not run the check")) {
 				t.Errorf("problems %q, error %v, want a problem: %v", problems, err, tt.want)
+			}
+		})
+	}
+}
+
+// `make lint` must print each line of the dead-code check whole: a line gone (the prerequisite deleted,
+// the run with the live tag dropped), a suffix (`|| true`), another configuration (the main one, which has
+// the tests on and many linters) or another tag each leave no line that is the wanted one.
+func TestTheLintTargetMustPrintTheDeadcodeLinesWhole(t *testing.T) {
+	first, second := deadcodeRecipe[0], deadcodeRecipe[1]
+	tests := []struct {
+		name  string
+		lines []string
+		want  int // the number of problems
+	}{
+		{"both lines", []string{first, second}, 0},
+		{"the prerequisite deleted", nil, 2},
+		{"the first line only", []string{first}, 1},
+		{"the live line only", []string{second}, 1},
+		{"the first line made non-fatal", []string{first + " || true", second}, 1},
+		{"the live line made non-fatal", []string{first, second + " || true"}, 1},
+		{"the main configuration", []string{strings.Replace(first, ".golangci-deadcode.yml", ".golangci.yml", 1), second}, 1},
+		{"no configuration", []string{strings.Replace(first, " --config .golangci-deadcode.yml", "", 1), second}, 1},
+		{"another tag", []string{first, strings.Replace(second, "live", "mutants", 1)}, 1},
+		{"the tests turned on by a flag", []string{first + " --tests", second}, 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := newIdealMake(t)
+			c := newChecker(t, m)
+			m.dryLines = func(tc dryCase, lines []string) []string {
+				if tc.target == "lint" {
+					return append([]string{"go build", lintRecipe + c.root}, tt.lines...)
+				}
+				return lines
+			}
+			problems, err := c.check(context.Background())
+			if err != nil || len(problems) != tt.want {
+				t.Errorf("problems %q, error %v, want %d", problems, err, tt.want)
+			}
+			for _, p := range problems {
+				if !strings.Contains(p, "make lint does not run `go tool") {
+					t.Errorf("a problem that is not about a line of the dead-code check: %q", p)
+				}
 			}
 		})
 	}
@@ -245,6 +292,9 @@ func TestTheRecipeOfTheCheckTargetIsPinnedAsWritten(t *testing.T) {
 		{"another line", strings.Replace(goodMakefile, recipeSource+"\n", recipeSource+"\n\ttrue\n", 1), "mutationrecipe is not as written"},
 		{"no recipe", strings.Replace(goodMakefile, recipeSource+"\n", "", 1), "mutationrecipe is not as written"},
 		{"no target", "all:\n\ttrue\n", "no mutationrecipe target"},
+		{"a - prefix on the dead-code run", strings.Replace(goodMakefile, "\t$(DEVTOOL) golangci-lint run --config .golangci-deadcode.yml ./...", "\t-$(DEVTOOL) golangci-lint run --config .golangci-deadcode.yml ./...", 1), "deadcode is not as written"},
+		{"an @ prefix on the dead-code live run", strings.Replace(goodMakefile, "\t$(DEVTOOL) golangci-lint run --config .golangci-deadcode.yml --build-tags live", "\t@$(DEVTOOL) golangci-lint run --config .golangci-deadcode.yml --build-tags live", 1), "deadcode is not as written"},
+		{"the dead-code live run missing", strings.Replace(goodMakefile, deadcodeSource[1]+"\n", "", 1), "deadcode is not as written"},
 		{"the mutants recipe without the PASS line", strings.Replace(goodMakefile, mutantsSource[2]+"\n", "", 1), "recipemutants"},
 		{"a - prefix on the PASS line", strings.Replace(goodMakefile, "\tgrep -e", "\t-grep -e", 1), "recipemutants"},
 		{"an @ prefix on the test run", strings.Replace(goodMakefile, "\tgo -C devtools test", "\t@go -C devtools test", 1), "recipemutants"},
@@ -684,8 +734,8 @@ func TestTheCasesAreWhatTheJobsUse(t *testing.T) {
 // not), and a pinned word is a whole word (the same words with a digit glued on are not).
 func TestThePinnedEndingIsASuffixAndThePinnedWordsAreWholeWords(t *testing.T) {
 	for _, tc := range dryCases() {
-		if tc.pins.ending == "" && len(tc.pins.has) == 0 {
-			continue
+		if tc.target == "lint" || (tc.pins.ending == "" && len(tc.pins.has) == 0) {
+			continue // `make lint` has no gremlins line; its lines are held whole by TestTheLintTargetMustPrintTheDeadcodeLinesWhole
 		}
 		edits := map[string]func(line string) string{
 			"a word after the line": func(line string) string { return line + " --verbose" },

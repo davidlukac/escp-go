@@ -546,6 +546,55 @@
   "equivalent": ""
  },
  {
+  "name": "make lint without the dead-code check",
+  "old": "lint: deadcode\n",
+  "new": "",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "dead-code: the run made non-fatal with a - prefix",
+  "old": "\t$(DEVTOOL) golangci-lint run --config .golangci-deadcode.yml ./...\n",
+  "new": "\t-$(DEVTOOL) golangci-lint run --config .golangci-deadcode.yml ./...\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "dead-code: the run made non-fatal with || true",
+  "old": "\t$(DEVTOOL) golangci-lint run --config .golangci-deadcode.yml ./...\n",
+  "new": "\t$(DEVTOOL) golangci-lint run --config .golangci-deadcode.yml ./... || true\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "dead-code: the run with the live tag dropped",
+  "old": "\t$(DEVTOOL) golangci-lint run --config .golangci-deadcode.yml --build-tags live ./...\n",
+  "new": "",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "dead-code: the live run made non-fatal with a - prefix",
+  "old": "\t$(DEVTOOL) golangci-lint run --config .golangci-deadcode.yml --build-tags live ./...\n",
+  "new": "\t-$(DEVTOOL) golangci-lint run --config .golangci-deadcode.yml --build-tags live ./...\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "dead-code: the configuration dropped",
+  "old": " --config .golangci-deadcode.yml ./...\n",
+  "new": " ./...\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
+  "name": "dead-code: the main configuration used",
+  "old": " --config .golangci-deadcode.yml ./...\n",
+  "new": " --config .golangci.yml ./...\n",
+  "occurrence": 0,
+  "equivalent": ""
+ },
+ {
   "name": "PKG_DIRS expanded at every start of make",
   "old": "PKG_DIRS = ",
   "new": "PKG_DIRS := ",

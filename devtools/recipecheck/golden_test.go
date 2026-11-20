@@ -37,7 +37,7 @@ var goldenDryCases = []string{
 	"mutation with PKG=model | env [] | args [\"mutation\" \"PKG=model\"] | ending \" --output build/mutation.json\" | has [\"GOFLAGS=-count=1\" \"--timeout-coefficient 10\" \"--workers 4\" \"-E '^safety/[^/]+$'\" \"-E '^internal/udp/[^/]+$'\"] | lacks [\"-E '^model/[^/]+$'\"] | plain false",
 	"mutation-diff with PKG=. | env [] | args [\"mutation-diff\" \"PKG=.\"] | ending \" --output build/mutation.json --diff origin/main\" | has [\"GOFLAGS=-count=1\" \"--timeout-coefficient 10\" \"-E '^model/[^/]+$'\"] | lacks [] | plain false",
 	"recipemutants runs the mutants test with its tag and needs its PASS line | env [] | args [\"recipemutants\"] | ending \"\" | has [] | lacks [] | plain true",
-	"make lint runs this check | env [] | args [\"lint\"] | ending \"\" | has [] | lacks [] | plain false",
+	"make lint runs this check and the dead-code check | env [] | args [\"lint\"] | ending \"\" | has [\"go tool -modfile=devtools/go.mod golangci-lint run --config .golangci-deadcode.yml ./...\" \"go tool -modfile=devtools/go.mod golangci-lint run --config .golangci-deadcode.yml --build-tags live ./...\"] | lacks [] | plain false",
 }
 
 var goldenExitCases = []string{

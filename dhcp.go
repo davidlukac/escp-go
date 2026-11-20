@@ -79,7 +79,8 @@ func (c *Client) finishDHCP(ctx context.Context, before model.IPConfig, wrote er
 	// lockwait: the lock is held across the wait for the lease on purpose (the outcome of a write that may have been applied is settled before another call uses the client); the wait ends after leaseWait, or with Close (withStop)
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	// errors.Is(wrote, ErrClosed) is belt and braces: every ErrClosed of the client implies closing(), but the helper may be handed any error (equivalent mutant).
+	// The ErrClosed operand is kept on purpose: a caller that cancels its context with ErrClosed as the cause
+	// gets ErrClosed (closedBy) while closing() is false and the write may have gone out; it is cut short, not settled (TestACallerThatCancelsWithErrClosedAsTheCauseIsCutShortWithoutSettling).
 	if wrote != nil && (errors.Is(wrote, ErrClosed) || c.closing()) {
 		return cutShort() // Close ended the write: nothing is settled on a closed client
 	}

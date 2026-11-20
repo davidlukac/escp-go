@@ -99,18 +99,15 @@ func TestACallerThatGaveUpDuringTheFirstContactDoesNotStartALookup(t *testing.T)
 
 // A client whose Close has begun but that does not hold the lock yet (Close closes the stop channel
 // first and then waits for the lock) refuses to take the lock and to exchange: the three places that
-// say so each test the closed flag and the stop channel, and the flag alone is not set yet. The
+// say so test closing(), the one source of "Close has begun" (there is no second flag). The
 // state is made by closing the stop channel, which is exactly what Close does first.
-// Held by the `||` of lock in request.go and of mayExchange in transport.go.
+// Held by the test of closing() in lock (request.go) and in mayExchange (transport.go).
 func TestACallOnAClientWhoseCloseHasBegunIsRefusedBeforeTheLockOrTheSocket(t *testing.T) {
 	begun := func(t *testing.T) (*Client, *escptest.Switch) {
 		t.Helper()
 		f := escptest.Start(t)
 		c := dialFake(t, f, "secret")
 		c.stopOnce.Do(func() { close(c.stop) }) // Close has begun; it has not got the lock
-		if c.closed {
-			t.Fatal("the closed flag is set before Close has the lock: the state of the test is wrong")
-		}
 		return c, f
 	}
 	t.Run("lock gives nothing and holds nothing", func(t *testing.T) {

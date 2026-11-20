@@ -6,6 +6,13 @@
 //
 //	go -C devtools run ./lintcheck -root . -lint "$(go tool -modfile=devtools/go.mod -n golangci-lint)"
 //
+// The same check holds another configuration to its own fixture module, with the linters the configuration
+// enables (`-linters ""`): `make lintfixtures` runs the dead-code configuration (.golangci-deadcode.yml,
+// `unused` alone with the tests left out) over devtools/deadcodefixtures, where a function that only a test
+// calls must be reported, so that a configuration weakened to `tests: true` or to another linter fails.
+//
+//	go -C devtools run ./lintcheck -root . -lint "$(...)" -config .golangci-deadcode.yml -fixtures devtools/deadcodefixtures -linters ""
+//
 // A rule whose pattern stops matching, an exclusion whose path or text now swallows a fixture, a rule
 // relaxed or a linter upgrade that resolves a call differently each leave a finding missing or one more
 // than expected, and the command exits 1 with one line for each. With -print it prints what the linter
@@ -42,7 +49,9 @@ const defaultFixtures = "devtools/lintfixtures"
 // to the configuration later does not have to be satisfied by the fixtures: the rules are what is under test.
 const defaultLinters = "depguard,forbidigo"
 
-// configName is the configuration file the linter reads from the root of the repository.
+// configName is the configuration the linter reads from the root of the repository, unless -config names
+// another. The linter always finds it in the working directory under this name, whatever it is called in
+// the repository.
 const configName = ".golangci.yml"
 
 // expectedName is the list of the expected findings, in the fixture module.
@@ -55,8 +64,8 @@ func main() {
 
 // options are the parsed flags.
 type options struct {
-	root, lint, fixtures, linters string
-	print                         bool
+	root, lint, fixtures, linters, config string
+	print                                 bool
 }
 
 // parseOptions reads the flags; it returns false after reporting a usage error.
@@ -67,7 +76,8 @@ func parseOptions(args []string, stderr io.Writer) (options, bool) {
 	fs.StringVar(&o.root, "root", ".", "the root of the repository (where .golangci.yml is)")
 	fs.StringVar(&o.lint, "lint", "", "the golangci-lint binary (required)")
 	fs.StringVar(&o.fixtures, "fixtures", defaultFixtures, "the fixture module, relative to the root")
-	fs.StringVar(&o.linters, "linters", defaultLinters, "the linters to run, comma-separated")
+	fs.StringVar(&o.linters, "linters", defaultLinters, "the linters to run, comma-separated; empty: the ones the configuration enables")
+	fs.StringVar(&o.config, "config", configName, "the configuration file, relative to the root")
 	fs.BoolVar(&o.print, "print", false, "print the findings as lines of the expected list and exit")
 	if err := fs.Parse(args); err != nil {
 		return o, false

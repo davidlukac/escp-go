@@ -104,7 +104,7 @@ func (m *idealMake) printDry(tc dryCase) string {
 	var lines []string
 	switch {
 	case tc.target == "lint":
-		lines = []string{"go build", lintRecipe + m.root}
+		lines = append([]string{"go build", lintRecipe + m.root}, tc.pins.has...)
 	case tc.want == nil:
 		lines = []string{"mkdir -p build", gremlinsLine(tc.pins)}
 	default:
@@ -173,7 +173,8 @@ func (m *idealMake) runExit(env, args []string) (string, int, error) {
 
 // goodMakefile is the part of the Makefile the check reads for itself.
 var goodMakefile = "all:\n\ttrue\n\n" + recipeTarget + ":\n" + recipeSource + "\n\n" +
-	mutantsTarget + ":\n" + strings.Join(mutantsSource, "\n") + "\n\nnext:\n\ttrue\n"
+	mutantsTarget + ":\n" + strings.Join(mutantsSource, "\n") + "\n\n" +
+	deadcodeTarget + ":\n" + strings.Join(deadcodeSource, "\n") + "\n\nnext:\n\ttrue\n"
 
 // repoRoot is a scratch repository: a directory with the Makefile the check reads.
 func repoRoot(t *testing.T) string {
