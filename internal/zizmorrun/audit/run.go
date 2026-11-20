@@ -78,7 +78,9 @@ func Run(ctx context.Context, args []string, env Environment) int {
 	// One byte over the verdict's limit is all it needs to refuse an answer that is too large: any larger cap gives the
 	// same verdict (an equivalent mutant of the constant), it only keeps more of the answer in memory.
 	answer := &capped{limit: verdict.MaxAnswer + 1}
-	status, err := env.Runner(ctx, root, Build(token, env.Environ()), answer, env.Stderr)
+	log := &lineEscaper{out: env.Stderr}
+	status, err := env.Runner(ctx, root, Build(token, env.Environ()), answer, log)
+	log.Close()
 	switch {
 	case err != nil:
 		_, _ = fmt.Fprintln(env.Stderr, "zizmor: it could not be run:", strconv.QuoteToASCII(err.Error()))

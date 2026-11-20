@@ -58,6 +58,10 @@ type probeCase struct {
 	want want
 	// recorded are the assertions on the call the stub recorded (stub runs that pass).
 	recorded []assertion
+	// noLineStartsWith are the prefixes that no line of the output may have, and outputHas the text the output
+	// must hold: what the log of the run must look like whatever the tree holds.
+	noLineStartsWith []string
+	outputHas        []string
 	// control: a failure ends the probes, because the ones after it prove nothing.
 	control bool
 }
@@ -147,6 +151,8 @@ func treeCases() []probeCase {
 		{name: "one allowed finding more", setup: []fixture{addOneSetupUse}, want: fails(markerFindings)},
 		{name: "one allowed finding fewer and a suppressed one more", setup: []fixture{removeOneSetupUse, addFinding, suppressIn(findingFile)}, want: fails(markerFindings)},
 		{name: "the rule named in an ignore comment is not read: the findings are what counts", setup: []fixture{nameAnotherRuleOnSetupUses}, want: passes},
+		{name: "a file name with a new line and a workflow command does not start a line of the log", setup: []fixture{addHostileFileName}, want: passes,
+			noLineStartsWith: []string{"::"}, outputHas: []string{"zizmor: ::warning::x.yml"}},
 		{name: "a copy of the program that runs zizmor in the audited tree", setup: []fixture{addFinding, shadowTheRunner}, want: fails(findingRule)},
 	}
 }

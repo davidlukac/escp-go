@@ -95,6 +95,9 @@ func idealScript(t *testing.T, cases []probeCase, deviate func(i int, c probeCas
 		if !pc.want.pass {
 			out, status = "refused: "+pc.want.marker+"\n", 1
 		}
+		for _, text := range pc.outputHas {
+			out += text + "\n"
+		}
 		var args, vars []string
 		for _, a := range pc.recorded {
 			switch a.kind {
@@ -179,6 +182,28 @@ func TestRunReportsEveryProbeThatBreaks(t *testing.T) {
 				status, out, _ := runCases(t, cases, idealScript(t, cases, deviate))
 				if status != exitProblem || !strings.Contains(out, "FAIL  "+c.name+": ") {
 					t.Errorf("status %d, want %d with a FAIL line for the case:\n%s", status, exitProblem, out)
+				}
+			})
+		}
+	}
+}
+
+// The probes on the log of the run are checked too: a line that starts a workflow command, or the escaped line
+// that is missing, turns the probe red.
+func TestRunChecksTheOutputOfTheCases(t *testing.T) {
+	for _, c := range scriptCases() {
+		if len(c.noLineStartsWith) == 0 && len(c.outputHas) == 0 {
+			continue
+		}
+		for name, output := range map[string]string{
+			"a line that starts a workflow command": c.outputHas[0] + "\n::warning::x.yml\n",
+			"the escaped line missing":              "something else\n",
+		} {
+			t.Run(c.name+": "+name, func(t *testing.T) {
+				cases := []probeCase{c}
+				status, out, _ := runCases(t, cases, func(int, call) (string, int, error) { return output, 0, nil })
+				if status != exitProblem || !strings.Contains(out, "FAIL  "+c.name+": ") {
+					t.Errorf("status %d, want %d with a FAIL line:\n%s", status, exitProblem, out)
 				}
 			})
 		}

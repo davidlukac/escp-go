@@ -17,6 +17,10 @@
 //   - every environment variable that can change what zizmor audits or how it reaches GitHub is removed (see
 //     [cleared]), then GH_TOKEN is set from GH_TOKEN or GITHUB_TOKEN (an empty variable counts as no token); with
 //     a token the audits that look up an action's history run online, without one the run is --offline;
+//   - what zizmor writes on its standard error is untrusted text (it names the files it audits, and a file name can
+//     hold a new line and a workflow command): every line is forwarded as "zizmor: " and the line escaped by
+//     verdict.Escape (printable ASCII, at most 200 characters), at most 200 lines, so no line of the job log starts
+//     with "::";
 //   - the findings are judged by package verdict: exactly the expected number of findings of the `self-repository`
 //     rule and nothing else. The program that judges them is built from the repository this one lives in, never
 //     from the audited tree: scripts/zizmor.sh runs it with `go -C`.

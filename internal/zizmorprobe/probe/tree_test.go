@@ -289,6 +289,10 @@ func TestFixtures(t *testing.T) {
 			wantLink(t, tr, ".github/actions/linked", "../../ci")
 			wantFile(t, tr, "ci/action.yml", injectedAction)
 		}},
+		{name: "addHostileFileName", setup: []fixture{addHostileFileName}, check: func(t *testing.T, tr tree) {
+			t.Helper()
+			wantFile(t, tr, ".github/workflows/a\n::warning::x.yml", cleanWorkflow)
+		}},
 		{name: "shadowTheRunner", setup: []fixture{shadowTheRunner}, check: func(t *testing.T, tr tree) {
 			t.Helper()
 			wantFile(t, tr, "go.mod", shadowModule)

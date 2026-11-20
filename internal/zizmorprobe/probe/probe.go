@@ -277,11 +277,32 @@ func judge(c probeCase, res result) []string {
 	case !c.want.pass && !strings.Contains(res.output, c.want.marker):
 		problems = append(problems, fmt.Sprintf("exit %d, wanted a failure that mentions %s", res.status, c.want.marker))
 	}
+	problems = append(problems, outputProblems(c, res.output)...)
 	if res.status == 0 {
 		for _, a := range c.recorded {
 			if !holds(a, res.call) {
 				problems = append(problems, "the stub recorded a call that breaks: "+describe(a))
 			}
+		}
+	}
+	return problems
+}
+
+// outputProblems says what is wrong with the output of a run: a line that starts with a prefix the case
+// forbids, or text the case wants and the output lacks.
+func outputProblems(c probeCase, output string) []string {
+	var problems []string
+	for _, prefix := range c.noLineStartsWith {
+		for line := range strings.SplitSeq(output, "\n") {
+			if strings.HasPrefix(line, prefix) {
+				problems = append(problems, fmt.Sprintf("a line of the output starts with %q: %q", prefix, line))
+				break
+			}
+		}
+	}
+	for _, text := range c.outputHas {
+		if !strings.Contains(output, text) {
+			problems = append(problems, fmt.Sprintf("the output lacks %q", text))
 		}
 	}
 	return problems

@@ -278,7 +278,7 @@ func TestStrictParse(t *testing.T) {
 		{"zero", `[0,-0,0.5,10]`, true},
 		{"the same name in two objects", `[{"a":1},{"a":2}]`, true},
 		{"the same name at two depths", `{"a":{"a":1}}`, true},
-		{"escapes", `["\"\\\/\b\f\n\r\té😀"]`, true},
+		{"escapes", "[\"\\\"\\\\\\/\\b\\f\\n\\r\\t\\u00e9\\ud83d\\ude00\"]", true},
 		{"a lone surrogate", `["\ud800"]`, true},
 		{"a repeated name", `{"a":1,"a":2}`, false},
 		{"a repeated name, one escaped", `{"a":1,"a":2}`, false},

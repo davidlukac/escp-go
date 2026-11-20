@@ -286,6 +286,16 @@ func quote(text string) string {
 	return strconv.QuoteToASCII(text)
 }
 
+// Escape is untrusted text made safe for a job log: cut to 200 characters (the cut ends in "..."), and written
+// as printable ASCII, with the quote marks of a Go literal left off: a control character, a new line, an
+// escape sequence and any character outside ASCII become an escape such as \n or \u00e9, so that the result
+// is one line of printable ASCII whatever the text holds. It is what every string taken from the answer of
+// zizmor goes through, and what package audit applies to each line zizmor writes on its standard error.
+func Escape(text string) string {
+	quoted := quote(text)
+	return quoted[1 : len(quoted)-1]
+}
+
 // Exit codes of Run.
 const (
 	exitPass  = 0

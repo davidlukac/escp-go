@@ -186,6 +186,12 @@ func linkADirectory(t tree) error {
 	)(t)
 }
 
+// addHostileFileName adds a workflow without a finding whose file name has a new line and, after it, what a
+// job log reads as a workflow command: zizmor writes the name of every file it audits on its standard error.
+func addHostileFileName(t tree) error {
+	return t.write(".github/workflows/a\n::warning::x.yml", cleanWorkflow)
+}
+
 // shadowTheRunner puts a copy of the program that runs zizmor and accepts everything at the root of the tree.
 func shadowTheRunner(t tree) error {
 	return all(

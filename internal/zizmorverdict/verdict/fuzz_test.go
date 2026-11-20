@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 	"unicode"
+	"unicode/utf8"
 )
 
 // plainReading is the oracle of FuzzJudge: the answer read by strictParse, a reader of the JSON grammar that
@@ -106,6 +107,26 @@ func FuzzParseExpected(f *testing.F) {
 		}
 		if !plainNumber.MatchString(text) || strconv.Itoa(got) != text {
 			t.Fatalf("accepted %q as %d", text, got)
+		}
+	})
+}
+
+// FuzzEscape: whatever the text, the result is one line of printable ASCII (no quote mark added around it) and
+// it reads back as the text it stands for when the text is short enough not to be cut.
+func FuzzEscape(f *testing.F) {
+	for _, seed := range []string{"", "a", "a\n::warning::x", "\x1b[31m", "\u202e", "\xff", "caf\u00e9", strings.Repeat("x", 300), `"\`} {
+		f.Add(seed)
+	}
+	f.Fuzz(func(t *testing.T, text string) {
+		got := Escape(text)
+		if !printableLines(got) || strings.ContainsAny(got, "\n\r") {
+			t.Fatalf("Escape(%q) = %q, not a line of printable ASCII", text, got)
+		}
+		if utf8.RuneCountInString(text) <= maxField {
+			back, err := strconv.Unquote(`"` + got + `"`)
+			if err != nil || (utf8.ValidString(text) && back != text) {
+				t.Fatalf("Escape(%q) = %q does not read back (%q, %v)", text, got, back, err)
+			}
 		}
 	})
 }

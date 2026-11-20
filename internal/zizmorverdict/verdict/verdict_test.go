@@ -474,3 +474,30 @@ func TestJudgeAcceptsTheSameNameInDifferentObjects(t *testing.T) {
 		})
 	}
 }
+
+// Escape is the one escaper of untrusted text of the tool: one line of printable ASCII, cut at 200 characters.
+func TestEscape(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		text string
+		want string
+	}{
+		{name: "plain text is kept", text: "completed ./.github/workflows/a.yml", want: "completed ./.github/workflows/a.yml"},
+		{name: "empty", text: "", want: ""},
+		{name: "a new line and a workflow command", text: "a\n::warning::x", want: `a\n::warning::x`},
+		{name: "a carriage return, a tab and a NUL", text: "a\r\tb\x00", want: `a\r\tb\x00`},
+		{name: "an escape sequence", text: "\x1b[31mred", want: `\x1b[31mred`},
+		{name: "a quote and a backslash", text: `say "a\b"`, want: `say \"a\\b\"`},
+		{name: "characters outside ASCII", text: "caf\u00e9 \U0001f308", want: "caf\\u00e9 \\U0001f308"},
+		{name: "a line separator and a right-to-left override", text: "a\u2028b\u202e", want: "a\\u2028b\\u202e"},
+		{name: "invalid UTF-8", text: "a\xffb", want: `a\xffb`},
+		{name: "the limit is kept whole", text: strings.Repeat("x", maxField), want: strings.Repeat("x", maxField)},
+		{name: "one over the limit is cut with an ellipsis", text: strings.Repeat("x", maxField+1), want: strings.Repeat("x", maxField-len(ellipsis)) + ellipsis},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := Escape(tc.text); got != tc.want {
+				t.Errorf("Escape(%q) = %q, want %q", tc.text, got, tc.want)
+			}
+		})
+	}
+}

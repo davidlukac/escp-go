@@ -388,3 +388,35 @@ func TestProcessEnvironmentHoldsTheProcess(t *testing.T) {
 		t.Errorf("ProcessEnvironment() = %+v", env)
 	}
 }
+
+// zizmor's own output reaches the log only through the escaper: a file name with a new line and a workflow
+// command in what zizmor wrote on its standard error does not start a line of ours with "::".
+func TestRunEscapesWhatZizmorWritesOnItsStandardError(t *testing.T) {
+	hostile := "INFO audit: completed ./.github/workflows/a\n::warning::x.yml\n\x1b[31m::error::y"
+	for _, tc := range []struct {
+		name   string
+		f      *fakeRunner
+		status int
+	}{
+		{name: "a run that passes", f: &fakeRunner{out: noFindings, errOut: hostile}, status: 0},
+		{name: "a run that fails", f: &fakeRunner{out: noFindings, errOut: hostile, status: 1}, status: 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			status, _, errOut := run(t, tc.f, nil, repo(t), "0")
+			if status != tc.status {
+				t.Fatalf("status %d, want %d", status, tc.status)
+			}
+			for line := range strings.SplitSeq(errOut, "\n") {
+				if strings.HasPrefix(line, "::") || strings.ContainsRune(line, '\x1b') {
+					t.Errorf("an unsafe line reached the log: %q", line)
+				}
+			}
+			// subtests: the expectations are substrings of one run's output, not cases
+			for _, want := range []string{"zizmor: INFO audit: completed ./.github/workflows/a\n", "zizmor: ::warning::x.yml\n", "zizmor: \\x1b[31m::error::y\n"} {
+				if !strings.Contains(errOut, want) {
+					t.Errorf("stderr lacks %q: %q", want, errOut)
+				}
+			}
+		})
+	}
+}
