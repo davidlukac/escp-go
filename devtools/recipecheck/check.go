@@ -159,7 +159,7 @@ func lintProblems(tc dryCase, lines []string, root string) []string {
 	return problems
 }
 
-// sourceProblems pins the recipes of the mutationrecipe, recipemutants, deadcode, zizmorcheck and zizmor targets in the text of the
+// sourceProblems pins the text of the recipes of the mutationrecipe, recipemutants, deadcode, zizmorcheck and zizmor targets in the
 // Makefile: `make -n` hides a `-` prefix (a failing step that does not fail make) and an `@`, so each
 // recipe is compared as it is written, line by line, and must have no other line.
 func sourceProblems(makefile string) []string {

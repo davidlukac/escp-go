@@ -13,8 +13,16 @@ const zizmorJobKey = "  zizmor:"
 
 // zizmorSteps are the two steps of the zizmor job that run the gate, as they must be written, whole and in
 // this order: the audit (`make zizmor`, with the token the job has) and the probes (`make zizmorcheck`, which
-// cannot be skipped there). A step with another command, another or an added `env:`, an `if:` or a
-// `continue-on-error:` is not these lines.
+// cannot be skipped there). The check compares these lines; a step with another command, another or an added
+// `env:` variable, an `if:` or a `continue-on-error:` is not these lines.
+//
+// What the check is: a tripwire against an accidental or partial edit of the gate. It looks at the lines of these two
+// steps, at the keys of jobLinesThatWeakenIt at the level of the job, and (in check.go) at the text of the recipes
+// of the Makefile. It does not establish what else decides whether and where these steps run: settings of the
+// whole workflow, settings of the job such as its defaults, its working directory, its dependencies on other jobs,
+// a container or a matrix, a variable of make, a rule that replaces a recipe. The whole workflow files and the
+// Makefile are read at review, and a required status check is what makes a red job block; both are the
+// maintainer's.
 var zizmorSteps = []string{
 	"      - name: Audit the workflows",
 	"        run: make zizmor",
@@ -30,7 +38,7 @@ var zizmorSteps = []string{
 // an `env:` for the whole job, a `continue-on-error:` (a red job that does not block), an `if:`.
 var jobLinesThatWeakenIt = []string{"    env:", "    continue-on-error:", "    if:"}
 
-// workflowProblems pins what the CI jobs run: the zizmor job of a workflow must hold the steps of zizmorSteps
+// workflowProblems compares the lines of what the CI jobs run, within the limits given at zizmorSteps: the zizmor job of a workflow must hold the steps of zizmorSteps
 // exactly once, in a row, and must not carry a line of jobLinesThatWeakenIt at its own level. The text of the
 // workflow is read as lines, since the check must not trust a parser that the same file could confuse; the job
 // is the lines from its key to the next key of the same level.
