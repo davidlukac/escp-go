@@ -134,7 +134,7 @@ func scriptCases() []probeCase {
 	return append(cases, treeCases()...)
 }
 
-// treeCases are the probes on links, actions, the number of allowed findings, and the reader of the answer.
+// treeCases are the probes on links, actions, the number of allowed findings, and the program that runs zizmor.
 func treeCases() []probeCase {
 	return []probeCase{
 		{name: "an extra inline suppression", setup: []fixture{addFinding, suppressIn(findingFile)}, want: fails(markerFindings)},
@@ -147,7 +147,7 @@ func treeCases() []probeCase {
 		{name: "one allowed finding more", setup: []fixture{addOneSetupUse}, want: fails(markerFindings)},
 		{name: "one allowed finding fewer and a suppressed one more", setup: []fixture{removeOneSetupUse, addFinding, suppressIn(findingFile)}, want: fails(markerFindings)},
 		{name: "the rule named in an ignore comment is not read: the findings are what counts", setup: []fixture{nameAnotherRuleOnSetupUses}, want: passes},
-		{name: "a copy of the reader in the audited tree", setup: []fixture{addFinding, shadowTheReader}, want: fails(findingRule)},
+		{name: "a copy of the program that runs zizmor in the audited tree", setup: []fixture{addFinding, shadowTheRunner}, want: fails(findingRule)},
 	}
 }
 

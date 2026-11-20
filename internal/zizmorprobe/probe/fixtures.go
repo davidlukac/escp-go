@@ -65,7 +65,7 @@ runs:
 	byteOrderMark = "\xef\xbb\xbf"
 
 	// shadowModule and shadowMain are a Go module of the repository's path with a program in the place of the
-	// reader of zizmor's answer, that accepts everything.
+	// program that runs zizmor, which accepts everything.
 	shadowModule = "module github.com/davidlukac/escp-go\n\ngo 1.22\n"
 	shadowMain   = "package main\n\nfunc main() {}\n"
 )
@@ -186,10 +186,10 @@ func linkADirectory(t tree) error {
 	)(t)
 }
 
-// shadowTheReader puts a copy of the reader of zizmor's answer that accepts everything at the root of the tree.
-func shadowTheReader(t tree) error {
+// shadowTheRunner puts a copy of the program that runs zizmor and accepts everything at the root of the tree.
+func shadowTheRunner(t tree) error {
 	return all(
 		func(t tree) error { return t.write("go.mod", shadowModule) },
-		func(t tree) error { return t.write("internal/zizmorverdict/main.go", shadowMain) },
+		func(t tree) error { return t.write("internal/zizmorrun/main.go", shadowMain) },
 	)(t)
 }

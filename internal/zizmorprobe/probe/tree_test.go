@@ -289,10 +289,10 @@ func TestFixtures(t *testing.T) {
 			wantLink(t, tr, ".github/actions/linked", "../../ci")
 			wantFile(t, tr, "ci/action.yml", injectedAction)
 		}},
-		{name: "shadowTheReader", setup: []fixture{shadowTheReader}, check: func(t *testing.T, tr tree) {
+		{name: "shadowTheRunner", setup: []fixture{shadowTheRunner}, check: func(t *testing.T, tr tree) {
 			t.Helper()
 			wantFile(t, tr, "go.mod", shadowModule)
-			wantFile(t, tr, "internal/zizmorverdict/main.go", shadowMain)
+			wantFile(t, tr, "internal/zizmorrun/main.go", shadowMain)
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

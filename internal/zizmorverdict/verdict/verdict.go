@@ -40,8 +40,9 @@ const (
 	// AllowedRule is the rule whose findings are expected, in the number given on the command line.
 	AllowedRule = "self-repository"
 
-	// maxAnswer is the most bytes of an answer that are read. The answer for this repository is about 44 KB.
-	maxAnswer = 16 << 20
+	// MaxAnswer is the most bytes of an answer that are read: Run refuses an answer of more bytes. The answer for
+	// this repository is about 44 KB.
+	MaxAnswer = 16 << 20
 	// maxExpectedDigits is the most digits an expected count may have.
 	maxExpectedDigits = 6
 	// maxListed is the most findings of other rules a verdict lists.
@@ -233,13 +234,13 @@ func Run(args []string, in io.Reader, out, errOut io.Writer) int {
 		_, _ = io.WriteString(errOut, "zizmor: "+err.Error()+"\n")
 		return exitFail
 	}
-	answer, err := io.ReadAll(io.LimitReader(in, maxAnswer+1))
+	answer, err := io.ReadAll(io.LimitReader(in, MaxAnswer+1))
 	if err != nil {
 		_, _ = io.WriteString(errOut, "zizmor: the answer could not be read: "+quote(err.Error())+"\n")
 		return exitFail
 	}
-	if len(answer) > maxAnswer {
-		_, _ = fmt.Fprintf(errOut, "zizmor: the answer is larger than %d bytes\n", maxAnswer)
+	if len(answer) > MaxAnswer {
+		_, _ = fmt.Fprintf(errOut, "zizmor: the answer is larger than %d bytes\n", MaxAnswer)
 		return exitFail
 	}
 	verdict := Judge(expected, answer)

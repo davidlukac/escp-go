@@ -79,9 +79,9 @@ func TestRunSizeLimitOfTheAnswer(t *testing.T) {
 		status int
 		err    string
 	}{
-		{name: "at the limit", size: maxAnswer, status: 0},
-		{name: "one byte over the limit", size: maxAnswer + 1, status: 1, err: "larger than 16777216 bytes"},
-		{name: "far over the limit", size: maxAnswer + 1<<20, status: 1, err: "larger than 16777216 bytes"},
+		{name: "at the limit", size: MaxAnswer, status: 0},
+		{name: "one byte over the limit", size: MaxAnswer + 1, status: 1, err: "larger than 16777216 bytes"},
+		{name: "far over the limit", size: MaxAnswer + 1<<20, status: 1, err: "larger than 16777216 bytes"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var out, errOut bytes.Buffer
