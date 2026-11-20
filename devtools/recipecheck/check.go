@@ -81,6 +81,13 @@ func (c *checker) check(ctx context.Context) (problems []string, err error) {
 		return nil, fmt.Errorf("reading the Makefile: %w", err)
 	}
 	problems = append(problems, sourceProblems(string(text))...)
+	for _, name := range zizmorWorkflows {
+		workflow, err := c.files.ReadFile(filepath.Join(c.root, filepath.FromSlash(name)))
+		if err != nil {
+			return nil, fmt.Errorf("reading %s: %w", name, err)
+		}
+		problems = append(problems, workflowProblems(name, string(workflow))...)
+	}
 	s, err := c.stage()
 	if err != nil {
 		return nil, err
@@ -148,17 +155,18 @@ func lintProblems(tc dryCase, lines []string, root string) []string {
 	return problems
 }
 
-// sourceProblems pins the recipes of the mutationrecipe, recipemutants, deadcode and zizmorcheck targets in the text of the
+// sourceProblems pins the recipes of the mutationrecipe, recipemutants, deadcode, zizmorcheck and zizmor targets in the text of the
 // Makefile: `make -n` hides a `-` prefix (a failing step that does not fail make) and an `@`, so each
 // recipe is compared as it is written, line by line, and must have no other line.
 func sourceProblems(makefile string) []string {
 	lines := strings.Split(makefile, "\n")
 	var problems []string
 	for target, want := range map[string][]string{
-		recipeTarget:   {recipeSource},
-		mutantsTarget:  mutantsSource,
-		deadcodeTarget: deadcodeSource,
-		zizmorTarget:   zizmorSource,
+		recipeTarget:    {recipeSource},
+		mutantsTarget:   mutantsSource,
+		deadcodeTarget:  deadcodeSource,
+		zizmorTarget:    zizmorSource,
+		zizmorRunTarget: zizmorRunSource,
 	} {
 		at := slices.Index(lines, target+":")
 		if at < 0 {

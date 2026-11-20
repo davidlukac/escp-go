@@ -29,6 +29,37 @@ const (
 	zizmorCount = "7"
 )
 
+// zizmorRunTarget is the target the CI jobs run, `make zizmor`. zizmorRunRecipe is what `make -n zizmor
+// ZIZMOR_SELF_REPOSITORY_FINDINGS=7` must print, each line whole (the number is the one given on the command
+// line, so that a number of its own in the recipe fails), and zizmorRunSource is the recipe as it is written in
+// the Makefile, where `make -n` hides a prefix.
+const zizmorRunTarget = "zizmor"
+
+var (
+	zizmorRunRecipe = []string{
+		"command -v zizmor >/dev/null 2>&1 || { \\",
+		"\t\techo \"zizmor is not installed. The pinned version, with hashes:\"; \\",
+		"\t\techo \"  python3 -m venv ~/.cache/escp-go-zizmor && ~/.cache/escp-go-zizmor/bin/pip install --require-hashes -r devtools/zizmor/requirements.txt\"; \\",
+		"\t\techo \"then put ~/.cache/escp-go-zizmor/bin on PATH.\"; \\",
+		"\t\texit 1; }",
+		"pin=\"$(sed -n 's/^zizmor==\\([0-9][0-9.]*\\).*/\\1/p' devtools/zizmor/requirements.txt)\"; \\",
+		"\thave=\"$(zizmor --version | awk '{print $2}')\"; \\",
+		"\t[ \"$have\" = \"$pin\" ] || echo \"warning: zizmor $have is installed, devtools/zizmor/requirements.txt pins $pin\"",
+		"ZIZMOR_SELF_REPOSITORY_FINDINGS=" + zizmorCount + " scripts/zizmor.sh",
+	}
+	zizmorRunSource = []string{
+		"\t@command -v zizmor >/dev/null 2>&1 || { \\",
+		"\t\techo \"zizmor is not installed. The pinned version, with hashes:\"; \\",
+		"\t\techo \"  python3 -m venv ~/.cache/escp-go-zizmor && ~/.cache/escp-go-zizmor/bin/pip install --require-hashes -r devtools/zizmor/requirements.txt\"; \\",
+		"\t\techo \"then put ~/.cache/escp-go-zizmor/bin on PATH.\"; \\",
+		"\t\texit 1; }",
+		"\t@pin=\"$$(sed -n 's/^zizmor==\\([0-9][0-9.]*\\).*/\\1/p' devtools/zizmor/requirements.txt)\"; \\",
+		"\thave=\"$$(zizmor --version | awk '{print $$2}')\"; \\",
+		"\t[ \"$$have\" = \"$$pin\" ] || echo \"warning: zizmor $$have is installed, devtools/zizmor/requirements.txt pins $$pin\"",
+		"\t@ZIZMOR_SELF_REPOSITORY_FINDINGS=$(ZIZMOR_SELF_REPOSITORY_FINDINGS) scripts/zizmor.sh",
+	}
+)
+
 // zizmorRecipe is the line `make -n lint` must print for the probes of the zizmor gate, whole, with the
 // number given on the command line; zizmorSource is the recipe as it is written in the Makefile, where
 // `make -n` hides a prefix.
@@ -176,6 +207,8 @@ func dryCases() []dryCase {
 	cases = append(cases, filterCases()...)
 	cases = append(cases, dryCase{label: "recipemutants runs the mutants test with its tag and needs its PASS line",
 		args: []string{mutantsTarget}, target: mutantsTarget, plain: true, want: mutantsRecipe})
+	cases = append(cases, dryCase{label: "make zizmor runs the script with the number the Makefile holds",
+		args: []string{zizmorRunTarget, "ZIZMOR_SELF_REPOSITORY_FINDINGS=" + zizmorCount}, target: zizmorRunTarget, plain: true, want: zizmorRunRecipe})
 	cases = append(cases, dryCase{label: "make lint runs this check, the dead-code check and the zizmor probes",
 		args: []string{"lint", "ZIZMOR_SELF_REPOSITORY_FINDINGS=" + zizmorCount}, target: "lint",
 		pins: pins{has: append(slices.Clone(deadcodeRecipe), zizmorRecipe)}})
