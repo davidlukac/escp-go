@@ -1,6 +1,6 @@
 // Command zizmorrun is what `make zizmor` runs (through scripts/zizmor.sh): it audits a repository with the
-// pinned zizmor, with fixed options and a cleaned environment so that nothing in the audited tree changes
-// what is audited, and judges the answer against an exact expectation. The options, the variables that are
+// pinned zizmor, with fixed options and a cleaned environment so that no input the audited tree can carry (a
+// configuration file, an ignore file, a comment) changes what is audited, and judges the answer against an exact expectation. The options, the variables that are
 // cleared and the reasons are in the documentation of package audit; it is a build tool of this repository,
 // not part of the API.
 //

@@ -14,7 +14,7 @@
 //     (json-v1, which is also what `json` means in zizmor 1.32.0, so that a change of the default is not read
 //     as a different answer). The whole repository is the input, so a composite action is audited wherever it is;
 //   - a symbolic link under .github/ is refused: it would make the files audited depend on where it points;
-//   - every environment variable that can change what zizmor audits or how it reaches GitHub is removed (see
+//   - every environment variable that changes what zizmor audits, or the host its token is sent to, is removed (see
 //     [cleared]), then GH_TOKEN is set from GH_TOKEN or GITHUB_TOKEN (an empty variable counts as no token); with
 //     a token the audits that look up an action's history run online, without one the run is --offline;
 //   - what zizmor writes on its standard error is untrusted text (it names the files it audits, and a file name can
@@ -22,8 +22,15 @@
 //     verdict.Escape (printable ASCII, at most 200 characters), at most 200 lines, so no line of the job log starts
 //     with "::";
 //   - the findings are judged by package verdict: exactly the expected number of findings of the `self-repository`
-//     rule and nothing else. The program that judges them is built from the repository this one lives in, never
-//     from the audited tree: scripts/zizmor.sh runs it with `go -C`.
+//     rule and nothing else. The program that judges them is built from the repository the script lives in
+//     (scripts/zizmor.sh runs it with `go -C`). In CI that is the checked-out pull request, which is also the tree
+//     that is audited, so this package, package verdict, the probes, go.mod, go.work and vendor/ are part of what
+//     the gate runs on: a change to any of them changes the gate, and CONTRIBUTING.md lists what is read at review.
+//
+// The proxy variables of zizmor's HTTP client (HTTPS_PROXY, https_proxy and ALL_PROXY) are not cleared. The audited
+// files cannot set them (a job's own `env:` can, which is pinned by devtools/recipecheck and read at review), they
+// change only the route the requests take and not what is audited, and clearing them would break a run behind a
+// proxy.
 //
 // Options that are not passed keep their default: --persona, --min-severity and --min-confidence have no
 // environment variable and no configuration file to change them (--no-config); --fix, --lsp, --completions,

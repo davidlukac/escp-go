@@ -82,7 +82,8 @@ jobs:
         with:
           persist-credentials: false
       # The audit is run by a Go program of this repository (internal/zizmorrun, started by scripts/zizmor.sh), built
-      # with the go tool from the repository's own go.mod, not from the audited files.
+      # with the go tool from the go.mod of the checked-out tree. That tree is the one audited, so these files, go.mod,
+      # go.work, vendor/ and this step are part of what the gate runs on: a change to any of them changes the gate.
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod

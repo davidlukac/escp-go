@@ -153,7 +153,7 @@ func treeCases() []probeCase {
 		{name: "the rule named in an ignore comment is not read: the findings are what counts", setup: []fixture{nameAnotherRuleOnSetupUses}, want: passes},
 		{name: "a file name with a new line and a workflow command does not start a line of the log", setup: []fixture{addHostileFileName}, want: passes,
 			noLineStartsWith: []string{"::"}, outputHas: []string{"zizmor: ::warning::x.yml"}},
-		{name: "a copy of the program that runs zizmor in the audited tree", setup: []fixture{addFinding, shadowTheRunner}, want: fails(findingRule)},
+		{name: "a copy of the program that runs zizmor in an audited tree other than the script's", setup: []fixture{addFinding, shadowTheRunner}, want: fails(findingRule)},
 	}
 }
 
