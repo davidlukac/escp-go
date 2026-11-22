@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -22,6 +23,49 @@ const (
 	mutantsTarget  = "recipemutants"
 	recipeSource   = "\tgo -C devtools run ./recipecheck -root $(CURDIR)"
 	deadcodeTarget = "deadcode"
+	zizmorTarget   = "zizmorcheck"
+	// zizmorCount is the number of allowed findings the lint case hands to make, to see that the recipe passes
+	// the Makefile's variable on and does not hold a number of its own.
+	zizmorCount = "7"
+)
+
+// zizmorRunTarget is the target the CI jobs run, `make zizmor`. zizmorRunRecipe is what `make -n zizmor
+// ZIZMOR_SELF_REPOSITORY_FINDINGS=7` must print, each line whole (the number is the one given on the command
+// line, so that a number of its own in the recipe fails), and zizmorRunSource is the recipe as it is written in
+// the Makefile, where `make -n` hides a prefix.
+const zizmorRunTarget = "zizmor"
+
+var (
+	zizmorRunRecipe = []string{
+		"command -v zizmor >/dev/null 2>&1 || { \\",
+		"\t\techo \"zizmor is not installed. The pinned version, with hashes:\"; \\",
+		"\t\techo \"  python3 -m venv ~/.cache/escp-go-zizmor && ~/.cache/escp-go-zizmor/bin/pip install --require-hashes -r devtools/zizmor/requirements.txt\"; \\",
+		"\t\techo \"then put ~/.cache/escp-go-zizmor/bin on PATH.\"; \\",
+		"\t\texit 1; }",
+		"pin=\"$(sed -n 's/^zizmor==\\([0-9][0-9.]*\\).*/\\1/p' devtools/zizmor/requirements.txt)\"; \\",
+		"\thave=\"$(zizmor --version | awk '{print $2}')\"; \\",
+		"\t[ \"$have\" = \"$pin\" ] || echo \"warning: zizmor $have is installed, devtools/zizmor/requirements.txt pins $pin\"",
+		"ZIZMOR_SELF_REPOSITORY_FINDINGS=" + zizmorCount + " scripts/zizmor.sh",
+	}
+	zizmorRunSource = []string{
+		"\t@command -v zizmor >/dev/null 2>&1 || { \\",
+		"\t\techo \"zizmor is not installed. The pinned version, with hashes:\"; \\",
+		"\t\techo \"  python3 -m venv ~/.cache/escp-go-zizmor && ~/.cache/escp-go-zizmor/bin/pip install --require-hashes -r devtools/zizmor/requirements.txt\"; \\",
+		"\t\techo \"then put ~/.cache/escp-go-zizmor/bin on PATH.\"; \\",
+		"\t\texit 1; }",
+		"\t@pin=\"$$(sed -n 's/^zizmor==\\([0-9][0-9.]*\\).*/\\1/p' devtools/zizmor/requirements.txt)\"; \\",
+		"\thave=\"$$(zizmor --version | awk '{print $$2}')\"; \\",
+		"\t[ \"$$have\" = \"$$pin\" ] || echo \"warning: zizmor $$have is installed, devtools/zizmor/requirements.txt pins $$pin\"",
+		"\t@ZIZMOR_SELF_REPOSITORY_FINDINGS=$(ZIZMOR_SELF_REPOSITORY_FINDINGS) scripts/zizmor.sh",
+	}
+)
+
+// zizmorRecipe is the line `make -n lint` must print for the probes of the zizmor gate, whole, with the
+// number given on the command line; zizmorSource is the recipe as it is written in the Makefile, where
+// `make -n` hides a prefix.
+var (
+	zizmorRecipe = "ZIZMOR_SELF_REPOSITORY_FINDINGS=" + zizmorCount + " go run ./internal/zizmorprobe"
+	zizmorSource = []string{"\tZIZMOR_SELF_REPOSITORY_FINDINGS=$(ZIZMOR_SELF_REPOSITORY_FINDINGS) go run ./internal/zizmorprobe"}
 )
 
 // deadcodeRecipe is what `make -n lint` must print for the dead-code check, each line whole: the
@@ -67,6 +111,11 @@ type dryCase struct {
 	target string
 	// plain: no gremlins in the recipe, only the whole-line comparison.
 	plain bool
+	// looseTabs: the lines are compared without their leading tabs. GNU make removes a tab after a backslash and
+	// a new line when it prints a recipe and make 3.81 does not, so the lines of a recipe that continues a line
+	// differ in their tabs between the two; the words of the lines are still compared whole. The recipe as it is
+	// written in the Makefile is pinned with its tabs by sourceProblems.
+	looseTabs bool
 }
 
 // thresholdLine, coefficientLine and checkLine are the steps the recipes run around gremlins.
@@ -163,8 +212,11 @@ func dryCases() []dryCase {
 	cases = append(cases, filterCases()...)
 	cases = append(cases, dryCase{label: "recipemutants runs the mutants test with its tag and needs its PASS line",
 		args: []string{mutantsTarget}, target: mutantsTarget, plain: true, want: mutantsRecipe})
-	cases = append(cases, dryCase{label: "make lint runs this check and the dead-code check", args: []string{"lint"}, target: "lint",
-		pins: pins{has: deadcodeRecipe}})
+	cases = append(cases, dryCase{label: "make zizmor runs the script with the number the Makefile holds",
+		args: []string{zizmorRunTarget, "ZIZMOR_SELF_REPOSITORY_FINDINGS=" + zizmorCount}, target: zizmorRunTarget, plain: true, looseTabs: true, want: zizmorRunRecipe})
+	cases = append(cases, dryCase{label: "make lint runs this check, the dead-code check and the zizmor probes",
+		args: []string{"lint", "ZIZMOR_SELF_REPOSITORY_FINDINGS=" + zizmorCount}, target: "lint",
+		pins: pins{has: append(slices.Clone(deadcodeRecipe), zizmorRecipe)}})
 	return cases
 }
 

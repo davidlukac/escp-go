@@ -68,12 +68,7 @@ func TestRunGivesTheMakeProgramAndTheRootToTheRunner(t *testing.T) {
 			}
 			base := repoRoot(t)
 			e.abs = func(p string) (string, error) { return filepath.Join(base, p), nil }
-			if err := os.MkdirAll(filepath.Join(base, "repo"), 0o750); err != nil {
-				t.Fatal(err)
-			}
-			if err := os.WriteFile(filepath.Join(base, "repo", "Makefile"), []byte(goodMakefile), 0o600); err != nil {
-				t.Fatal(err)
-			}
+			fillRepository(t, filepath.Join(base, "repo"))
 			if code := run(context.Background(), append(tt.args, "-root", "repo"), e); code != exitOK {
 				t.Fatalf("code %d", code)
 			}

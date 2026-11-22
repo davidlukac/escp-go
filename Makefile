@@ -57,8 +57,23 @@ actionlint:
 # The security of the workflow files, with zizmor at its default severity and persona (what a workflow
 # may do and how untrusted input reaches it; CONTRIBUTING.md). It is a Python program, not a Go tool, so
 # it is not in devtools/go.mod: the version is pinned, with hashes, in devtools/zizmor/requirements.txt, which
-# CI installs and Dependabot bumps. It runs online (the audits that look up an action's history)
-# when a GitHub token is in GH_TOKEN or GITHUB_TOKEN, offline otherwise. Not part of the pre-commit hook.
+# CI installs and Dependabot bumps. internal/zizmorrun (a Go program, started by scripts/zizmor.sh)
+# builds the command line, with fixed options and a cleaned environment so that no input the audited tree
+# can carry (a configuration file, an ignore file, a comment) changes the result; the gate's own files are
+# part of that tree (CONTRIBUTING.md). It runs online (the audits that look up an action's history) when a
+# GitHub token is in GH_TOKEN or GITHUB_TOKEN, offline otherwise. Not part of the pre-commit hook.
+#
+# The findings are an exact allow-list: zizmor is run with --no-ignores (an ignore comment changes
+# nothing) and the run passes only when it reports this many `self-repository` findings (one per use of
+# the local setup action, which the workflows write as `./.github/actions/setup`) and nothing else. The
+# rule is counted, not located: a use of another local action that the rule also reports counts the same,
+# and is audited itself because the whole repository is the input. A new finding, a new use or a
+# removed one is a deliberate edit of this number in the same pull request. The answer (--format json-v1)
+# is read by the same program (package internal/zizmorverdict/verdict), which fails closed on anything it
+# does not understand. The number goes away, with the comments on those uses, when actionlint accepts the
+# `$/` form of a local action (rhysd/actionlint#711).
+ZIZMOR_SELF_REPOSITORY_FINDINGS := 13
+
 .PHONY: zizmor
 zizmor:
 	@command -v zizmor >/dev/null 2>&1 || { \
@@ -69,7 +84,7 @@ zizmor:
 	@pin="$$(sed -n 's/^zizmor==\([0-9][0-9.]*\).*/\1/p' devtools/zizmor/requirements.txt)"; \
 	have="$$(zizmor --version | awk '{print $$2}')"; \
 	[ "$$have" = "$$pin" ] || echo "warning: zizmor $$have is installed, devtools/zizmor/requirements.txt pins $$pin"
-	@if [ -n "$$GH_TOKEN$$GITHUB_TOKEN" ]; then zizmor --no-progress .github/; else echo "no GH_TOKEN: offline audits only"; zizmor --offline --no-progress .github/; fi
+	@ZIZMOR_SELF_REPOSITORY_FINDINGS=$(ZIZMOR_SELF_REPOSITORY_FINDINGS) scripts/zizmor.sh
 
 # Records GitHub's own rendering of the descriptions in internal/mergereadiness/readiness/testdata/oracle
 # (NN-name.md -> NN-name.html), the ground truth the tests of the "Merge readiness" check compare the
@@ -92,7 +107,7 @@ modcheck:
 	go mod verify
 	go -C devtools mod verify
 
-# Three checks of the project's own, run by `make lint` (they are prerequisites of it, so a change to the
+# Four checks of the project's own, run by `make lint` (they are prerequisites of it, so a change to the
 # lint recipe does not touch them):
 #   catalogcheck  every name the defect catalog gives to a check resolves: a renamed test or a removed
 #                 target fails here (devtools/catalogcheck; it exits 1 with one line per problem);
@@ -104,9 +119,16 @@ modcheck:
 #                 violation of each rule and, in the places a rule leaves out, code that must stay clean,
 #                 and the findings are compared with devtools/lintfixtures/expected.txt, every one present
 #                 and nothing else (devtools/lintcheck; about a second). A rule whose pattern stops
-#                 matching, an exclusion that swallows a fixture or a rule that was relaxed fails here.
-.PHONY: catalogcheck guarantee lintfixtures mutationrecipe recipemutants
-lint: catalogcheck guarantee lintfixtures mutationrecipe
+#                 matching, an exclusion that swallows a fixture or a rule that was relaxed fails here;
+#   zizmorcheck   scripts/zizmor.sh, the command `make zizmor` runs (a few lines that start
+#                 internal/zizmorrun), still reports a deliberate finding next to each of these inputs of
+#                 the audited tree: a configuration file, an ignore file, an extra inline suppression, a
+#                 file zizmor cannot load, a link; and a stub zizmor records the command line and the
+#                 environment (internal/zizmorprobe, a Go program, offline). It needs the pinned
+#                 zizmor: without it the check says so and passes, and the `zizmor` jobs of CI, which
+#                 install it, set ZIZMOR_REQUIRED so that it cannot be skipped there.
+.PHONY: catalogcheck guarantee lintfixtures mutationrecipe recipemutants zizmorcheck
+lint: catalogcheck guarantee lintfixtures mutationrecipe zizmorcheck
 
 # The mutation recipes (devtools/recipecheck): `make -n` of the three mutation targets with the
 # variables the jobs use, every recipe line compared whole, and make run with a stand-in for gremlins to
@@ -153,6 +175,9 @@ lint: deadcode
 deadcode:
 	$(DEVTOOL) golangci-lint run --config .golangci-deadcode.yml ./...
 	$(DEVTOOL) golangci-lint run --config .golangci-deadcode.yml --build-tags live ./...
+
+zizmorcheck:
+	ZIZMOR_SELF_REPOSITORY_FINDINGS=$(ZIZMOR_SELF_REPOSITORY_FINDINGS) go run ./internal/zizmorprobe
 
 # Known vulnerabilities in the code and its dependencies.
 vuln:

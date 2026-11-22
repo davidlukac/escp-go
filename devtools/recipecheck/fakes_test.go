@@ -174,16 +174,41 @@ func (m *idealMake) runExit(env, args []string) (string, int, error) {
 // goodMakefile is the part of the Makefile the check reads for itself.
 var goodMakefile = "all:\n\ttrue\n\n" + recipeTarget + ":\n" + recipeSource + "\n\n" +
 	mutantsTarget + ":\n" + strings.Join(mutantsSource, "\n") + "\n\n" +
-	deadcodeTarget + ":\n" + strings.Join(deadcodeSource, "\n") + "\n\nnext:\n\ttrue\n"
+	deadcodeTarget + ":\n" + strings.Join(deadcodeSource, "\n") + "\n\n" +
+	zizmorTarget + ":\n" + strings.Join(zizmorSource, "\n") + "\n\n" +
+	zizmorRunTarget + ":\n" + strings.Join(zizmorRunSource, "\n") + "\n\nnext:\n\ttrue\n"
 
-// repoRoot is a scratch repository: a directory with the Makefile the check reads.
+// goodWorkflow is a workflow whose zizmor job is as pinned, with the jobs around it.
+var goodWorkflow = "name: T\njobs:\n  lint:\n    runs-on: x\n    steps:\n      - run: make lint\n\n" +
+	"  # a comment between the jobs\n" + zizmorJobKey + "\n    name: Workflow security (zizmor)\n    runs-on: x\n    steps:\n" +
+	"      - uses: actions/checkout@abc\n        with:\n          persist-credentials: false\n" +
+	"      - name: Install the pinned zizmor\n        run: |\n          pip install zizmor\n" +
+	strings.Join(zizmorSteps, "\n") + "\n\n  unit:\n    runs-on: x\n    steps:\n      - run: make test\n"
+
+// repoRoot is a scratch repository: a directory with the Makefile and the workflows the check reads.
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "Makefile"), []byte(goodMakefile), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	fillRepository(t, dir)
 	return dir
+}
+
+// fillRepository writes the Makefile and the workflows the check reads into dir.
+func fillRepository(t *testing.T, dir string) {
+	t.Helper()
+	files := map[string]string{"Makefile": goodMakefile}
+	for _, name := range zizmorWorkflows {
+		files[name] = goodWorkflow
+	}
+	for name, content := range files {
+		path := filepath.Join(dir, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
 }
 
 // failingFiles is the real file system that fails an operation on a name when fail says so.
