@@ -57,10 +57,11 @@ actionlint:
 # The security of the workflow files, with zizmor at its default severity and persona (what a workflow
 # may do and how untrusted input reaches it; CONTRIBUTING.md). It is a Python program, not a Go tool, so
 # it is not in devtools/go.mod: the version is pinned, with hashes, in devtools/zizmor/requirements.txt, which
-# CI installs and Dependabot bumps. internal/zizmorrun (a Go program, started by scripts/zizmor.sh) builds the command line, with fixed options so that
-# the result does not depend on files in the checked-out tree: it runs online (the audits that look up
-# an action's history) when a GitHub token is in GH_TOKEN or GITHUB_TOKEN, offline otherwise. Not part
-# of the pre-commit hook.
+# CI installs and Dependabot bumps. internal/zizmorrun (a Go program, started by scripts/zizmor.sh)
+# builds the command line, with fixed options and a cleaned environment so that no input the audited tree
+# can carry (a configuration file, an ignore file, a comment) changes the result; the gate's own files are
+# part of that tree (CONTRIBUTING.md). It runs online (the audits that look up an action's history) when a
+# GitHub token is in GH_TOKEN or GITHUB_TOKEN, offline otherwise. Not part of the pre-commit hook.
 #
 # The findings are an exact allow-list: zizmor is run with --no-ignores (an ignore comment changes
 # nothing) and the run passes only when it reports this many `self-repository` findings (one per use of
@@ -68,8 +69,9 @@ actionlint:
 # rule is counted, not located: a use of another local action that the rule also reports counts the same,
 # and is audited itself because the whole repository is the input. A new finding, a new use or a
 # removed one is a deliberate edit of this number in the same pull request. The answer (--format json-v1)
-# is read by the same program (package internal/zizmorverdict/verdict), which fails closed on anything it does not understand. The number goes away, with the comments on those uses, when actionlint accepts the `$/` form of a local
-# action (rhysd/actionlint#711).
+# is read by the same program (package internal/zizmorverdict/verdict), which fails closed on anything it
+# does not understand. The number goes away, with the comments on those uses, when actionlint accepts the
+# `$/` form of a local action (rhysd/actionlint#711).
 ZIZMOR_SELF_REPOSITORY_FINDINGS := 13
 
 .PHONY: zizmor
@@ -118,10 +120,11 @@ modcheck:
 #                 and the findings are compared with devtools/lintfixtures/expected.txt, every one present
 #                 and nothing else (devtools/lintcheck; about a second). A rule whose pattern stops
 #                 matching, an exclusion that swallows a fixture or a rule that was relaxed fails here;
-#   zizmorcheck   scripts/zizmor.sh, the command `make zizmor` runs (a few lines that start internal/zizmorrun), still reports a deliberate finding
-#                 next to each input the audited tree can carry (a configuration file, an ignore file, an
-#                 extra inline suppression, a file zizmor cannot load, a link, a stub zizmor that records the command line
-#                 and the environment; internal/zizmorprobe, a Go program, offline). It needs the pinned
+#   zizmorcheck   scripts/zizmor.sh, the command `make zizmor` runs (a few lines that start
+#                 internal/zizmorrun), still reports a deliberate finding next to each of these inputs of
+#                 the audited tree: a configuration file, an ignore file, an extra inline suppression, a
+#                 file zizmor cannot load, a link; and a stub zizmor records the command line and the
+#                 environment (internal/zizmorprobe, a Go program, offline). It needs the pinned
 #                 zizmor: without it the check says so and passes, and the `zizmor` jobs of CI, which
 #                 install it, set ZIZMOR_REQUIRED so that it cannot be skipped there.
 .PHONY: catalogcheck guarantee lintfixtures mutationrecipe recipemutants zizmorcheck
