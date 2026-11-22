@@ -1,5 +1,5 @@
-// Package probe proves that scripts/zizmor.sh, what `make zizmor` runs, reports a deliberate finding
-// whatever the audited tree says about the check itself. zizmor reads inputs from the tree it audits: a
+// Package probe proves that scripts/zizmor.sh, what `make zizmor` runs, reports a deliberate finding next to
+// each input of the audited tree that its cases name. zizmor reads inputs from the tree it audits: a
 // configuration file, an ignore file, an inline suppression comment, the files it can load, the files that
 // links lead to, and where the files are. For each of those inputs a probe copies the repository's .github/
 // into a scratch git repository, adds a workflow with a template injection (the finding) and the input, runs
@@ -37,6 +37,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"unicode"
 )
 
 // Exit statuses of Run.
@@ -289,12 +290,13 @@ func judge(c probeCase, res result) []string {
 }
 
 // outputProblems says what is wrong with the output of a run: a line that starts with a prefix the case
-// forbids (white space before it does not count),  or text the case wants and the output lacks.
+// forbids (white space before it does not count: every character `unicode.IsSpace` accepts), or text the
+// case wants and the output lacks.
 func outputProblems(c probeCase, output string) []string {
 	var problems []string
 	for _, prefix := range c.noLineStartsWith {
 		for line := range strings.SplitSeq(output, "\n") {
-			if strings.HasPrefix(strings.TrimLeft(line, " \t"), prefix) {
+			if strings.HasPrefix(strings.TrimLeftFunc(line, unicode.IsSpace), prefix) {
 				problems = append(problems, fmt.Sprintf("a line of the output starts with %q: %q", prefix, line))
 				break
 			}
@@ -365,6 +367,6 @@ func (h *harness) runAll(ctx context.Context, cases []probeCase) int {
 		_, _ = fmt.Fprintf(h.env.Stderr, "zizmorprobe: %d probe(s) failed\n", failures)
 		return exitProblem
 	}
-	_, _ = fmt.Fprintln(h.env.Stdout, "zizmorprobe: every input the tree can carry is ignored or refused")
+	_, _ = fmt.Fprintln(h.env.Stdout, "zizmorprobe: every case holds: each input it names is ignored or refused")
 	return exitOK
 }

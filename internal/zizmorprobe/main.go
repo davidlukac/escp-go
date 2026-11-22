@@ -1,5 +1,5 @@
 // Command zizmorprobe is the check behind `make zizmorcheck`: it proves that scripts/zizmor.sh (what `make
-// zizmor` runs) reports a deliberate finding whatever the audited tree says about the check itself. The
+// zizmor` runs) reports a deliberate finding next to each input of the audited tree that its cases name. The
 // cases, the fixtures and the reasons are in the documentation of package probe; it is a build tool of this
 // repository, not part of the API.
 //
