@@ -5,11 +5,13 @@ version; a breaking change is called out as such. The history before 0.1.0 is th
 `internal/escp` of [terraform-provider-tplinkeasysmart](https://github.com/davidlukac/terraform-provider-tplinkeasysmart),
 whose commits this repository keeps.
 
-## 0.10.2
+## 0.11.0
+
+A minor version while the module is 0.x: the exported API is unchanged, but a requirement of the module is raised and four documented behaviors change, so the entry carries a migration table.
 
 - **Behavior changes** (no API change: the exported declarations are those of 0.10.1, only doc comments differ, and nothing a program compiles against breaks). Two fixes change what a caller can observe when a call ends early. Each row is one change; the number is the issue.
 
-  | 0.10.1 | 0.10.2 |
+  | 0.10.1 | 0.11.0 |
   |---|---|
   | `SetIPConfig` and `EnableDHCP` settled a write they may have sent also for a call whose context was canceled, or past its deadline, before any datagram of the write had left the client: while the call dropped stale replies, read the switch before a write that is not repeated, opened the session, or was about to send. The call probed the switch (`SetIPConfig`: a wait of up to its settle window) or waited for a lease (`EnableDHCP`) and returned `ErrMoveUnconfirmed`, "the switch did not answer at its new address", for a switch that never saw the request (#243) | The call returns the context's error (`context.Canceled`, `context.DeadlineExceeded`) at once: no probe, no lease wait, nothing of the write sent. `ErrMoveUnconfirmed` now means that a write was sent. A write that was sent and not answered is settled as before, a cancellation between its attempts and a write that failed at the socket included. A caller that matched `ErrMoveUnconfirmed` to detect its own cancellation matches `errors.Is(err, context.Canceled)` (or the deadline) now, which is what `errors.Is` on a canceled call should have given |
   | `Close` in the same windows returned `ErrClosed` joined with `ErrMoveUnconfirmed` ("the switch may have taken the change"), which was false for the same reason (#243) | It returns `ErrClosed` alone |
