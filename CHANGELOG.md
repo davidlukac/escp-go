@@ -5,6 +5,10 @@ version; a breaking change is called out as such. The history before 0.1.0 is th
 `internal/escp` of [terraform-provider-tplinkeasysmart](https://github.com/davidlukac/terraform-provider-tplinkeasysmart),
 whose commits this repository keeps.
 
+## 0.10.2
+
+- Management writes canceled before they were sent are no longer settled; Locate and Discover send nothing for an ended context; checks and tooling
+
 ## 0.10.1
 
 - **Behavior changes** (no API change: `make apidiff` shows none; no migration table is needed, nothing a program compiles against breaks). The two fixes below change what a caller can observe in a rare case, and the fake switch changes in two ways a test can notice:
