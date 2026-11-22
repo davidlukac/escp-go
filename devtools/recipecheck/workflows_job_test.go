@@ -88,7 +88,13 @@ func TestEndsJob(t *testing.T) {
 		{name: "two spaces and a tab", line: "  \t", want: false},
 		{name: "a tab", line: "\t", want: false},
 		{name: "two spaces and a carriage return", line: "  \r", want: false},
+		{name: "two spaces and a form feed", line: "  \f", want: false},
+		{name: "two spaces and a vertical tab", line: "  \v", want: false},
+		{name: "two spaces and a no-break space", line: "   ", want: false},
 		{name: "a comment", line: "  # note", want: false},
+		{name: "a deeper line that has a key", line: "   unit:", want: false},
+		// Not a comment for this check (the file would not be valid YAML, and the other checks refuse it).
+		{name: "two spaces, a tab and a comment", line: "  \t# note", want: true},
 		{name: "a job-level key", line: "    if: false", want: false},
 		{name: "a one-space key", line: " unit:", want: false},
 		{name: "a key of the workflow", line: "jobs:", want: false},
