@@ -4,7 +4,8 @@
 # reproduce both jobs locally.
 #
 #   * On a pull request: only the lines the PR changes (a minute or two). Informational: it shows the
-#     mutants that survived in the job summary; an equivalent mutant is not a reason to bend a test.
+#     mutants that survived in the job summary; an equivalent mutant is not a reason to bend a test,
+#     but it is called equivalent only after an input that tells the two apart has been tried (CONTRIBUTING.md).
 #   * Weekly and on request: the whole module (about a quarter of an hour). It fails below the efficacy
 #     threshold, so a slow slide in test quality is noticed. The efficacy counts a timed-out mutant as
 #     killed (the tests did not finish, which is a kill); `make mutation` checks it with
