@@ -16,13 +16,12 @@ const zizmorJobKey = "  zizmor:"
 // cannot be skipped there). The check compares these lines; a step with another command, another or an added
 // `env:` variable, an `if:` or a `continue-on-error:` is not these lines.
 //
-// What the check is: a tripwire against an accidental or partial edit of the gate. It looks at the lines of these two
-// steps, at the keys of jobLinesThatWeakenIt at the level of the job, and (in check.go) at the text of the recipes
-// of the Makefile. It does not establish what else decides whether and where these steps run: settings of the
-// whole workflow, settings of the job such as its defaults, its working directory, its dependencies on other jobs,
-// a container or a matrix, a variable of make, a rule that replaces a recipe. The whole workflow files and the
-// Makefile are read at review, and a required status check is what makes a red job block; both are the
-// maintainer's.
+// What the check is: a tripwire against an accidental or partial edit of the gate. It looks at the lines of
+// these two steps, at the keys of jobLinesThatWeakenIt at the level of the job, and (in check.go) at the text
+// of some recipes of the Makefile and the lines `make -n` prints for them. It does not examine the settings of
+// the workflow, of the job and of make that decide whether and where the steps run. The whole workflow files
+// and the Makefile are read at review, and a required status check is what makes a red job block; both are
+// the maintainer's.
 var zizmorSteps = []string{
 	"      - name: Audit the workflows",
 	"        run: make zizmor",
@@ -38,10 +37,11 @@ var zizmorSteps = []string{
 // an `env:` for the whole job, a `continue-on-error:` (a red job that does not block), an `if:`.
 var jobLinesThatWeakenIt = []string{"    env:", "    continue-on-error:", "    if:"}
 
-// workflowProblems compares the lines of what the CI jobs run, within the limits given at zizmorSteps: the zizmor job of a workflow must hold the steps of zizmorSteps
-// exactly once, in a row, and must not carry a line of jobLinesThatWeakenIt at its own level. The text of the
-// workflow is read as lines, since the check must not trust a parser that the same file could confuse; the job
-// is the lines from its key to the next key of the same level.
+// workflowProblems compares the lines of what the CI jobs run, within the limits given at zizmorSteps. The
+// zizmor job of a workflow must hold the steps of zizmorSteps exactly once, in a row, and must not carry a line
+// of jobLinesThatWeakenIt at its own level. The text of the workflow is read as lines, since the check must
+// not trust a parser that the same file could confuse; the job is the lines from its key to the next key of
+// the same level (see endsJob).
 func workflowProblems(name, text string) []string {
 	lines := strings.Split(text, "\n")
 	start := slices.Index(lines, zizmorJobKey)
@@ -49,11 +49,8 @@ func workflowProblems(name, text string) []string {
 		return []string{fmt.Sprintf("%s has no zizmor job (a line %q)", name, zizmorJobKey)}
 	}
 	job := lines[start+1:]
-	for i, line := range job {
-		if strings.HasPrefix(line, "  ") && !strings.HasPrefix(line, "   ") && !strings.HasPrefix(line, "  #") {
-			job = job[:i]
-			break
-		}
+	if end := slices.IndexFunc(job, endsJob); end >= 0 {
+		job = job[:end]
 	}
 	var problems []string
 	if found := countRun(job, zizmorSteps); found != 1 {
@@ -67,6 +64,14 @@ func workflowProblems(name, text string) []string {
 		}
 	}
 	return problems
+}
+
+// endsJob is whether line is the key of the next job: it has exactly two leading spaces, is not a comment and
+// is not blank. A line of white space only (of any length), an empty line and a comment line belong to the job
+// they are in, whatever the indentation, so that none of them hides the keys that follow it.
+func endsJob(line string) bool {
+	return strings.HasPrefix(line, "  ") && !strings.HasPrefix(line, "   ") && !strings.HasPrefix(line, "  #") &&
+		strings.TrimSpace(line) != ""
 }
 
 // countRun is how many times the lines of want are in lines, in a row and each whole, and not followed by a line
