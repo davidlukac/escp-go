@@ -17,6 +17,10 @@
 // is this program, run under the name zizmor, and records its arguments and its environment. They need no
 // network and no zizmor.
 //
+// The scratch repositories are made with git run without any GIT_ variable of this process and with -C: a git hook
+// (make lint runs these probes from the pre-commit hook) exports GIT_DIR for the repository it runs in, and
+// `git init` with it set would change that repository and not the scratch one.
+//
 // The probes run a POSIX shell script over symbolic links, so the tests of this package are not built for
 // Windows.
 //
@@ -59,6 +63,9 @@ const (
 	gitCommand = "git"
 	zizmorName = "zizmor"
 )
+
+// gitVariablePrefix starts the name of every variable that tells git which repository, index or work tree to use.
+const gitVariablePrefix = "GIT_"
 
 // stubCount is the number of findings the script is told to expect in the stub runs, which answer none.
 const stubCount = "0"
@@ -184,7 +191,7 @@ func (h *harness) fresh(ctx context.Context) (tree, error) {
 	if err := copyDir(filepath.Join(h.root, ".github"), filepath.Join(dir, ".github")); err != nil {
 		return tree{}, err
 	}
-	out, status, err := h.env.Runner(ctx, dir, nil, gitCommand, "init", "-q")
+	out, status, err := h.env.Runner(ctx, "", h.gitEnv(), gitCommand, "-C", dir, "init", "-q")
 	if err != nil {
 		return tree{}, fmt.Errorf("git init in the scratch tree: %w", err)
 	}
@@ -192,6 +199,25 @@ func (h *harness) fresh(ctx context.Context) (tree, error) {
 		return tree{}, fmt.Errorf("git init in the scratch tree: exit %d: %w", status, gitError(out))
 	}
 	return tree{dir: dir}, nil
+}
+
+// gitEnv is the environment of the git commands of the probes: this process's, without any GIT_ variable. A git
+// hook exports GIT_DIR (and GIT_INDEX_FILE, GIT_WORK_TREE...) for the repository it runs in, and `git init`
+// with GIT_DIR set does not make the directory it is run in a repository: it re-initializes the repository
+// that GIT_DIR names and records it as bare, which for a commit made in a linked worktree changes the
+// configuration shared with the main clone. make lint runs these probes from the pre-commit hook.
+func (h *harness) gitEnv() []string { return withoutGitVariables(h.env.Environ()) }
+
+// withoutGitVariables is env without the entries whose name starts with GIT_ (the result is never nil, so a
+// runner does not take it for "the environment of this process").
+func withoutGitVariables(env []string) []string {
+	kept := make([]string, 0, len(env))
+	for _, entry := range env {
+		if name, _, _ := strings.Cut(entry, "="); !strings.HasPrefix(name, gitVariablePrefix) {
+			kept = append(kept, entry)
+		}
+	}
+	return kept
 }
 
 // gitError is the output of a git that failed, as an error.
