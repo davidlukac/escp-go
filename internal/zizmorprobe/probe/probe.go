@@ -208,12 +208,12 @@ func (h *harness) fresh(ctx context.Context) (tree, error) {
 // configuration shared with the main clone. make lint runs these probes from the pre-commit hook.
 func (h *harness) gitEnv() []string { return withoutGitVariables(h.env.Environ()) }
 
-// withoutGitVariables is env without the entries whose name starts with GIT_ (the result is never nil, so a
+// withoutGitVariables is env without the entries that start with GIT_ (a name never contains =) (the result is never nil, so a
 // runner does not take it for "the environment of this process").
 func withoutGitVariables(env []string) []string {
 	kept := make([]string, 0, len(env))
 	for _, entry := range env {
-		if name, _, _ := strings.Cut(entry, "="); !strings.HasPrefix(name, gitVariablePrefix) {
+		if !strings.HasPrefix(entry, gitVariablePrefix) {
 			kept = append(kept, entry)
 		}
 	}

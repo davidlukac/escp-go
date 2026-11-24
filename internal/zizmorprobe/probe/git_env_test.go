@@ -68,6 +68,9 @@ func TestFreshRunsGitWithoutTheGitEnvironment(t *testing.T) {
 			if c.name != gitCommand || !slices.Equal(c.args, []string{"-C", tr.dir, "init", "-q"}) {
 				t.Errorf("ran %s %q, want git -C %s init -q", c.name, c.args, tr.dir)
 			}
+			if c.dir != "" {
+				t.Errorf("the runner was given the directory %q as well as -C: a relative one would be applied twice", c.dir)
+			}
 			if c.env == nil || !slices.Equal(c.env, tc.want) {
 				t.Errorf("environment %q (nil: %t), want %q", c.env, c.env == nil, tc.want)
 			}
