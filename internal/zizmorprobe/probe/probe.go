@@ -64,7 +64,8 @@ const (
 	zizmorName = "zizmor"
 )
 
-// gitVariablePrefix starts the name of every variable that tells git which repository, index or work tree to use.
+// gitVariablePrefix starts the name of every variable that configures git: which repository, index or work tree
+// it uses, and also its configuration and identity. A git hook exports some of them, so every one is dropped.
 const gitVariablePrefix = "GIT_"
 
 // stubCount is the number of findings the script is told to expect in the stub runs, which answer none.
@@ -208,8 +209,8 @@ func (h *harness) fresh(ctx context.Context) (tree, error) {
 // configuration shared with the main clone. make lint runs these probes from the pre-commit hook.
 func (h *harness) gitEnv() []string { return withoutGitVariables(h.env.Environ()) }
 
-// withoutGitVariables is env without the entries that start with GIT_ (a name never contains =) (the result is never nil, so a
-// runner does not take it for "the environment of this process").
+// withoutGitVariables is env without the entries whose name starts with GIT_ (a name never contains an equals sign).
+// The result is never nil, so a runner does not take it for "the environment of this process".
 func withoutGitVariables(env []string) []string {
 	kept := make([]string, 0, len(env))
 	for _, entry := range env {
