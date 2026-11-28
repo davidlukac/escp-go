@@ -88,7 +88,7 @@ jobs:
       # The audit is run by a Go program of this repository (internal/zizmorrun, started by scripts/zizmor.sh), built
       # with the go tool from the go.mod of the checked-out tree. That tree is the one audited, so these files, go.mod,
       # go.work, vendor/ and this step are part of what the gate runs on: a change to any of them changes the gate.
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version-file: go.mod
           cache: false
@@ -221,7 +221,7 @@ jobs:
           persist-credentials: false
       # The same action ./.github/actions/setup wraps, but reading the provider's go.mod: the
       # provider may need a newer Go than this module's floor.
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version-file: provider/go.mod
           cache: true
